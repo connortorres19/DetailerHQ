@@ -1,7 +1,17 @@
 # DetailerHQ — Design System
 
-> **Status:** Draft for review · **Last updated:** 2026-10-29
+> **Status:** Draft for review · **Revision 2** · **Last updated:** 2026-10-29
 > Companion to [`PRODUCT_PLAN.md`](./PRODUCT_PLAN.md). The product name is a placeholder; nothing in this system depends on it.
+
+### What changed in revision 2
+
+- Added §1.1 **One system, three contexts** — how the same tokens serve the marketing site, the public booking/status pages and the dashboard.
+- Added a **claims and honesty policy** (§2.4): no fake testimonials, invented statistics or unsupported performance claims; stage-appropriate pilot vs. trial wording.
+- Copy updated for **no automated messaging** ("Open in Messages", never "Send SMS") and **recorded** (not collected) amounts.
+- Landing page and pricing hierarchy now adapt to the **pilot** stage and the later **7-day trial** stage.
+- Explicit **tablet** layout (768–1023 px).
+- New component specs: **customer status page**, **propose a different time**, **conflict and duplicate warnings**, **notification center**, **message templates and "Did you send it?"**, **communication log**, **account banners and restricted (read-only) state**, **analytics money labels**.
+- Status badge set updated for the new request and lead statuses.
 
 ---
 
@@ -38,6 +48,23 @@ The visual reference point is **well-made automotive and instrument design**: a 
 6. **Consistency over novelty.** One way to do each thing. A new pattern needs a reason that an existing one can't serve.
 7. **Density where it helps.** Desktop tables and calendars may be compact; mobile prioritises one clear task per screen.
 
+### 1.1 One system, three contexts
+
+The marketing site, the public pages each detailer shares with customers, and the dashboard all use **the same tokens, typefaces, grid and components**. They differ in tone and density, not in identity.
+
+| | Marketing site | Public booking & status pages | Dashboard |
+|---|---|---|---|
+| **Job** | Explain the product honestly and earn a conversation | Help a vehicle owner send a request and understand its status | Help the owner run the day |
+| **Brand presence** | Ours (provisional name from config) | **The detailer's**; ours only as a small "Powered by" link | Minimal; the business's name in the sidebar |
+| **Color** | Graphite dark sections + light sections; brass details allowed | Light only; graphite + steel; no brass | Light only; graphite + steel + status colors; no brass |
+| **Imagery** | Licensed, real automotive/detailing photography; real product screenshots | None (the detailer's own logo later) | None |
+| **Type scale** | Up to `display` (56px max) | Up to `h2` | Up to `h2`; dense `body` 15px on desktop |
+| **Density** | Generous (80–128px section padding) | Calm, single column, 640px max | Compact tables and calendars; one task per screen on phones |
+| **Motion** | One subtle image fade at most | State changes only | State changes only |
+| **Primary action** | Apply for the pilot / Start trial (stage-dependent) | Send request · Accept this time | Approve request · Mark complete, etc. |
+
+If a pattern exists in one context, reuse it in the others before inventing a variant (e.g., the same badge, button and form field everywhere).
+
 ---
 
 ## 2. Voice and interface content
@@ -51,9 +78,13 @@ Direct, practical, calm — like an experienced shop manager. Short sentences. T
 | "Approve request" | "Submit" / "Let's go!" |
 | "3 requests waiting" | "You've got new opportunities! 🎉" |
 | "Recorded revenue" | "Revenue collected" (we don't collect) |
-| "Text customer" (opens your phone's messages) | "Send SMS" |
+| "Open in Messages" / "Open in Mail" / "Copy message" | "Send SMS" / "Email customer" / "Message sent" |
+| "Request sent — not confirmed yet" | "You're booked!" (for a request) |
+| "Recorded amount" | "Payment received" / "Charged" |
+| "Pilot access until Dec 15" (pilot stage) | "Free trial" (before trials exist) |
 | "This slot was just taken. Choose another time." | "Oops! Something went wrong." |
 | "Not enough data yet — 2 completed jobs this month." | A chart with two points and a "+100%" badge |
+| "3 leads booked after a logged follow-up" | "Follow-ups generated 3 bookings" |
 
 ### 2.2 Content rules
 
@@ -77,6 +108,21 @@ Direct, practical, calm — like an experienced shop manager. Short sentences. T
 | Phones | (512) 555-0142 (always `555-01xx` fictional range) |
 
 Marketing screenshots must be taken from the real product with this seeded data, not mocked in a drawing tool.
+
+The prices above are **illustrative values for one fictional business** in mocks and screenshots. They are never used as defaults in the product, never shown as typical market prices, and every screenshot showing prices belongs visibly to a named fictional business.
+
+### 2.4 Claims and honesty policy
+
+Applies to the marketing site, in-app copy, onboarding, emails we write ourselves and sales conversations.
+
+- **No fake testimonials**, stock-photo "customers", invented quotes, or composite reviews. Real testimonials only with the person's written permission, their real name and business, and unedited meaning.
+- **No invented statistics**: no user counts, "bookings processed", ratings, time-saved or revenue-increase figures unless measured, documented and current. No industry statistics without a cited source.
+- **No unsupported performance claims** ("Double your bookings", "Never miss a lead", "Save 10 hours a week").
+- **No customer logos** without permission.
+- **No features described before they ship** — including automated texts/emails, payments, deposits, integrations and AI. "Coming soon" lists are avoided; if needed, use "Not available yet" in the included/not-included section.
+- **Stage-correct wording:** during the pilot, use "pilot program" and "pilot access"; "7-day free trial" and "no credit card required" appear only after trial enforcement and billing ship (PRODUCT_PLAN §3.2).
+- **Trial terms are stated plainly** wherever the trial is offered: length, exact end time, what happens at the end, and that data isn't deleted when it ends.
+- A claims checklist is reviewed before each marketing publish (§16).
 
 ---
 
@@ -121,11 +167,11 @@ Muted, slightly desaturated — readable, not alarming. Every status is shown wi
 
 | Status meaning | Text / icon | Background | Border | Used for |
 |---|---|---|---|---|
-| **Attention** (amber) | `#8A5A00` | `#FBF3E2` | `#EBD6A8` | Pending request, quote expiring, conflict warning |
-| **Scheduled / info** (steel) | `#2F5D8A` | `#EEF3F8` | `#C9D8E7` | Scheduled appointment, sent quote |
-| **Positive** (green) | `#2E6B3F` | `#EAF3EC` | `#C3DDC9` | Completed, accepted, won, approved |
-| **Critical** (red) | `#A6352B` | `#FBECEA` | `#EBC3BE` | Errors, overdue, no-show, destructive actions |
-| **Neutral** (graphite) | `#52524E` | `#F0F0EE` | `#DADAD6` | Draft, cancelled, declined, expired, archived |
+| **Attention** (amber) | `#8A5A00` | `#FBF3E2` | `#EBD6A8` | Pending request, follow-up due, possible duplicate, conflict warning, trial ending |
+| **Scheduled / info** (steel) | `#2F5D8A` | `#EEF3F8` | `#C9D8E7` | Scheduled appointment, time proposed (waiting on customer), quote sent, contacted |
+| **Positive** (green) | `#2E6B3F` | `#EAF3EC` | `#C3DDC9` | Approved, completed, accepted, booked |
+| **Critical** (red) | `#A6352B` | `#FBECEA` | `#EBC3BE` | Errors, overdue, no-show, destructive actions, restricted account |
+| **Neutral** (graphite) | `#52524E` | `#F0F0EE` | `#DADAD6` | New, draft, cancelled, declined, withdrawn, expired, duplicate, lost, archived |
 | **In progress** (graphite strong) | `#171716` | `#FFFFFF` | `#171716` | In-progress appointment (outlined, distinct without adding a hue) |
 
 All text/background pairs above meet ≥ 4.5:1.
@@ -341,7 +387,7 @@ The marketing site may be more atmospheric than the product — dark graphite se
 ### 9.1 Global header
 
 - Left: wordmark (set in Plex Sans 600, letter-spaced −0.01em; placeholder until the name is cleared). Optional small brass mark.
-- Center/right: Product · Pricing · Sign in · primary button "Request early access" (or "Start free trial" once self-serve is live).
+- Center/right: Product · Pricing (labelled "Pilot program" during the pilot) · Sign in · primary button whose label depends on the stage: **"Apply for the pilot"** during the pilot; **"Start 7-day free trial"** only after trial enforcement and billing ship.
 - Height 64px, solid background (dark on the hero, light below). No transparency blur.
 - Mobile: wordmark + "Sign in" + menu button opening a full-screen sheet.
 
@@ -351,15 +397,15 @@ The marketing site may be more atmospheric than the product — dark graphite se
    - Overline (brass, optional): "Software for independent detailers"
    - Headline (`display`, max two lines, left-aligned): *"Run your detailing business from one tidy place."*
    - Supporting line (`body-lg`, max 2 lines): "Take booking requests, approve jobs, keep every customer and vehicle on record, and follow up on quotes — from your phone."
-   - Primary button + secondary text link ("See the booking page →").
-   - No floating badges, no "Trusted by 10,000+", no star ratings until real.
-2. **The booking page, shown for real** — light section. A real phone screenshot of a business booking page next to a short explanation of the request → approve flow, as three numbered steps in plain text (not icon tiles).
+   - Primary button (stage-dependent label, see §9.1) + secondary text link ("See the booking page →").
+   - No floating badges, no "Trusted by 10,000+", no star ratings, no performance claims (§2.4).
+2. **The booking page, shown for real** — light section. A real phone screenshot of a business booking page and its status page, next to a short explanation of the flow as numbered steps in plain text (not icon tiles): *Customer sends a request → you approve, decline or suggest another time → they see the status on their link.*
 3. **The owner's day** — a desktop screenshot of the Today screen and calendar, with 3–4 short annotations connected by thin hairlines pointing to real UI elements ("Requests waiting for you", "Next job and gate code").
 4. **Customers and vehicles** — short copy + screenshot of a customer profile with vehicle history.
-5. **Quotes and follow-ups** — screenshot of a quote and its follow-up task.
-6. **Honest numbers** — analytics screenshot with the line: "Every number comes from jobs you've actually recorded."
-7. **What's included and what isn't (yet)** — a plain two-column list. *Included:* booking page, approvals, calendar, customers & vehicles, quotes, follow-up reminders, analytics, CSV export. *Not yet:* automatic texts or emails to customers, online payments and deposits. This builds trust.
-8. **Pricing teaser** — one plan, one price, trial terms, link to pricing page.
+5. **Leads, quotes and follow-ups** — screenshot of a lead with its quote, communication log and follow-up task; one line explaining templates open in the owner's own Messages or Mail app.
+6. **Honest numbers** — analytics screenshot with the line: "Every number comes from jobs you've actually recorded." Shows quoted value, booked job value and recorded revenue as separate, labelled figures.
+7. **What's included and what isn't (yet)** — a plain two-column list. *Included:* booking page and request status links, approvals and suggested times, calendar, customers & vehicles, leads & quotes, follow-up reminders and message templates, analytics, CSV export. *Not available yet:* automatic texts or emails, online payments and deposits, social media integrations, CSV import. This builds trust.
+8. **Pricing teaser** — **pilot stage:** "Now accepting a small number of pilot businesses" with a link to pilot details; **paid-launch stage:** one plan, price, and the trial stated in full ("7-day free trial. No credit card required. When it ends, subscribe to keep using DetailerHQ — your data isn't deleted.").
 9. **Founder note** — short, signed, real person (photo optional), why this is being built and how to reach them. Replaces fake testimonials until real ones exist.
 10. **FAQ** — 5–7 practical questions (data ownership, export, texting, mobile, cancellation).
 11. **Footer** — dark; product links, legal, contact email, © year. Small and tidy.
@@ -381,7 +427,15 @@ This is the detailer's page, not ours. Our branding is a single small "Powered b
 - Service menu: grouped by category; each row shows name, short description, duration, price (`From $260` / `$65` / `Quote required`). Rows, not cards. Primary button at the bottom (sticky on mobile): "Request an appointment"; secondary: "Request a quote".
 - Request flow: one step per screen on mobile with a step indicator ("Step 2 of 6 · Vehicle"), back link, sticky bottom action bar showing the running estimate ("Full detail · Large SUV · from $310 · 4h 30m"). On desktop, the summary sits in a right rail.
 - Time selection: date strip (next 14 days, horizontally scrollable) + list of available start times as 48px buttons. Unavailable dates are visibly disabled with an accessible label, not hidden.
-- Confirmation: plain, reassuring, explicit that it is a request: "Request sent to Northside Detail Co. They'll contact you to confirm."
+- Confirmation: plain, reassuring, explicit that it is a request: "Request sent to Northside Detail Co. — not confirmed yet." followed by what happens next and the status link with **Copy link** (see §13.11).
+- **Timezone:** a quiet line above the time list — "Times are in Central Time (CT)". If the visitor's device is in another zone, an info banner says so.
+- **Inquiry flow** (`/b/[slug]/inquiry`) uses the same steps minus time selection, with a larger "What do you need?" textarea. Its confirmation says the business will reply directly.
+
+### 9.5 Pricing page
+
+- **Pilot stage:** title "Pilot program". What pilots get, what we ask in return (feedback), pilot price (or "no charge") stated plainly, pilot length, what happens at the end, data ownership and export. Application form or link to `/contact`. Never the words "free trial".
+- **Paid-launch stage:** one plan card (border only, no shadow), price, billing interval, the full trial statement (length, no card, what happens at the end, data retention), included features list identical to the home page's "included" list, FAQ.
+- No comparison tables against competitors, no "Most popular" ribbons, no strikethrough prices.
 
 ---
 
@@ -391,9 +445,9 @@ This is the detailer's page, not ours. Our branding is a single small "Powered b
 
 ```
 ┌──────────────┬─────────────────────────────────────────────────────────┐
-│ Business ▾   │  Page title                     [Search ⌘K]  [+ New ▾]  │
+│ Business ▾   │  Page title          [Search ⌘K]  [Bell 2]  [+ New ▾]   │
 │              ├─────────────────────────────────────────────────────────┤
-│ Today        │                                                         │
+│ Today        │  [Account banner — pilot/trial/restricted, if any]      │
 │ Requests   3 │  Page content                                           │
 │ Calendar     │  (max 1280px; forms 720px)                              │
 │ Customers    │                                                         │
@@ -413,7 +467,8 @@ This is the detailer's page, not ours. Our branding is a single small "Powered b
 ```
 
 - **Sidebar** 240px, background `graphite-50`, right border `graphite-200`. Nav items 36px tall, `body` size, icon 20px + label. Active item: `graphite-0` background, `graphite-900` text, 2px `steel-600` left indicator. Counts are plain numerals (`graphite-600`), with amber text only for pending requests.
-- **Top bar** 56px: page title (h2) left; global search (customers, vehicles by plate, quotes by number) and "New" menu (Appointment, Customer, Lead, Quote, Task) right. Sticky with `shadow-sm` once scrolled.
+- **Top bar** 56px: page title (h2) left; global search (customers, vehicles by plate, quotes by number), notifications button (bell icon with unread count, opens the notification panel, §13.13) and "New" menu (Appointment, Customer, Lead, Quote, Task, Log communication) right. Sticky with `shadow-sm` once scrolled.
+- **Account banner** (§13.16) sits directly under the top bar on every dashboard page when relevant (pilot ending, trial, restricted).
 - **Page header** within content: title, one-line description if needed, primary page action right-aligned, then filters/tabs below.
 - Sidebar collapses to a 64px icon rail between 1024–1279px if needed (tooltips on icons).
 
@@ -425,11 +480,12 @@ Daily work first (Today, Requests, Calendar), records next (Customers, Leads, Qu
 
 Ordered by urgency, not by data type:
 
-1. **Requests waiting** — count + oldest 3 with age ("Waiting 26h"), link to inbox. Hidden when zero.
-2. **Today's schedule** — chronological list: time range, customer, vehicle, services, address; next job expanded with tap-to-call/navigate.
-3. **Tasks due** — overdue first (red text "Overdue · 2 days"), then today.
-4. **This week at a glance** — small, factual: "6 jobs scheduled · $1,480 estimated". No charts here.
-5. **Setup checklist** — until complete, then gone.
+1. **Needs your action** — pending requests (oldest first, with age: "Waiting 26h"), customers who responded to a proposed time, possible duplicates. Hidden when empty.
+2. **Recent changes** — the latest unread notifications that change today's plan (customer cancelled, proposal accepted), max 3, link to all.
+3. **Today's schedule** — chronological list: time range, customer, vehicle, services, address; next job expanded with tap-to-call/navigate.
+4. **Tasks due** — overdue first (red text "Overdue · 2 days"), then today; leads in Follow-up due.
+5. **This week at a glance** — small, factual: "6 jobs scheduled · $1,480 booked job value". No charts here.
+6. **Setup checklist** — until complete, then gone.
 
 No KPI tile row of vanity metrics on the home screen.
 
@@ -447,13 +503,23 @@ Header: name/number, status badge, primary action(s) right ("Approve", "Mark com
 |---|---|---|
 | `xs` | 0 | Design baseline: **375px** (test down to 320px) |
 | `sm` | 640px | Large phones / small tablets |
-| `md` | 768px | Tablets portrait |
+| `md` | 768px | Tablets: navigation rail replaces bottom tab bar (§11.2) |
 | `lg` | 1024px | Sidebar appears |
 | `xl` | 1280px | Comfortable desktop |
 
 Design mobile-first; every screen is designed at 375px *and* 1280px before build.
 
-### 11.2 Mobile dashboard (< 1024px)
+### 11.2 Tablet dashboard (768–1023px)
+
+- **Navigation rail** 80px wide on the left: 20px icon above a 12px label for each primary destination (Today, Requests, Calendar, Customers, Leads, Quotes, Tasks), "More" at the bottom for setup and settings. No bottom tab bar.
+- Top bar as on desktop, with search collapsed to an icon.
+- **Landscape (≥ 1000px wide in practice):** list–detail split for Requests, Leads and Customers (list 360px, detail fills the rest), so the owner can work through the inbox without navigating back and forth.
+- **Portrait:** single pane, lists as on mobile; tables with ≤ 5 columns may remain tables.
+- Calendar: Week view available; Day view default.
+- Modals stay centred dialogs (not sheets) at 560px max width.
+- Touch target rules (44px) apply as on phones; no hover-only affordances.
+
+### 11.3 Mobile dashboard (< 768px)
 
 - **Bottom tab bar** (64px + safe-area inset): Today · Requests (badge) · Calendar · Customers · More. "More" opens a sheet with Leads, Quotes, Tasks, Services, Availability, Booking page, Analytics, Settings.
 - **Top bar** 56px: page title, search icon, "+" (New) icon button.
@@ -467,9 +533,13 @@ Design mobile-first; every screen is designed at 375px *and* 1280px before build
 - No hover-only affordances; no horizontal page scrolling (horizontal scrolling allowed only inside the date strip and wide tables explicitly marked scrollable).
 - Respect safe-area insets and the on-screen keyboard (sticky bars move above it or hide while typing).
 
-### 11.3 Installable web app
+### 11.4 Public pages on all devices
 
-Provide a web app manifest and icons so owners can "Add to Home Screen". Standalone display, `graphite-900` theme color. No offline promises in the MVP.
+The booking, inquiry, status and quote pages are single-column at every width (640px max). On desktop the request summary moves to a right rail beside the form (form 560px + rail 280px within a 900px container); everything else stays the same.
+
+### 11.5 Installable web app
+
+Provide a web app manifest and icons so owners can "Add to Home Screen". Standalone display, `graphite-900` theme color. No offline or push-notification promises in the MVP.
 
 ---
 
@@ -563,7 +633,10 @@ Rules:
 - **Outside availability:** subtle diagonal hatch of `graphite-50` on `graphite-25` to show closed hours; time off shown as a labelled neutral block ("Time off · Holiday").
 - **Appointment blocks:** white background, 1px border in status color, 3px left bar in status color, radius 4px; content: time range (mono or tabular), customer name (500), vehicle, first service. Truncate gracefully; full details on click.
   - Scheduled: steel; In progress: graphite-900 outline; Completed: green bar, text slightly muted; Cancelled/no-show: hidden by default (toggle "Show cancelled"), shown struck-through when visible.
-- **Pending requests** (toggle, on by default): dashed amber outline, transparent fill, label "Request" — clearly tentative.
+- **Tentative items** (toggle, on by default), always visually distinct from confirmed appointments and never counted as jobs:
+  - *Pending request:* dashed amber outline, transparent fill, label "Request". If the business holds pending times, add a small "Held" label.
+  - *Time proposed (waiting on customer):* dashed steel outline, label "Proposed · held until 3:00 PM".
+- Multiple requests for the same time stack side by side with a "2 requests" label.
 - **Buffers** shown as a faint hatched extension after jobs so the owner understands why slots are blocked.
 - **Navigation:** "Today" button, previous/next arrows, date label ("Mon, Nov 3 – Sun, Nov 9, 2026"), view switcher as a segmented control.
 - **Creating:** click an empty slot (desktop) or "+" (mobile) opens "New appointment" prefilled with that time. **No drag-and-drop rescheduling in MVP** — rescheduling is an explicit action in the appointment detail to avoid accidental moves.
@@ -592,6 +665,10 @@ Each list/page has a designed empty state: **plain title, one sentence of contex
 | Tasks | You're all caught up | Follow-up reminders for quotes and past customers will appear here. | Add task |
 | Analytics | Not enough data yet | Analytics are based on jobs you've recorded. Complete a few appointments to see trends. | View calendar |
 | Search (no results) | No matches for "tacoma" | Try a name, phone number, email or plate. | Clear search |
+| Communication log | No conversations logged | Log calls, texts and messages so you remember where things stand. | Log communication |
+| Templates | — (defaults always exist) | — | — |
+| Notifications | No notifications | New requests, customer responses and cancellations will appear here. | — |
+| Leads in Follow-up due | No follow-ups due | Leads appear here when their follow-up date passes without a reply. | View all leads |
 
 Filtered empty states say so: "No completed appointments in October" + "Clear filters".
 
@@ -605,15 +682,28 @@ Filtered empty states say so: "No completed appointments in October" + "Clear fi
 ### 13.8 Badges and status
 
 - Height 22px, 4px radius, 8px horizontal padding, `body-sm` 500 weight, status text/background/border from §3.4, optional 6px dot or 12px icon.
-- Labels: Pending · Approved · Declined · Expired · Scheduled · In progress · Completed · Cancelled · No-show · Draft · Sent · Accepted · New · Contacted · Quoted · Won · Lost · Overdue.
+- Labels and tones:
+  - **Booking requests:** Pending (attention) · Time proposed (info) · Approved (positive) · Declined · Proposal declined · Withdrawn · Expired · Duplicate (all neutral)
+  - **Appointments:** Scheduled (info) · In progress (outlined graphite) · Completed (positive) · Cancelled (neutral) · No-show (critical)
+  - **Leads:** New (neutral) · Contacted (info) · Quote sent (info) · Follow-up due (attention) · Booked (positive) · Lost (neutral)
+  - **Quotes:** Draft (neutral) · Sent (info) · Accepted (positive) · Declined · Expired (neutral)
+  - **Tasks:** Overdue (critical) · Due today (attention)
+  - **Account:** Pilot (neutral) · Trial (info) · Trial ends soon (attention) · Restricted (critical)
+- Status names in badges match the product plan exactly; never invent synonyms per screen.
 - One status badge per row. Don't use badges as decoration or for counts.
 
 ### 13.9 Analytics components
 
 - **Metric:** label (`label`, `graphite-600`), value (`metric`), comparison line in `body-sm` ("vs. $3,120 in September" — plain text; arrow icon allowed; green/red only for direction where meaning is unambiguous). Info icon opens the metric's definition.
 - Metrics sit in a simple row separated by vertical dividers, **not** in individual shadowed cards.
+- **Money values are always labelled with their exact term** and never combined into one "revenue" figure:
+  - "Quoted value" — helper: "Quotes you sent"
+  - "Booked job value" — helper: "Estimated value of scheduled and completed jobs"
+  - "Recorded revenue" — helper: "Amounts you entered when completing jobs"
+- **Sequence, not causation:** metrics that relate follow-ups to bookings use "after" wording and carry the fixed note: "Shows timing only — it doesn't mean the follow-up caused the booking."
+- **Insufficient data:** the metric slot shows "Not enough data yet" in `body-sm` with the count ("3 decided requests — percentages appear at 5"). Never a 0% or a dash that could be misread as a real result.
 - Bar charts preferred; line charts for time series ≥ 8 points; no donuts with center numbers; every chart has a title, axis labels, and an accessible text summary.
-- Small sample handling per PRODUCT_PLAN §9.12.
+- Small sample handling per PRODUCT_PLAN §11 (rates need at least 5 items).
 
 ### 13.10 Other components
 
@@ -623,7 +713,81 @@ Filtered empty states say so: "No completed appointments in October" + "Clear fi
 - **Avatar:** initials only (no generated avatars), `graphite-100` background, `graphite-700` text, circular, 28/32px.
 - **Timeline:** activity list with 12px dots on a 1px `graphite-200` line; timestamp `body-sm` `graphite-500`.
 - **Skeletons:** see §8.
-- **Notify panel ("Let the customer know"):** editable message text area, then buttons "Copy message", "Text", "Email", "Call" (secondary, with icons), and a checkbox "I've let the customer know". Helper text: "These open your phone's apps. DetailerHQ doesn't send messages."
+- **Notify panel ("Let the customer know"):** template picker, editable message text area (pre-filled, includes the status link), then buttons "Copy message", "Open in Messages", "Open in Mail", "Call" (secondary, with icons). Helper text: "These open your own apps. DetailerHQ doesn't send messages." After any of them is used, the "Did you send it?" prompt appears (§13.14).
+
+### 13.11 Customer status page (`/r/[token]`)
+
+The most important customer-facing screen: it replaces confirmation texts in the MVP.
+
+```
+┌──────────────────────────────────────────┐
+│ Northside Detail Co.                     │  business name (h3), phone · text links
+│ (512) 555-0142 · Call · Text             │
+├──────────────────────────────────────────┤
+│ [Pending]                                │  badge
+│ Request received — not confirmed yet     │  headline (h2)
+│ Northside Detail Co. will confirm,       │  next-step paragraph (body)
+│ decline, or suggest another time.        │
+│                                          │
+│ Requested   Sat, Nov 8 · 9:00 AM CT      │  definition list
+│ Service     Full detail                  │
+│ Vehicle     2021 Tesla Model Y · White   │
+│ Location    1234 Oak St, Austin          │
+│ Estimate    From $310 · about 4h 30m     │
+│                                          │
+│ [ Withdraw request ]                     │  secondary; primary only when a choice is needed
+│                                          │
+│ Save this page to check for updates.     │  body-sm + Copy link
+│ History                                  │  compact timeline (sent, proposed, confirmed…)
+└──────────────────────────────────────────┘
+```
+
+- One state per page, using the headline and next-step text from PRODUCT_PLAN §6.3 verbatim (centralised copy).
+- **Time proposed:** a highlighted block (info tone, 1px border, 6px radius) showing the proposed time, the owner's message, "Held until [time]", and two buttons: **Accept this time** (primary) and **Decline** (secondary). Declining asks for confirmation.
+- **Rescheduled:** new time prominent; previous time shown struck through in `graphite-500` with "Changed on Nov 5".
+- **Cancel before cutoff:** secondary button "Cancel appointment" → confirmation sheet stating the business's policy; after cutoff the button is replaced by the policy text and call/text links.
+- Dates always include the weekday, date, time and **timezone abbreviation**.
+- No DetailerHQ marketing on this page beyond the "Powered by" footer link.
+
+### 13.12 Propose a different time & conflict warnings
+
+- **Propose dialog** (sheet on mobile): date picker + available start times computed for the requested duration (same component as the public time picker), optional message to the customer (shown on the status page), and hold expiry (default from settings, editable). Primary: "Propose this time".
+- **Conflict warnings** appear inline above the action bar on request detail, new appointment, reschedule and propose screens:
+  - *Hard conflict* (critical tone): "Overlaps Marcus Bell's appointment (9:00–1:00 PM). Choose another time." — the confirm action is disabled and "Propose a different time" is offered.
+  - *Soft warnings* (attention tone), listed individually: "Inside the 30-minute buffer after Marcus Bell's job" · "Outside working hours" · "This would be the 4th job on Sat (limit 3)". Confirm button label changes to "Approve anyway" and requires a checkbox "I've checked these warnings".
+- **Possible duplicate** flag (attention tone) on request rows and detail: "Possible duplicate — same phone as request R-0041 (pending)". Links to the other request; action "Close as duplicate".
+
+### 13.13 Notification center
+
+- Bell icon button in the top bar with unread count (numeric, `body-sm`, graphite pill — not red unless a pending request is older than 24h).
+- Opens a popover (desktop, 380px) or full-screen sheet (mobile) listing notifications newest first: icon (16px), one-line title ("Jordan Reyes accepted Sun, Nov 9, 10:00 AM"), relative time, unread dot. Clicking marks read and opens the related record.
+- "Mark all as read" text button. Empty state: "No notifications."
+- Full page at `/app/notifications` with the same list and filters (Unread / All).
+- No sounds, no browser push prompts in the MVP.
+
+### 13.14 Message templates and "Did you send it?"
+
+- **Templates list** (`/app/settings/templates`): table/list of templates by purpose with a one-line preview; "Edit" opens a form page.
+- **Template editor:** name, purpose (select), body textarea (monospace off; `body` font) with an **Insert field** menu listing placeholders by human name ("Customer first name", "Status link"). Placeholders render in the editor as non-editable tokens with a `graphite-50` background and 4px radius (e.g., `Customer first name`), never raw `{curly_braces}` for the owner. A live preview below renders with sample fictional data and is labelled "Preview with sample details".
+- Character count shown (`body-sm`), with a note at > 300 characters: "Long texts may be split by some phones."
+- **Use in context:** the notify panel fills placeholders from the record; any missing value is shown as an amber highlighted token "Address missing" and the Copy/Open buttons are disabled until edited, with the reason stated.
+- **"Did you send it?" prompt:** after Copy / Open in Messages / Open in Mail, when the owner returns, an inline bar (not a modal) asks "Did you send it to Jordan?" with **Yes, log it** and **Not yet**. Yes creates an outbound communication entry; Not yet dismisses. Never auto-logged.
+
+### 13.15 Communication log
+
+- Appears as a section on customer and lead detail pages (and in the right rail timeline on appointments/requests).
+- Each entry: channel icon from Lucide (`phone`, `message-square`, `mail`, `message-circle` for social DMs, `user` for in person — no social-network brand logos) plus the channel name in text, direction ("You → Jordan" / "Jordan → You"), timestamp, summary text, optional "Template: Quote follow-up".
+- **Log communication** form (sheet/modal ≤ 4 fields): channel (segmented or select), direction (Outbound / Inbound), when (defaults to now), summary. Inbound entries on leads show the note "Marks this lead as responded".
+- Entries are editable/deletable by the owner with an "edited" marker.
+
+### 13.16 Account banners and restricted state
+
+- **Banner** under the top bar, full content width, 40px min height, status tone background + 1px border, text + one action:
+  - Pilot: neutral — "Pilot access until Dec 15, 2026." · "View pilot terms" (shown only in the final 14 days).
+  - Trial (paid-launch stage): info — "Trial ends Thu, Nov 6 at 3:42 PM CT." · "Choose a plan"; attention tone from 3 days before.
+  - Restricted: critical — "Your trial has ended. Your data is safe and read-only. Subscribe to keep taking requests." · "Subscribe" · secondary "Export data".
+- **Restricted (read-only) state:** create/edit/approve buttons are removed, and each page header shows one plain line instead: "Read-only — subscribe to make changes" (visible text, not a hover tooltip); forms render as read-only text, not disabled inputs; export, account settings and subscription remain fully interactive. The booking page shows the business's contact details with "Not accepting online requests right now."
+- Never use countdown timers, flashing, or urgency language ("Only 2 days left!!").
 
 ---
 
@@ -642,6 +806,8 @@ Generic AI-made and template sites share recognisable tells. We avoid them delib
 - **Emoji** as icons or bullet points; "🚀", "✨", "🎉".
 - **Inflated rounded corners** (16–32px) on everything, pill buttons, cards nested in cards.
 - **Fabricated social proof**: fake logos, stock-photo testimonials, "Join 10,000+ detailers", 4.9★ ratings, invented percentages ("Save 10 hours a week").
+- **Unsupported performance claims**: "Double your bookings", "Never miss a lead again", "Grow revenue 30%". See the claims policy (§2.4).
+- **Fake product UI**: dashboard mockups drawn in a design tool with impossible data, instead of real screenshots.
 - **Generic SaaS copy**: "Unlock", "Supercharge", "Seamless", "Elevate", "All-in-one platform", "Take your business to the next level", "Effortlessly".
 - **Dashboard templates**: KPI-card rows with sparkline + "↑ 12.5%" on fake data, donut charts for decoration, gradient area charts.
 - **Excessive motion**: scroll-reveal on every section, marquee logos, hover tilt, typing effects, counting numbers.
@@ -746,7 +912,8 @@ Components use semantic tokens; semantic tokens map to the palette. This allows 
 
 Use for every new screen or significant change.
 
-- [ ] Designed and checked at 375px and 1280px (and 320px for reflow).
+- [ ] Designed and checked at 375px, 768px and 1280px (and 320px for reflow).
+- [ ] Context rules followed (§1.1): no brass or imagery in the dashboard or public pages; detailer's brand leads on public pages.
 - [ ] Uses only tokens; no new colors, radii, shadows or font sizes.
 - [ ] One primary action; button labels are verb + object.
 - [ ] Realistic content; long names, long vehicle models and empty values tested.
@@ -754,6 +921,9 @@ Use for every new screen or significant change.
 - [ ] Status conveyed by text, not color alone.
 - [ ] Keyboard path and focus order verified; visible focus.
 - [ ] Touch targets ≥ 44px on mobile for primary actions.
-- [ ] Copy is honest about what the system does (no implied sending, charging or automation).
-- [ ] Numbers shown come from recorded data or are clearly labelled sample/estimate.
+- [ ] Copy is honest about what the system does (no implied sending, charging or automation); requests are never called bookings.
+- [ ] Numbers shown come from recorded data or are clearly labelled sample/estimate; quoted, booked and recorded values are labelled distinctly.
+- [ ] Times on customer-facing screens include the timezone abbreviation.
+- [ ] Marketing: passes the claims policy (§2.4) — no fake testimonials, invented statistics, unsupported claims, or stage-inappropriate "free trial" wording.
+- [ ] The product name comes from configuration, not hard-coded text.
 - [ ] Passes the §14 litmus test.

@@ -1,7 +1,18 @@
 # DetailerHQ — Product Plan
 
-> **Status:** Draft for review · **Last updated:** 2026-10-29
-> **Working name:** DetailerHQ. The name is *not* legally or commercially cleared. Treat it as a placeholder everywhere: keep it in a single config value, do not commission a logo, and do not buy paid brand assets until clearance is done (see §13).
+> **Status:** Draft for review · **Revision 2** · **Last updated:** 2026-10-29
+> **Working name:** DetailerHQ is provisional and has **not** been legally or commercially cleared. Treat it as a placeholder everywhere (see §17.3). No domains, services or brand assets are to be purchased or registered during planning.
+> **Companion document:** [`DESIGN_SYSTEM.md`](./DESIGN_SYSTEM.md)
+
+### What changed in revision 2
+
+- Locked decisions: **US only**, **Supabase Auth + Row Level Security**, **7-day no-card trial at public paid launch**, **pilot program before that**, **no customer payments or deposits**, **no automated customer messaging**, **in-app notifications only**.
+- Booking workflow expanded: owners can **propose a different time**; the customer status page now gives a clear next step for every state; explicit rules for **duplicates, cancellations, rescheduling, conflicts, time zones and DST**, and **how pending requests interact with slots**.
+- Leads and quotes separated from booking requests with new lead statuses (**New, Contacted, Quote sent, Follow-up due, Booked, Lost**); added a **communication log** and **editable message templates**.
+- Analytics now separates **quoted value**, **booked job value** and **recorded revenue**, with a definition for every metric and a rule against implying causation.
+- New sections: **authorization checks per operation**, **trial / pilot / subscription states and data retention**, **assumptions to verify before launch**, **customer acquisition plan**.
+- Scope is split into **MVP (pilot)**, **required before public paid launch**, and **later**.
+- Removed: Drizzle ORM (Supabase client + SQL migrations instead), owner notification email from the MVP, CSV import from the MVP.
 
 ---
 
@@ -9,42 +20,48 @@
 
 1. [Summary](#1-summary)
 2. [Target customer and problems](#2-target-customer-and-problems)
-3. [MVP scope](#3-mvp-scope)
+3. [Scope](#3-scope)
 4. [User roles and permissions](#4-user-roles-and-permissions)
 5. [Pages and routes](#5-pages-and-routes)
-6. [Key workflows](#6-key-workflows)
-7. [Domain model](#7-domain-model)
-8. [Security, privacy and data isolation](#8-security-privacy-and-data-isolation)
-9. [Acceptance criteria](#9-acceptance-criteria)
-10. [Architecture and operating cost](#10-architecture-and-operating-cost)
-11. [Implementation phases](#11-implementation-phases)
-12. [Testing strategy](#12-testing-strategy)
-13. [Decisions, open questions and risks](#13-decisions-open-questions-and-risks)
+6. [Booking requests: rules and lifecycle](#6-booking-requests-rules-and-lifecycle)
+7. [Other key workflows](#7-other-key-workflows)
+8. [Domain model](#8-domain-model)
+9. [Security, privacy and data isolation](#9-security-privacy-and-data-isolation)
+10. [Notifications](#10-notifications)
+11. [Analytics definitions](#11-analytics-definitions)
+12. [Pilot, trial, subscription and data retention](#12-pilot-trial-subscription-and-data-retention)
+13. [Acceptance criteria](#13-acceptance-criteria)
+14. [Architecture, budget and assumptions to verify](#14-architecture-budget-and-assumptions-to-verify)
+15. [Customer acquisition plan](#15-customer-acquisition-plan)
+16. [Implementation phases and testing](#16-implementation-phases-and-testing)
+17. [Decisions, open questions and risks](#17-decisions-open-questions-and-risks)
 
 ---
 
 ## 1. Summary
 
-DetailerHQ is a web application for independent auto detailers — mostly one- to three-person businesses, mobile or shop-based — that replaces the mix of text threads, Instagram DMs, paper notes and spreadsheets they use to run the business today.
+DetailerHQ is a web application for **independent auto detailers in the United States** — owner-operators and small shops, mobile or fixed-location — that replaces the mix of text threads, Instagram DMs, paper notes and spreadsheets they use today.
 
-The MVP does five things well:
+The MVP does six things well:
 
-1. Gives each business a **public booking page** where customers request an appointment for a specific service and vehicle.
-2. Lets the owner **approve or decline** each request, which turns approved requests into scheduled appointments.
-3. Keeps a clean record of **customers, vehicles, appointments, leads and quotes**, so nothing gets lost.
-4. Surfaces **follow-up tasks** so the owner remembers to chase quotes and bring back past customers.
-5. Shows **basic analytics computed only from what the business has actually recorded**.
+1. A **public booking page** where customers **request** an appointment. A request is never a confirmed booking.
+2. An **approval workflow**: the owner approves, declines, or proposes a different time, and the customer always sees a clear status and next step.
+3. Clean records of **customers, vehicles and appointments**, always tied to the correct business.
+4. **Leads and quotes**, tracked separately from booking requests, with a communication log.
+5. **Follow-ups**: in-app tasks, reminders and editable message templates the owner sends from their own phone or email.
+6. **Honest analytics** calculated only from recorded data, with every metric defined.
 
-The product does **not** send SMS, send email to customers, take payments or post to social media in the MVP. Where the owner needs to contact a customer, the app prepares the message and hands it to the owner's own phone (copy, `sms:`, `mailto:`, `tel:` links). This is a deliberate, honest constraint, and the marketing site must say so plainly.
+The product **does not** automatically send SMS, email or social messages; does **not** take customer payments or deposits; and does **not** depend on any paid messaging service. Copy throughout the product and marketing site must reflect this.
 
-### Success criteria for the MVP
+### Success criteria
 
 | Goal | Measure |
 |---|---|
-| Genuinely useful | 5 detailers use it for real bookings for 4 consecutive weeks |
-| Worth paying for | 3+ businesses convert to paid after the trial |
-| Cheap to run | Hosting and services ≤ ~$50/month at up to ~100 businesses |
-| Trustworthy | Zero cross-business data exposure; automated isolation tests pass on every deploy |
+| Genuinely useful | 5 pilot businesses use it for real requests for 4 consecutive weeks |
+| Worth paying for | ≥ 3 pilot businesses pay (pilot fee or subscription) |
+| Cheap to run | Infrastructure ≤ ~$50/month through the first ~100 businesses |
+| Trustworthy | Zero cross-business data exposure; isolation tests pass on every deploy |
+| Honest | Every marketing and in-app claim maps to a shipped, tested feature |
 
 ---
 
@@ -52,84 +69,107 @@ The product does **not** send SMS, send email to customers, take payments or pos
 
 ### 2.1 Primary customer
 
-**Independent detailer, owner-operator.** Usually works alone or with one helper. Often mobile (works at the customer's home or office) or runs a small one- or two-bay shop. Earns most revenue from maintenance washes, interior/exterior details, paint correction and ceramic coatings. Spends the working day with wet hands and a phone, not at a desk.
+**Independent mobile detailers and small detailing shops in the United States** (1–5 people).
 
-Characteristics that shape the design:
-
-- **Phone-first.** Most admin happens on a phone between jobs. Desktop is used for evening admin and quotes.
-- **Low tolerance for setup.** If setup takes more than ~15 minutes, they won't finish it.
-- **Already uses texting and Instagram.** We support those channels by recording where leads came from, not by replacing them.
-- **Prices vary by vehicle size and condition.** A sedan and a three-row SUV are different prices; a heavily soiled interior needs a quote.
-- **Few jobs per day** (typically 1–4), so each booking matters, and double-booking is very costly.
-- **Price sensitive but will pay** for something that clearly wins or saves jobs.
+- **Phone-first.** Admin happens between jobs, outdoors, often with wet hands. Desktop for evening admin and quotes.
+- **Low setup tolerance.** Setup must take under ~15 minutes.
+- **Already uses texting and Instagram/Facebook.** We record those conversations; we don't replace the channels.
+- **Every business prices differently.** Prices depend on the business, the vehicle's size, its condition and the region. The product never assumes universal detailing prices.
+- **Few jobs per day** (typically 1–4); a missed request or double-booking is costly.
+- **Price sensitive**, but will pay for something that clearly wins jobs or saves time.
 
 ### 2.2 Secondary users
 
-- **The detailer's customers** — vehicle owners booking through the public page. They never create an account.
-- **A helper or office manager** — *post-MVP* (see §4).
+- **The detailer's customers** — vehicle owners using the public booking page and status links. No accounts.
+- **Helpers / office managers** — later (see §3.3).
 
-### 2.3 Problems we are solving
+### 2.3 Problems solved
 
 | Problem today | What DetailerHQ does |
 |---|---|
-| Booking requests arrive by text, DM, phone and website form; some get missed | One public booking page and one **Requests** inbox |
-| Back-and-forth over "how much for my truck?" | Published service menu with prices by vehicle size and estimated durations |
-| Double-booking or overbooking the day | Availability rules, buffers, daily job caps and conflict warnings before approving |
-| No record of which car belongs to whom or what was done last time | Customer and vehicle records with service history |
-| Quotes written in Notes app, never followed up | Structured quotes with a shareable link and an automatic follow-up task |
-| Forgetting to bring back past customers | Follow-up tasks (e.g., "maintenance wash due") created from completed jobs |
-| No idea which services or lead sources actually make money | Analytics built strictly from recorded appointments, quotes and leads |
-
-### 2.4 Problems we are explicitly **not** solving in the MVP
-
-Payments, payroll, inventory/chemical tracking, route optimisation, marketing automation, reviews management, and fleet/dealer accounts.
+| Requests arrive by text, DM, phone and web forms; some get missed | One public booking page, one **Requests** inbox, in-app notifications |
+| Customers don't know if they're booked | A status page per request with the current status and a clear next step |
+| "How much for my truck?" back-and-forth | The business's own published service menu, with optional prices by vehicle size |
+| Double-booking | Configured hours and time off, plus database-enforced prevention of overlapping confirmed appointments |
+| Lost track of who owns which car | Customer and vehicle records with service history |
+| Quotes in the Notes app, never followed up | Structured leads and quotes, follow-up tasks, message templates, communication log |
+| No idea what actually makes money | Analytics from recorded jobs, clearly separating quoted, booked and recorded values |
 
 ---
 
-## 3. MVP scope
+## 3. Scope
 
-### 3.1 Included
+Scope is split into three tiers. A feature moves up a tier only with evidence (§3.4).
 
-| Area | Included capability |
+### 3.1 MVP — required for the pilot
+
+| Area | Requirement |
 |---|---|
-| **Account & business** | Owner sign-up, email verification, sign-in, password reset; one business per owner; business profile (name, phone, email, timezone, service type: mobile / shop / both, service area description, shop address) |
-| **Onboarding** | Guided setup: profile → hours → first services → booking page preview → publish |
-| **Service menu** | Categories; services with description, price type (fixed / "from" / quote required), base price, estimated duration; optional price and duration per vehicle size class; add-ons; active/hidden toggle; display order |
-| **Availability** | Weekly hours (multiple windows per day), start-time interval, minimum notice, booking horizon, buffer between jobs, max jobs per day, blocked dates / time off |
-| **Public booking page** | Business profile, service menu, request-an-appointment flow, request-a-quote flow, request status page, owner-controlled "accepting requests" switch |
-| **Requests** | Inbox of pending booking requests; approve (creates appointment) or decline; conflict warnings; customer matching on approval; "let the customer know" panel |
-| **Appointments & calendar** | Day, week and agenda views; create appointments manually; statuses: Scheduled, In progress, Completed, Cancelled, No-show; record final price and a manual payment note on completion |
-| **Customers & vehicles** | Customer list, search (name, phone, email, plate), customer detail with vehicles, appointments, quotes, notes; vehicle detail with service history |
-| **Leads** | Pipeline list with statuses (New, Contacted, Quoted, Won, Lost) and source; created manually or from public quote requests |
-| **Quotes** | Line-item quotes with per-business numbering, validity date, notes; statuses Draft, Sent, Accepted, Declined, Expired; shareable read-only link and print-friendly view; convert accepted quote to appointment |
-| **Follow-up tasks** | Manual tasks; automatic tasks from rules (quote follow-up, post-job maintenance reminder); due-today list on the Today screen |
-| **Analytics** | Requests, approval rate, completed jobs, recorded revenue, average job value, quote win rate, top services, lead sources, repeat customers — all from recorded data with date ranges |
-| **Settings & data** | Business settings, account security, CSV export of customers/vehicles/appointments/quotes, account deletion request |
-| **Marketing site** | Home, Pricing, Contact / early access, Terms, Privacy |
+| **Accounts** | Owner sign-up (invite-only during pilot) and sign-in via **Supabase Auth** (email + password); email verification; password reset; one business per owner |
+| **Business profile** | Name, phone, contact email, US timezone, service mode (mobile / shop / both), service area description, shop address, provisional booking slug |
+| **Onboarding** | Profile → hours → services → booking page preview → publish |
+| **Service menu** | Business-defined categories, services, descriptions, prices, estimated durations; price type fixed / "from" / quote required; optional price and duration per vehicle size class; add-ons; **bookable on/off per service**; ordering. No prefilled prices. |
+| **Availability** | Weekly working hours (multiple windows/day), unavailable periods (time off), start-time interval, minimum notice, booking horizon, buffer, max jobs per day, "hold requested times" setting |
+| **Public booking page** | Business profile, bookable services, appointment-request flow, inquiry/quote-request flow, "accepting requests" switch |
+| **Customer status page** | Per-request status page with next steps; accept/decline a proposed time; withdraw a request; cancel an approved appointment before the business's cutoff |
+| **Requests inbox** | Approve, decline, propose a different time; conflict checks; duplicate flags; customer matching |
+| **Appointments & calendar** | Day/Week/Agenda; manual creation; reschedule; cancel; complete with recorded final amounts; statuses Scheduled, In progress, Completed, Cancelled, No-show; database-enforced no-overlap |
+| **Customers & vehicles** | Manual entry, search, detail pages, history, archive, delete |
+| **Leads & quotes** | Inquiries tracked separately from booking requests; statuses New, Contacted, Quote sent, Follow-up due, Booked, Lost; line-item quotes with Draft/Sent/Accepted/Declined/Expired; shareable read-only quote link; print view |
+| **Communication log** | Manually logged calls, texts, emails, DMs, in-person conversations (inbound/outbound) on customers and leads |
+| **Follow-ups** | In-app tasks and reminders; automatic task rules; editable message templates with placeholders; "copy / open in Messages / open in Mail" with "mark as sent" logging; response tracking |
+| **Notifications** | In-app notification list, badges and Today screen (§10) |
+| **Analytics** | Defined metrics from recorded data (§11) with empty states |
+| **Settings & data** | Business settings, templates, account security, CSV **export**, deletion request |
+| **Pilot access** | `pilot` account status set by the operator; pilot end date shown in-app; written pilot terms (§12.2) |
+| **Marketing site** | Home, Pilot program / pricing page, Contact, Terms, Privacy — claims limited to shipped features |
 
-### 3.2 Explicitly excluded from the MVP
+### 3.2 Required before the public paid launch (not built during planning or early pilot)
 
-These will not be built, and **must not be mentioned as available** on the marketing site, in-app copy or sales conversations.
+These must be implemented **and tested** before the product is publicly offered for money with a 7-day free trial.
 
-| Excluded | Why / what we do instead |
+| Requirement | Notes |
 |---|---|
-| Automated SMS to customers | Cost, carrier registration (10DLC/A2P), TCPA consent risk. Instead: prepared message + `sms:` link opening the owner's own messaging app. |
-| Automated email to customers | Deliverability and compliance work. Instead: `mailto:` link and copy-to-clipboard. *(Owner-only notification email is a separate decision — see D-6.)* |
-| Online payments, deposits, card on file, invoicing with payment | Cost and liability. Instead: owner records final price and a manual payment note ("Paid — card", "Unpaid"). Copy must say "recorded", never "collected". |
-| Customer accounts / customer login | Unnecessary friction. Customers use unguessable status links. |
-| Online quote acceptance / e-signature | Phase 2 candidate. MVP: owner marks quote accepted. |
-| Instant (auto-approved) booking | Owners approve every request in v1. Data model allows auto-approve later. |
-| Staff accounts, roles, scheduling multiple technicians | Post-MVP. Schema includes a membership table so this is additive. |
-| Multiple locations per business | Post-MVP. |
-| Google/Apple calendar sync | Post-MVP. A read-only iCal feed is a cheap Phase 2 candidate. |
-| Social media posting, Instagram/Facebook inbox integrations | Out of scope. Lead *source* is recorded manually. |
-| Photo uploads (before/after, damage photos) | Storage cost and moderation; Phase 2 candidate. |
-| Route planning / travel time calculation | Owner sets a fixed buffer instead. |
-| Reviews requests, loyalty, memberships, gift cards | Post-MVP. |
-| Native mobile apps | Responsive web app; installable as a PWA (home-screen icon) only if trivial. |
-| AI features | None. Do not market any. |
-| Public API, Zapier | Post-MVP. |
-| Dark mode for the dashboard | Deferred; tokens are structured to allow it. |
+| **Subscription billing** for businesses | Provider to be selected (Stripe Billing is the likely candidate; verify fees). Webhooks verified server-side. |
+| **7-day free trial enforcement** | No card required (current preference). Exactly 7 × 24 hours from trial start (§12.3). |
+| **Subscription status handling** | trialing → active / trial_expired; past_due grace; cancellation; restricted access without data loss (§12.4) |
+| **Retention and deletion policy** | Written, legally reviewed, disclosed in Terms/Privacy, with pre-deletion notices (§12.5) |
+| **Transactional email provider for auth emails** | Supabase's default sender is intended for low-volume/testing use; a custom SMTP provider is expected to be needed (§14.4) |
+| **Public self-serve sign-up** | Replaces invite-only sign-up |
+| **Legal review** | Terms, Privacy Policy, service-provider/processor language |
+| **Marketing trial copy** | "7-day free trial, no credit card required" appears **only** after the above ships |
+| **Domain and final name** | After name clearance and explicit approval to spend |
+
+### 3.3 Later — not in the MVP
+
+Must not be presented as available anywhere until shipped.
+
+| Feature | Condition to reconsider |
+|---|---|
+| Automated SMS to customers | Pilot evidence + consent capture + TCPA/10DLC compliance review + cost approval |
+| Automated email to customers | Pilot evidence + reliable provider + unsubscribe/consent handling |
+| Owner email notifications (new request, etc.) | After a reliable email provider is selected; first candidate after the MVP |
+| Social media posting / inbox integrations | Strong pilot demand only |
+| Customer deposits, online payments, card on file | Pilot evidence that deposits block adoption |
+| CSV import of customers/vehicles | Pilot customers demonstrate it's essential (could be promoted into the MVP) |
+| Online quote acceptance / e-signature | Pilot demand |
+| Customer self-service rescheduling | Pilot demand; MVP uses cancel + new request or contacting the business |
+| Auto-approved (instant) booking | Owner demand; schema allows it |
+| Staff accounts, multiple technicians, concurrent jobs | Businesses with helpers among paying customers |
+| Calendar sync / iCal feed | Pilot demand (iCal feed is cheap) |
+| Photo uploads | Storage cost reviewed; pilot demand |
+| Multiple locations, multi-currency, non-US markets | Post-validation |
+| Dashboard dark mode, native apps, public API, AI features | Not planned |
+
+### 3.4 Feature intake rule
+
+We do not build features because they sound impressive. A feature is added to the active plan only if **at least one** is true:
+
+1. Two or more pilot businesses independently ask for it **and** describe the problem it solves in their own workflow.
+2. A pilot business states it is the reason they will not pay.
+3. It is required for security, privacy, legal compliance or data integrity.
+
+Each addition is logged in `docs/decisions/` with the evidence.
 
 ---
 
@@ -137,597 +177,1009 @@ These will not be built, and **must not be mentioned as available** on the marke
 
 ### 4.1 Roles
 
-| Role | Who | Authenticates? | MVP? |
+| Role | Who | Authentication | MVP |
 |---|---|---|---|
-| **Owner** | The detailer who signed up | Yes (email + password) | ✅ |
-| **Public visitor / customer** | Anyone with the booking link | No | ✅ |
-| **Request holder** | A customer holding a request-status or quote link | No — possession of an unguessable token | ✅ |
-| **Platform operator** | Us (DetailerHQ staff) | Yes, separate admin credentials | ✅ (no admin UI; scripted, audited) |
-| **Staff member** | Helper / technician / office manager | Yes | ❌ Post-MVP |
+| **Owner** | The detailer who created the business | Supabase Auth session | ✅ |
+| **Public visitor** | Anyone with the booking link | None | ✅ |
+| **Token holder** | A customer holding a request-status or quote link | Possession of an unguessable token (only its hash is stored) | ✅ |
+| **Platform operator** | DetailerHQ staff | Supabase dashboard / CLI with MFA; no in-app admin UI in MVP | ✅ |
+| **System** | Scheduled jobs (`pg_cron` inside the database) | Database role; no network exposure | ✅ |
+| **Staff** | Helper, technician, office manager | Supabase Auth | ❌ Later |
 
-### 4.2 Permission matrix (MVP)
+### 4.2 Permission matrix
 
-| Capability | Owner | Public visitor | Request holder | Operator |
+| Capability | Owner | Public visitor | Token holder | Operator |
 |---|---|---|---|---|
-| View business's published booking page and active services | ✅ | ✅ | ✅ | ✅ |
-| Submit booking or quote request | — | ✅ (rate-limited) | — | — |
-| View status of one specific request | ✅ | — | ✅ (own request only) | — |
-| View one specific shared quote | ✅ | — | ✅ (own quote only) | — |
-| Read/write customers, vehicles, appointments, leads, quotes, tasks | ✅ own business only | ❌ | ❌ | Break-glass only, logged |
+| View published booking page & bookable services | ✅ | ✅ | ✅ | ✅ |
+| Submit appointment request or inquiry | — | ✅ rate-limited | — | — |
+| View status of one request; accept/decline proposed time; withdraw; cancel before cutoff | ✅ (in app) | ❌ | ✅ that request only | — |
+| View one shared quote | ✅ | ❌ | ✅ that quote only | — |
+| Read/write business data (customers, vehicles, requests, appointments, leads, quotes, tasks, templates, communications, notifications) | ✅ own business only | ❌ | ❌ | Break-glass only, audited |
 | Configure services, availability, booking page | ✅ own business only | ❌ | ❌ | ❌ |
-| View analytics | ✅ own business only | ❌ | ❌ | Aggregate platform metrics only (counts, not PII) |
+| Analytics | ✅ own business only | ❌ | ❌ | Platform aggregates only (no PII) |
 | Export data / request deletion | ✅ own business only | ❌ | ❌ | Executes deletion |
-| Change subscription status (trial, active, paused) | ❌ | ❌ | ❌ | ✅ |
+| Change account status (pilot, trial, active, suspended) | ❌ | ❌ | ❌ | ✅ (later: billing webhook) |
 
-**Rules:**
+Notes:
 
-- An Owner can belong to exactly one business in the MVP, but the relationship is stored in a `memberships` table with a `role` column so Staff can be added without migration pain.
-- Operator access to tenant data is **break-glass only**: used to debug a reported issue with the owner's permission, recorded in the audit log with a reason.
+- Owner ↔ business is stored in a `memberships` table with a `role` column (`owner` only in MVP), so Staff can be added without restructuring.
+- Operator access to business data is **break-glass only** (debugging a reported issue, with the owner's permission), recorded with a reason in the audit log.
 
 ---
 
 ## 5. Pages and routes
 
-Route names are proposals. `[slug]` is the business's public booking handle; `[token]` is an unguessable random token (≥128 bits).
+`[slug]` = public booking handle. `[token]` = 128-bit+ random token, stored hashed.
 
 ### 5.1 Marketing site (public)
 
 | Route | Purpose |
 |---|---|
-| `/` | Home. Explains the product with real screenshots, the booking page, what's included and what isn't, pricing teaser, early access CTA. |
-| `/pricing` | One or two plans, trial terms, FAQ (including "Does it send texts?" → "Not yet…"). |
-| `/contact` | Early-access / contact form (stored in our DB; no third-party form service). |
-| `/legal/terms` | Terms of Service. |
-| `/legal/privacy` | Privacy Policy (covers both owners and their customers). |
-| `/security` *(optional)* | Short, factual description of how data is isolated and protected. Only claims we can verify. |
+| `/` | Home: real product screenshots, booking page, what's included **and what isn't**, pilot/trial CTA appropriate to the current stage |
+| `/pricing` | **Pilot stage:** "Pilot program" — by invitation, pilot terms summary, how to apply. **Paid launch:** plan, price, 7-day trial explanation and what happens when it ends |
+| `/contact` | Contact / pilot application form (stored in our database; no third-party form service) |
+| `/legal/terms` | Terms of Service (plus pilot terms during pilot) |
+| `/legal/privacy` | Privacy Policy covering owners and their customers, including retention and deletion |
 
-### 5.2 Authentication
+### 5.2 Authentication (Supabase Auth)
 
 | Route | Purpose |
 |---|---|
-| `/sign-up` | Create owner account. During beta, gated by invite code (D-8). |
-| `/sign-in` | Sign in. |
-| `/verify-email` | Instructions and resend link after sign-up. |
-| `/forgot-password` | Request reset email. |
-| `/reset-password` | Set new password from emailed link. |
+| `/sign-up` | Pilot: invite-only (invite link or code). Paid launch: open sign-up starting the 7-day trial |
+| `/sign-in` | Email + password |
+| `/auth/confirm` | Handles Supabase email confirmation / magic-link callbacks |
+| `/forgot-password`, `/reset-password` | Password recovery via Supabase Auth |
 
 ### 5.3 Onboarding
 
 | Route | Purpose |
 |---|---|
-| `/onboarding` | Five-step setup: (1) Business profile & timezone, (2) Where you work — mobile / shop / both, service area, (3) Weekly hours & booking rules, (4) Add first services (with editable starter templates, prices left blank), (5) Preview booking page & publish. Progress is saved per step; owner can skip to dashboard. |
+| `/onboarding` | (1) Business profile and US timezone, (2) Where you work, (3) Hours and booking rules, (4) First services — **names, prices and durations entered by the owner**; optional starter *names* only, never prices, (5) Preview and publish. Saved per step. |
 
-### 5.4 Business dashboard (authenticated, `/app/...`)
-
-| Route | Purpose |
-|---|---|
-| `/app` | **Today.** Today's appointments in time order, pending requests count with oldest first, tasks due today/overdue, setup checklist until complete. The owner's home screen on the phone. |
-| `/app/requests` | Inbox of booking requests. Tabs: Pending, Approved, Declined, All. Oldest pending first. |
-| `/app/requests/[id]` | Request detail: requested service(s), vehicle, location, preferred time(s), customer contact, notes, availability check / conflicts, matched existing customer. Actions: Approve, Approve at different time, Decline. Then "Let the customer know" panel. |
-| `/app/calendar` | Calendar with Day / Week / Agenda views (`?view=&date=`). Shows appointments and blocked time; pending requests shown as tentative. Mobile defaults to Agenda. |
-| `/app/appointments/new` | Create an appointment directly (phone booking, repeat customer). |
-| `/app/appointments/[id]` | Appointment detail: time, location, customer, vehicle, services and estimated price, status changes, completion (final price, payment note), internal notes, linked request/quote. |
-| `/app/customers` | Searchable customer list (name, phone, email, plate). |
-| `/app/customers/new` | Create customer (and optionally first vehicle). |
-| `/app/customers/[id]` | Customer profile: contact details, vehicles, appointment history, quotes, leads, tasks, notes, lifetime recorded revenue. |
-| `/app/vehicles/[id]` | Vehicle detail: year/make/model/trim, size class, color, plate, notes (e.g., "coated 2025-04"), service history. |
-| `/app/leads` | Lead pipeline as a list (filter by status/source). A board view is optional and desktop-only. |
-| `/app/leads/new`, `/app/leads/[id]` | Create / view lead: contact, vehicle info, what they want, source, status, activity notes, linked quote. |
-| `/app/quotes` | Quote list with status filters and totals. |
-| `/app/quotes/new`, `/app/quotes/[id]` | Quote editor: line items from service menu or custom, vehicle, validity, notes, terms; actions: mark sent (copy link / sms / mailto), mark accepted/declined, convert to appointment. |
-| `/app/quotes/[id]/print` | Print-optimised quote (browser "Save as PDF"). |
-| `/app/tasks` | All follow-up tasks: Overdue, Today, Upcoming, Done. |
-| `/app/services` | Service menu: categories, services, add-ons; reorder; show/hide. |
-| `/app/services/[id]` | Edit a service: name, description, price type, base price, per-size pricing & duration, add-ons, booking visibility. |
-| `/app/availability` | Weekly hours, slot interval, notice, horizon, buffer, daily cap, time off / blocked dates. |
-| `/app/booking-page` | Booking page settings: slug, intro text, policies (cancellation, prep instructions), accepting requests on/off, preview, copy link, downloadable QR code (generated locally). |
-| `/app/analytics` | Analytics with date range (this month, last month, last 90 days, year to date, custom). |
-| `/app/settings` | Business profile, contact details, timezone, vehicle size classes, follow-up rules. |
-| `/app/settings/account` | Owner name, email, password, sign out of other sessions. |
-| `/app/settings/data` | CSV export, account and data deletion request, data retention info. |
-
-### 5.5 Public business pages (unauthenticated)
+### 5.4 Dashboard (authenticated, `/app/...`)
 
 | Route | Purpose |
 |---|---|
-| `/b/[slug]` | Business booking page: name, short intro, service area / address, service menu with prices and durations, policies, buttons to request an appointment or a quote. If paused or not accepting: clear notice and phone/email to contact the business directly. |
-| `/b/[slug]/book` | Multi-step request form: Service → Vehicle → Location → Time → Contact → Review. |
-| `/b/[slug]/quote` | Quote request form for "quote required" services or general enquiries; creates a Lead. |
-| `/r/[token]` | Request status: Pending / Approved (with date, time, location) / Declined (with optional message) / Cancelled. No other customer data. |
-| `/q/[token]` | Read-only shared quote with business contact details. |
+| `/app` | **Today**: requests awaiting action, today's schedule, tasks due, recent notifications, account/trial banner, setup checklist |
+| `/app/notifications` | In-app notification list (read/unread) |
+| `/app/requests` | Inbox. Tabs: Needs action (Pending + customer responded), Waiting on customer (Time proposed), Approved, Closed (Declined, Withdrawn, Expired, Duplicate) |
+| `/app/requests/[id]` | Detail: requested items, vehicle, location, preferred times, contact, notes, conflicts, possible duplicates, customer match, history. Actions: **Approve**, **Propose a different time**, **Decline**, **Close as duplicate**. Then the "Let the customer know" panel |
+| `/app/calendar` | Day / Week / Agenda; appointments, time off, buffers; tentative holds |
+| `/app/appointments/new` | Manual appointment |
+| `/app/appointments/[id]` | Detail; actions: Start, Complete (record final amounts), Reschedule, Cancel, Mark no-show; history |
+| `/app/customers`, `/app/customers/new`, `/app/customers/[id]` | List/search; create; profile with vehicles, appointments, quotes, leads, tasks, communication log, notes |
+| `/app/vehicles/[id]` | Vehicle details and service history |
+| `/app/leads`, `/app/leads/new`, `/app/leads/[id]` | Lead list by status/source; create; detail with communication log, quotes, follow-up tasks, outcome |
+| `/app/quotes`, `/app/quotes/new`, `/app/quotes/[id]`, `/app/quotes/[id]/print` | Quotes list, editor, detail, print view |
+| `/app/tasks` | Follow-up tasks: Overdue, Today, Upcoming, Done |
+| `/app/services`, `/app/services/[id]` | Service menu and editor |
+| `/app/availability` | Working hours, time off, booking rules |
+| `/app/booking-page` | Slug, intro, policies, cancellation cutoff, accepting requests, preview, link and QR code |
+| `/app/analytics` | Metrics with definitions and date range |
+| `/app/settings` | Business profile, timezone, vehicle size classes, follow-up rules |
+| `/app/settings/templates` | Message templates |
+| `/app/settings/account` | Name, email, password, sessions |
+| `/app/settings/plan` | Pilot: pilot terms and end date. Paid launch: trial status, subscription, billing portal link |
+| `/app/settings/data` | CSV export, retention information, deletion request |
+
+### 5.5 Public business pages
+
+| Route | Purpose |
+|---|---|
+| `/b/[slug]` | Booking page: business info, bookable services with the business's prices and durations, policies, "Request an appointment" and "Ask a question / request a quote" |
+| `/b/[slug]/request` | Multi-step appointment request: Service → Vehicle → Location → Time → Contact → Review |
+| `/b/[slug]/inquiry` | Inquiry / quote request (no time slot) → creates a **Lead** |
+| `/r/[token]` | Request status page with next steps and permitted customer actions |
+| `/q/[token]` | Read-only quote |
 
 ### 5.6 System pages
 
-`404`, `500`, "booking page not found", "link expired or invalid", and a maintenance page — all styled, all with a clear next step.
+404, 500, "booking page unavailable", "link not valid", maintenance — all with a clear next step.
 
 ---
 
-## 6. Key workflows
+## 6. Booking requests: rules and lifecycle
 
-### 6.1 Owner: sign-up and onboarding
+### 6.1 Principle
 
-1. Owner signs up with name, email, password (and invite code during beta).
-2. Verifies email.
-3. Onboarding step 1: business name, phone, contact email, timezone (defaulted from browser, confirmed).
-4. Step 2: mobile / shop / both; service area description (free text, e.g., "North Austin, within 20 miles") and/or shop address.
-5. Step 3: weekly hours (presets: "Mon–Sat, 8am–5pm"), start-time interval (default 60 min), minimum notice (default 24 h), horizon (default 60 days), buffer (default 30 min), max jobs/day (default 3).
-6. Step 4: pick starter service templates (e.g., "Maintenance wash", "Interior detail", "Full detail", "Paint enhancement", "Ceramic coating — quote required"). **Prices are blank and must be entered** — we never pre-fill invented prices.
-7. Step 5: preview booking page, choose slug, publish. Shown link, copy button and QR code.
-8. Lands on **Today** with a setup checklist ("Share your booking link", "Add your existing customers").
+> **An appointment request is not a booking.** It becomes a confirmed appointment only when the owner approves it, or when the customer accepts a time the owner proposed. Every customer-facing screen says this plainly.
 
-### 6.2 Customer: request an appointment
+### 6.2 Request statuses
 
-1. Opens `/b/[slug]` from the business's Instagram bio, Google profile or a text.
-2. Chooses a service (and optional add-ons). Prices shown according to the vehicle size they will pick ("from $180").
-3. Enters vehicle: year, make, model (free text with suggestions), size class (with plain-language examples: "Mid-size SUV — e.g., RAV4, CR-V"), optional color and condition notes.
-4. Chooses location: at their address (if business is mobile; address required, with a note on service area) or drop-off at the shop.
-5. Picks a preferred start time from available slots; optionally one alternate.
-6. Enters name, mobile phone, email (one of phone/email required; both recommended), contact preference, notes.
-7. Ticks consent: "I agree that [Business] may contact me about this request" with links to the business's policy and our privacy policy.
-8. Reviews summary: services, vehicle, estimated price and duration, preferred time. Submit text reads **"Send request"**, not "Book".
-9. Confirmation screen: "Request sent. This is not confirmed yet. [Business] will contact you by phone or text to confirm." Shows a status link (`/r/[token]`) to bookmark.
-
-### 6.3 Customer: request a quote
-
-Same as 6.2 but without a time slot; adds "What do you need?" and an optional preferred timeframe. Creates a **Lead** with source "Booking page — quote request". Confirmation explains the business will respond with a quote.
-
-### 6.4 Owner: review a booking request
-
-1. Requests badge shows pending count. Owner opens the request.
-2. Sees an **availability check**: whether the slot is still free, any overlap with appointments (including buffer), day's job count vs. cap, and whether the time is outside hours (possible if rules changed).
-3. Sees **customer match**: "Possible existing customer: Jordan Reyes (same phone)". Owner can link to existing or create new. Vehicle matched similarly within the customer.
-4. **Approve**: creates Appointment (Scheduled) with service snapshot and estimated price; creates/links Customer and Vehicle; request status → Approved.
-   **Approve at a different time**: owner picks a new time; same outcome; status page shows the new time.
-   **Decline**: optional message to customer (shown on status page) and optional internal reason; offers "Save as lead" so the contact isn't lost.
-5. **Let the customer know** panel: prefilled message ("Hi Jordan, you're confirmed for a Full Detail on Sat, Nov 8 at 9:00 AM at 1234 Oak St. — Northside Detail Co."). Buttons: Copy, Text (`sms:`), Email (`mailto:`), Call (`tel:`). Owner can tick "Customer notified" (records timestamp). Nothing is sent by DetailerHQ.
-6. Requests pending longer than 48 h are highlighted. Requests whose preferred time has passed are automatically marked **Expired** and listed separately.
-
-### 6.5 Owner: day of the job
-
-1. Opens **Today** on the phone: next appointment card with time, address (tap → opens maps app via a standard maps URL), customer phone (tap to call/text), vehicle, services, notes from last visit.
-2. Marks **In progress** (optional), then **Complete**: confirms final price (defaults to estimate; editable with line adjustments), payment note (Unpaid / Paid — cash / card / transfer / other), internal job notes.
-3. On completion, follow-up rule creates a task, e.g., "Maintenance wash reminder — Jordan Reyes, 2021 Tesla Model Y" due in 6 weeks (interval configurable per service).
-4. Can mark **No-show** or **Cancelled** (with reason); cancellations frees the slot.
-
-### 6.6 Owner: lead → quote → appointment
-
-1. Lead arrives (public quote request) or is created manually ("Instagram DM — wants ceramic coating on new F-150").
-2. Owner sets status Contacted, adds notes.
-3. Creates a Quote from the lead: picks services/line items, adjusts prices, sets validity (default 14 days), adds terms.
-4. Marks quote **Sent** using Copy link / Text / Email buttons (link goes to `/q/[token]`). Lead → Quoted. A follow-up task is created ("Follow up on Q-0012", due in 3 days, configurable).
-5. When customer says yes, owner marks **Accepted** → "Schedule it" creates an appointment pre-filled from the quote; lead → Won; customer and vehicle are created/linked.
-6. If declined or expired → lead → Lost with a reason (price, timing, went elsewhere, no response).
-
-### 6.7 Owner: manual booking
-
-Phone call from a repeat customer → **New → Appointment** → search customer → pick vehicle → pick services → pick time (availability shown, conflicts warned but owner may override with confirmation) → Save.
-
-### 6.8 Owner: configure services and availability
-
-- Services: add/edit/reorder; set price per size class or a single price; set duration per size class; mark "quote required" (shows on booking page with "Request quote" instead of time picker); hide without deleting (historic appointments keep their snapshot).
-- Availability: edit weekly windows; add time off ("Nov 24–28, Holiday"); changes apply to future slot calculation only and never alter existing appointments.
-
-### 6.9 Owner: analytics review
-
-Owner opens Analytics, picks "Last month". Sees numbers with their definitions available on hover/tap (e.g., "Recorded revenue: sum of final prices on appointments marked Completed in this period"). If there's too little data (e.g., fewer than 5 completed jobs), the page says so rather than showing misleading percentages.
-
-### 6.10 Owner: export and leave
-
-Settings → Data → Export generates CSV files (zip) on demand. Deletion request: confirm by typing the business name; business is deactivated immediately (booking page offline), data hard-deleted after a 30-day grace period (D-10), backups age out per provider retention.
-
----
-
-## 7. Domain model
-
-### 7.1 Conventions
-
-- Every tenant-owned table has a non-null **`business_id`**. No exceptions.
-- Primary keys are random UUIDs (v4 or v7). Sequential numbers are never exposed in URLs. Human-friendly numbers (e.g., `Q-0012`) are display-only, unique per business.
-- All timestamps stored in UTC (`timestamptz`); the business's IANA timezone (e.g., `America/Chicago`) is used for display and slot calculation. DST transitions must be tested.
-- Money stored as integer **cents** with a currency code (`USD` by default; single currency per business).
-- Soft-delete (`archived_at`) for customers, vehicles, services; hard delete only via the account deletion process.
-- Appointments and quotes store a **snapshot** of service names, prices and durations at the time of creation so later menu edits don't rewrite history.
-- `created_at`, `updated_at`, `created_by` on every table.
-
-### 7.2 Entities
-
-| Entity | Key fields (conceptual) | Notes |
+| Status | Meaning | Set by |
 |---|---|---|
-| **User** | id, email, name, password (managed by auth provider), email_verified_at | Identity only; no business data here. |
-| **Business** | id, name, slug, phone, email, timezone, service_mode (mobile/shop/both), service_area_text, shop_address, currency, account_status (trialing/active/paused/cancelled), accepting_requests, published_at | The tenant. |
-| **Membership** | id, business_id, user_id, role (`owner`; later `staff`) | Unique (business_id, user_id). |
-| **BookingSettings** | business_id, slot_interval_min, min_notice_min, horizon_days, buffer_min, max_jobs_per_day, hold_pending (bool), intro_text, policies_text, prep_instructions | 1:1 with Business. |
-| **AvailabilityRule** | id, business_id, weekday (0–6), start_time, end_time | Multiple windows per weekday. Local wall-clock times. |
-| **TimeOff** | id, business_id, starts_at, ends_at, label | Blocks slots. |
-| **VehicleSizeClass** | id, business_id, name, description/examples, sort_order | Defaults: Car / Small SUV / Large SUV & Truck / Van. Editable. |
-| **ServiceCategory** | id, business_id, name, sort_order | |
-| **Service** | id, business_id, category_id, name, description, price_type (fixed / starting_at / quote_required), base_price_cents, base_duration_min, is_addon, is_public, sort_order, follow_up_after_days, archived_at | |
-| **ServicePrice** | id, business_id, service_id, size_class_id, price_cents, duration_min | Optional overrides per size class. |
-| **Customer** | id, business_id, first_name, last_name, phone (E.164), email, preferred_contact, address, notes, source, archived_at | Unique-ish matching on phone/email within business (not enforced unique — households share phones). |
-| **Vehicle** | id, business_id, customer_id, year, make, model, trim, color, size_class_id, plate, vin (optional), notes, archived_at | |
-| **BookingRequest** | id, business_id, status (pending/approved/declined/expired/cancelled), public_token_hash, requested_start, alternate_start, location_type, service_address, contact snapshot (name/phone/email), vehicle snapshot, notes, consent_at, ip_hash, decline_message, decided_at, decided_by, customer_id?, vehicle_id?, appointment_id?, customer_notified_at | Snapshot fields hold what the customer typed; links filled on approval. |
-| **BookingRequestItem** | id, business_id, booking_request_id, service_id, name/price/duration snapshot | |
-| **Appointment** | id, business_id, customer_id, vehicle_id, starts_at, ends_at, location_type, service_address, status (scheduled/in_progress/completed/cancelled/no_show), estimated_total_cents, final_total_cents, payment_note_status (unpaid/paid), payment_method_note, cancel_reason, completed_at, internal_notes, booking_request_id?, quote_id? | |
-| **AppointmentItem** | id, business_id, appointment_id, service_id?, name, price_cents, duration_min, quantity | Snapshot lines; custom lines allowed. |
-| **Lead** | id, business_id, status (new/contacted/quoted/won/lost), source (booking_page / phone / text / instagram / facebook / google / referral / walk_in / repeat / other), lost_reason, contact snapshot, vehicle description, request_text, customer_id?, public_token_hash? | |
-| **Quote** | id, business_id, number (per business), status (draft/sent/accepted/declined/expired), customer_id?, lead_id?, vehicle_id?, vehicle_text, valid_until, notes, terms, subtotal_cents, discount_cents, total_cents, public_token_hash, sent_at, decided_at | |
-| **QuoteItem** | id, business_id, quote_id, service_id?, name, description, price_cents, quantity, duration_min | |
-| **Task** | id, business_id, title, due_at, status (open/done/dismissed), kind (manual / quote_follow_up / maintenance_reminder / request_follow_up), related_type, related_id, completed_at | Polymorphic link to customer / lead / quote / appointment, validated in application code. |
-| **Note** | id, business_id, related_type, related_id, body, created_by | Timeline notes on customer/lead/appointment. |
-| **AuditEvent** | id, business_id?, actor_type (owner/operator/system/public), actor_id, action, entity_type, entity_id, metadata (no PII payloads), ip_hash, created_at | Append-only. |
-| **ContactSubmission** | id, name, email, business_name, message, created_at | Marketing-site enquiries; not tenant data. |
+| `pending` | Submitted; waiting for the owner | Customer submission |
+| `time_proposed` | Owner proposed a different time; waiting for the customer | Owner |
+| `approved` | Confirmed; an appointment exists | Owner approval, or customer accepting a proposal |
+| `declined` | Owner declined | Owner |
+| `proposal_declined` | Customer declined the proposed time | Customer |
+| `withdrawn` | Customer withdrew before a decision | Customer |
+| `expired` | No decision before the requested time, or proposal not answered before its expiry | System |
+| `closed_duplicate` | Owner closed it as a duplicate of another request | Owner |
 
-### 7.3 Relationships
+After approval the **appointment** owns the lifecycle (Scheduled → In progress → Completed / Cancelled / No-show); the status page reflects the appointment.
 
 ```
-User ──< Membership >── Business
-                           │
-   ┌───────────┬───────────┼─────────────┬──────────────┬──────────────┐
-   │           │           │             │              │              │
-BookingSettings  AvailabilityRule  TimeOff  VehicleSizeClass  ServiceCategory ──< Service ──< ServicePrice
-                                                                                       │
-Customer ──< Vehicle                                                                   │
-   │  │                                                                                │
-   │  └──< Appointment ──< AppointmentItem ──(snapshot of)─────────────────────────────┘
-   │           ▲    ▲
-   │           │    └── Quote ──< QuoteItem
-   │           │          ▲
-   │     BookingRequest   └── Lead
-   │      ──< BookingRequestItem
+              ┌──────────── withdrawn (customer)
+              │
+ submit ──► pending ──► approved ──► [appointment lifecycle]
+              │  │          ▲
+              │  └─► time_proposed ──► (customer accepts) ─┘
+              │          │
+              │          ├─► proposal_declined (customer)
+              │          └─► expired (no answer)
+              ├─► declined (owner)
+              ├─► closed_duplicate (owner)
+              └─► expired (requested time passed)
+```
+
+### 6.3 Customer status page — status and next steps
+
+The status page shows only that request: business name and contact options, services, vehicle, requested/proposed/confirmed time **with timezone**, and the next step.
+
+| State shown | Headline | Next step text | Customer actions |
+|---|---|---|---|
+| Pending | Request received — not confirmed yet | "[Business] reviews requests and will confirm, decline, or suggest another time. Check this page for updates; they may also contact you directly." | Withdraw request · Call / text business |
+| Time proposed | [Business] suggested a different time | "Accept to confirm, or decline and contact them. This suggestion is held until [time]." | **Accept this time** · Decline · Call / text |
+| Approved / Scheduled | Confirmed for Sat, Nov 8, 9:00 AM CT | Location, prep instructions, cancellation policy | Cancel (until cutoff) · Call / text |
+| Rescheduled | Time changed — now Sun, Nov 9, 10:00 AM CT | "Your appointment was moved by [Business]. Previously: Sat, Nov 8, 9:00 AM." | Cancel (until cutoff) · Call / text |
+| In progress / Completed | Completed on Nov 8 | "Thanks — contact [Business] with any questions." | Call / text |
+| Declined | [Business] can't take this request | Owner's optional message; "You're welcome to send a new request." | Send a new request · Call / text |
+| Proposal declined | You declined the suggested time | "Contact [Business] or send a new request." | Send a new request |
+| Withdrawn | You withdrew this request | — | Send a new request |
+| Cancelled (by customer / by business) | Appointment cancelled | Who cancelled and when; optional message | Send a new request · Call / text |
+| Expired | This request expired | "It wasn't confirmed before the requested time." | Send a new request |
+| Closed as duplicate | This request was combined with another | "[Business] is handling your booking through another request you sent." | Call / text |
+
+The page **never** shows other customers' information, internal notes, or why a slot is unavailable.
+
+Because DetailerHQ doesn't message customers in the MVP, the customer learns about changes by (a) revisiting the status page and (b) the owner contacting them. The confirmation screen therefore offers **Copy link** and asks the customer to save the link, and every owner message template includes the `{status_link}` placeholder by default.
+
+### 6.4 How pending requests interact with available slots
+
+| Item | Effect on public availability | Effect on owner calendar |
+|---|---|---|
+| Confirmed appointment (Scheduled / In progress) | Blocks its time **plus buffer** | Shown as an appointment |
+| Time off | Blocks | Shown as time off |
+| **Pending request — default** (`hold_pending = off`) | **Does not block.** Other customers may request the same time. | Shown as tentative; the request shows "1 other request for this time" |
+| **Pending request — hold enabled** (`hold_pending = on`) | Blocks its requested time (plus buffer) until decided, withdrawn or expired, up to **48 hours** after submission (then it stops blocking, but stays pending) | Shown as tentative hold |
+| **Time proposed by the owner** | **Always blocks** the proposed time until the customer answers or the proposal expires (default 48 h, never later than the proposed start minus minimum notice) | Shown as tentative hold |
+| Declined / withdrawn / expired / duplicate | No effect | Hidden |
+
+**Default rationale:** holding times for unconfirmed requests lets one spam submission or an unresponsive customer block a detailer's day. The default favours the owner's control; owners who prefer protecting customers from collisions can turn holding on. Daily job caps count only confirmed appointments (and holds, when holding is on).
+
+### 6.5 Conflicting appointments — validation rules
+
+**Hard rules (always enforced; cannot be overridden):**
+
+1. Two appointments of the same business with status **Scheduled** or **In progress** must not overlap in time (`[starts_at, ends_at)`). Enforced by a PostgreSQL **exclusion constraint** on `(business_id, tstzrange(starts_at, ends_at))`, so no code path — approval, accepting a proposal, manual creation, rescheduling, reopening — can create an overlap, even under concurrent requests.
+2. `ends_at > starts_at`; appointment length between 15 minutes and 72 hours (multi-day shop jobs such as coatings are created manually; public requests are limited to a single working window).
+3. Appointments reference a customer and vehicle of the **same business** (composite foreign keys).
+4. Approval is idempotent: a request can produce at most one appointment (unique constraint on `appointments.booking_request_id`).
+
+**Soft rules (warn; owner must explicitly confirm):**
+
+- Overlaps another appointment's **buffer**
+- Outside working hours, or during time off
+- Exceeds the max jobs per day
+- Less than the minimum notice, or in the past
+- Overlaps a **tentative hold** (another pending request with holding on, or an outstanding proposal)
+
+**Public requests** may only choose slots that pass all hard and soft rules. Availability is re-checked when the request is submitted and again on approval; if a hard rule fails on approval, approval is blocked and the owner is offered **Propose a different time**.
+
+When a customer accepts a proposed time, the hard rules run again. If the time is no longer available (e.g., the owner booked over it manually after confirming a warning), acceptance fails gracefully: the customer sees "This time is no longer available — [Business] will contact you", the request returns to `pending`, and the owner gets a notification.
+
+### 6.6 Duplicate requests
+
+| Case | Rule |
+|---|---|
+| Double-click / network retry | Each form session carries an **idempotency key**; resubmitting returns the original request and status link. No duplicate row. |
+| Same contact sends another request while one is open | Accepted, but flagged **"Possible duplicate"** when the normalized phone or email matches an open (`pending` / `time_proposed`) request for the same business. Both are linked in the inbox; the owner can **Close as duplicate** (customer sees "combined with another request"). |
+| Excessive open requests | Max **3 open requests per contact per business**. Beyond that, the form shows a generic message: "We couldn't send this request. Please contact [Business] directly at (512) 555-0142." It does not reveal whether that phone/email has other requests. |
+| Automated spam | Per-IP and per-business rate limits and a honeypot field; a free bot challenge (e.g., Cloudflare Turnstile) can be added if abuse appears (requires account registration — later decision). |
+| Same person, different businesses | Not a duplicate. Businesses never see each other's requests or customers. |
+
+### 6.7 Cancellations
+
+| Who | When | Rule |
+|---|---|---|
+| Customer | `pending` / `time_proposed` | **Withdraw** from the status page at any time. Frees any hold. Owner notified in-app. |
+| Customer | Approved appointment, **before** the business's cancellation cutoff (default 24 h before start; configurable 0–72 h, or self-cancellation disabled) | **Cancel** from the status page with an optional reason. Appointment → Cancelled (by customer); slot freed; owner notified. |
+| Customer | After the cutoff | Status page shows the business's cancellation policy and call/text buttons; no self-cancel. |
+| Owner | Any time before completion | **Cancel** with a reason (internal) and optional customer-facing message; slot freed; status page updated; "Let the customer know" panel shown. |
+| Owner | Customer didn't show | **Mark no-show** (only after the start time). |
+
+Cancelled appointments are kept (with `cancelled_by`, `cancelled_at`, reason) for history and analytics. Nothing is charged or refunded: there are no payments in the MVP.
+
+### 6.8 Rescheduling
+
+- **Owner reschedules** an appointment from its detail page: picks a new time, runs hard and soft rules, saves. The previous time is kept in history; the status page shows "Time changed" with the new and previous times; the owner is prompted to inform the customer using the "Appointment rescheduled" template.
+- **Before approval**, changing the time is done with **Propose a different time** (the customer must accept).
+- **Customer-initiated rescheduling** is not self-service in the MVP. The status page says: "Need a different time? Contact [Business]" (call/text), or the customer can cancel (before cutoff) and send a new request.
+- Rescheduling never changes prices; the recorded estimate stays unless the owner edits items.
+
+### 6.9 Time zones and daylight-saving time
+
+1. **Business timezone is authoritative.** Each business has one IANA timezone from the **US list** (e.g., `America/New_York`, `America/Chicago`, `America/Denver`, `America/Phoenix`, `America/Los_Angeles`, `America/Anchorage`, `Pacific/Honolulu`, plus other US IANA zones such as `America/Detroit`, `America/Indiana/Indianapolis`, `America/Boise`). Chosen during onboarding; the browser's zone is only a suggestion.
+2. **Storage:** all instants in UTC (`timestamptz`). Working hours are stored as **local wall-clock times** per weekday; time off as local dates or local start/end times; both are interpreted in the business timezone at calculation time.
+3. **Display:** public pages always show the business's timezone ("Times are in Central Time (CT)"). If the visitor's device is in a different zone, a notice says so. The dashboard shows the zone abbreviation only when the device zone differs from the business zone. Customer-facing confirmations always include the abbreviation (e.g., "9:00 AM CST").
+4. **Spring forward** (local 2:00–2:59 AM doesn't exist): candidate start times in the gap are skipped. Appointments are stored as real durations, so a job spanning the change ends one wall-clock hour later than naive arithmetic suggests.
+5. **Fall back** (local 1:00–1:59 AM occurs twice): slots are generated per real instant; any ambiguous time is labelled with its abbreviation (CDT/CST).
+6. **Arizona (`America/Phoenix`) and Hawaii** have no DST; tests cover them.
+7. **Changing the business timezone:** existing appointments keep their absolute instant. The owner sees a warning listing future appointments whose local time will display differently and must confirm. Working hours keep their wall-clock values in the new zone.
+8. **"Today", date filters, daily caps, analytics periods and expiry jobs** all use the business's local calendar day.
+9. Request expiry, proposal expiry and cancellation cutoffs compare UTC instants.
+
+---
+
+## 7. Other key workflows
+
+### 7.1 Owner sign-up and onboarding
+
+1. **Pilot:** owner receives an invite (operator-created via Supabase Auth invite or an invite code) and accepts the pilot terms. **Paid launch:** owner signs up publicly; the 7-day trial starts when the business is created.
+2. Verifies email (Supabase Auth). An unverified owner can set up but cannot publish the booking page.
+3. Onboarding steps (§5.3). Services require the owner's own names, descriptions, prices and durations; we never fill in prices.
+4. Publish: link, copy button, QR code (generated locally).
+5. Lands on **Today** with a setup checklist.
+
+### 7.2 Customer submits an appointment request
+
+1. Opens `/b/[slug]`; sees the business's bookable services, prices and durations.
+2. Chooses service(s) and add-ons → vehicle (year, make, model, size class with examples, optional color/condition notes) → location (their address if the business is mobile; shop if fixed) → preferred start time (+ optional alternate) → contact (name, mobile phone and/or email; preferred contact method) → review.
+3. Consent checkbox: "I agree that [Business] may contact me about this request."
+4. Submit button: **"Send request"**.
+5. Confirmation: "Request sent — not confirmed yet," next steps, status link with **Copy link**.
+
+### 7.3 Customer sends an inquiry / quote request
+
+Same flow without a time slot, with "What do you need?" and an optional timeframe. Creates a **Lead** (status New, source "Booking page"), not a booking request. Confirmation explains the business will reply directly.
+
+### 7.4 Owner handles a request
+
+1. Notification + inbox badge. Opens the request.
+2. Reviews conflicts (§6.5), duplicate flags (§6.6), and customer/vehicle matching (exact normalized phone or email match within **this business only**; owner confirms link-or-create).
+3. **Approve** → appointment created; status page shows Confirmed.
+   **Propose a different time** → choose time (hard rules enforced), optional message, expiry → status `time_proposed`; the time is held.
+   **Decline** → optional customer message and internal reason; option to **Save as lead**.
+4. **Let the customer know** panel: template pre-filled with request details and `{status_link}`. Buttons: Copy, Open in Messages (`sms:`), Open in Mail (`mailto:`), Call (`tel:`). After using one, the owner is asked **"Did you send it?"** — *Yes* logs an outbound communication; *Not yet* creates nothing. DetailerHQ itself sends nothing.
+
+### 7.5 Day of the job
+
+1. **Today**: next appointment with time, address (opens maps app), tap-to-call/text, vehicle, services, prep notes, last visit's notes.
+2. **Start** (optional) → **Complete**: confirm **recorded final amounts** per line item (default to the booked estimate, editable; add/remove lines), optional payment note (Not recorded / Marked paid — cash / card / transfer / other / Unpaid). Copy: "Recorded amounts are for your records. DetailerHQ doesn't process payments."
+3. Completion triggers follow-up rules (e.g., maintenance reminder task in N days, set per service by the owner).
+
+### 7.6 Leads and quotes
+
+Leads are **inquiries and prospects**, tracked separately from booking requests. A lead may come from the public inquiry form, a declined request saved as a lead, or manual entry (phone, text, Instagram, Facebook, Google, referral, walk-in, repeat customer, other).
+
+| Lead status | Meaning | Transition |
+|---|---|---|
+| **New** | Not yet contacted | Default on creation |
+| **Contacted** | Owner has been in touch | Manual, or automatically when an outbound communication is logged on a New lead |
+| **Quote sent** | A quote has been marked sent | Automatic when a linked quote is marked Sent |
+| **Follow-up due** | The lead's next follow-up date has passed with no recorded inbound response since | Automatic (scheduled job) from Contacted / Quote sent; or manual |
+| **Booked** | An appointment was created for this lead | Automatic when an appointment is created from the lead or its accepted quote |
+| **Lost** | Not proceeding | Manual, with a reason (price, timing, went elsewhere, no response, not a fit, other) |
+
+Owners can move a lead to any status manually; every change is recorded in its history.
+
+**Quotes:** line items (from the business's services or custom), vehicle, valid-until date (default 14 days), notes, terms, optional single estimated tax line. Statuses: Draft → Sent → Accepted / Declined / Expired (automatic after valid-until). Shared via `/q/[token]` (read-only) and print view. **Accepted** → "Schedule it" pre-fills an appointment.
+
+**Values are recorded separately:** the quote's total is the **quoted value**; the appointment's estimated total is the **booked job value**; the completed appointment's recorded final amount is the **recorded revenue**. Changing one never overwrites another.
+
+### 7.7 Follow-ups, reminders and templates
+
+- **Tasks:** title, due date/time, optional link to customer / lead / quote / appointment, status (open, done, dismissed), and an **outcome** when completed: *Responded*, *No response*, *Booked*, *Not interested*, *Other*.
+- **Automatic task rules** (owner-editable, can be turned off):
+  - Quote marked Sent → "Follow up on quote Q-0012" in 3 days.
+  - Appointment completed → "Maintenance reminder for [customer]" after the service's follow-up interval (blank by default; the owner sets it).
+  - Request pending > 24 h → "Respond to request from [customer]".
+  - Appointment tomorrow → optional "Remind [customer] about tomorrow" (off by default).
+- **Message templates** (`/app/settings/templates`): editable text with placeholders. Defaults provided for: request approved, time proposed, request declined, appointment reminder, appointment rescheduled, appointment cancelled, quote sent, quote follow-up, thank-you after job, maintenance reminder. Default texts contain **no prices or business-specific claims**.
+  - Placeholders: `{customer_first_name}`, `{business_name}`, `{business_phone}`, `{service_names}`, `{vehicle}`, `{appointment_date}`, `{appointment_time}`, `{appointment_address}`, `{proposed_time}`, `{status_link}`, `{quote_link}`, `{quote_total}`, `{quote_valid_until}`.
+  - A missing value (e.g., no address) is highlighted and must be edited before copying.
+- **Response tracking:** logging an **inbound** communication on a lead records a response and clears Follow-up due; task outcomes record whether the lead responded or booked.
+- **Communication log:** each entry has channel (call, text, email, Instagram, Facebook, in person, other), direction (inbound/outbound), date/time, summary, optional template used, and who logged it. Entries are created **only** manually or after the owner confirms "Did you send it?". The product never claims a message was delivered.
+
+### 7.8 Manual appointment
+
+New → Appointment → search or create customer → pick or add vehicle → services (business prices pre-filled, editable) → time (availability shown; hard rules enforced; soft rules warn) → save.
+
+### 7.9 Configure services and availability
+
+- Services: create/edit/reorder; **bookable on/off**; hide/archive without affecting historical snapshots; per-size-class prices/durations; "quote required" sends customers to the inquiry form.
+- Availability: weekly windows, time off (single day, date range, or partial day), rules (§6.4). Changes affect only future slot calculation; existing appointments are never moved.
+
+### 7.10 Trial end and subscription (paid launch)
+
+See §12. In short: banner during the trial with the exact end date and time; at expiry the account becomes **restricted** (read-only + export + subscribe), the booking page stops accepting new requests, and **no data is deleted**.
+
+### 7.11 Export and deletion
+
+- Export: CSV zip (customers, vehicles, appointments + items, requests, leads, quotes + items, tasks, communications) generated on demand, available in every account state including restricted.
+- Deletion request: typed confirmation → booking page offline immediately → hard deletion after the disclosed grace period (§12.5).
+
+---
+
+## 8. Domain model
+
+### 8.1 Conventions
+
+- **Every business-owned table has a non-null `business_id`.** No exceptions.
+- Primary keys: random UUIDs. Human-readable numbers (`R-0042`, `Q-0012`) are per-business display values only.
+- Timestamps in UTC (`timestamptz`); business timezone for local interpretation (§6.9).
+- Money in integer **cents**, USD only.
+- Snapshots: requests, appointments and quotes copy service names, prices and durations so menu edits never rewrite history.
+- `created_at`, `updated_at`, `created_by` everywhere; `business_id` is **immutable** after insert (trigger).
+- Soft archive (`archived_at`) for customers, vehicles, services; hard deletion only through explicit deletion flows.
+
+### 8.2 Entities
+
+| Entity | Key fields (conceptual) |
+|---|---|
+| **auth.users** (Supabase) | id, email, encrypted password, email confirmation — managed by Supabase Auth; no business data |
+| **Profile** | user_id, display name |
+| **Business** | id, name, slug, phone, email, timezone (US IANA), service_mode, service_area_text, shop_address, accepting_requests, published_at, account_status, pilot_ends_at, trial_started_at, trial_ends_at, access_restricted_at, deletion_requested_at |
+| **Membership** | business_id, user_id, role (`owner`) — unique pair |
+| **BookingSettings** | business_id (1:1), slot_interval_min, min_notice_min, horizon_days, buffer_min, max_jobs_per_day, hold_pending, proposal_expiry_hours, customer_cancel_cutoff_hours, customer_self_cancel, intro_text, policies_text, prep_instructions |
+| **AvailabilityRule** | business_id, weekday, start_time, end_time (local) |
+| **TimeOff** | business_id, starts_local, ends_local (or all-day dates), label |
+| **VehicleSizeClass** | business_id, name, examples, sort_order |
+| **ServiceCategory** | business_id, name, sort_order |
+| **Service** | business_id, category_id, name, description, price_type, base_price_cents, base_duration_min, is_addon, is_bookable, follow_up_after_days, sort_order, archived_at |
+| **ServicePrice** | business_id, service_id, size_class_id, price_cents, duration_min |
+| **Customer** | business_id, first/last name, phone_e164, email, preferred_contact, address (mobile jobs only), notes, source, archived_at |
+| **Vehicle** | business_id, customer_id, year, make, model, trim, color, size_class_id, plate (optional), notes, archived_at |
+| **BookingRequest** | business_id, number, status, idempotency_key, token_hash, requested_start/end, alternate_start, proposed_start/end, proposal_message, proposal_expires_at, location_type, service_address, contact snapshot (name, phone_e164, email, preferred_contact), vehicle snapshot, notes, consent_at, duplicate_of_id, decline_message, decline_reason (internal), decided_at/by, customer_id, vehicle_id |
+| **BookingRequestItem** | business_id, request_id, service_id, name/price/duration snapshot |
+| **Appointment** | business_id, customer_id, vehicle_id, booking_request_id (unique, nullable), quote_id, lead_id, starts_at, ends_at, location_type, service_address, status, estimated_total_cents, recorded_total_cents, payment_note, cancelled_by (customer/business), cancelled_at, cancel_reason, customer_message, completed_at, internal_notes |
+| **AppointmentItem** | business_id, appointment_id, service_id, name, quantity, estimated_price_cents, recorded_price_cents, duration_min |
+| **Lead** | business_id, status, source, lost_reason, contact snapshot, customer_id, vehicle_description, request_text, next_follow_up_at, last_inbound_at |
+| **Quote** | business_id, number, status, lead_id, customer_id, vehicle_id/vehicle_text, valid_until, notes, terms, subtotal/discount/tax/total cents, token_hash, sent_at, decided_at |
+| **QuoteItem** | business_id, quote_id, service_id, name, description, quantity, price_cents, duration_min |
+| **Task** | business_id, title, due_at, status, kind (manual / rule), rule_key, related_type, related_id, outcome, completed_at |
+| **MessageTemplate** | business_id, purpose, name, body, is_default |
+| **Communication** | business_id, customer_id, lead_id, related_type/id, channel, direction, occurred_at, summary, template_id, logged_by |
+| **Note** | business_id, related_type/id, body, created_by |
+| **Notification** | business_id, type, related_type/id, title, created_at, read_at |
+| **ActivityEvent** | business_id, entity_type/id, kind (status_changed, rescheduled, …), from/to, actor (owner / customer / system), created_at — powers timelines and status page history |
+| **AuditEvent** | business_id (nullable), actor_type/id, action, entity, metadata (no PII), ip_hash, created_at — append-only security log |
+| **Subscription** *(paid launch)* | business_id, provider, provider_customer_id, provider_subscription_id, status, current_period_end, cancel_at_period_end |
+| **ContactSubmission** | Marketing-site contact/pilot applications (not business data) |
+
+### 8.3 Relationships
+
+```
+auth.users ──< Membership >── Business ──1 BookingSettings
+                                 │
+     ┌───────────┬───────────────┼───────────────┬──────────────────┐
+AvailabilityRule TimeOff  VehicleSizeClass  ServiceCategory ──< Service ──< ServicePrice
+                                 │
+Customer ──< Vehicle             │
+   │                             │
+   ├──< BookingRequest ──< BookingRequestItem
+   │        │ 0..1
+   │        ▼
+   ├──< Appointment ──< AppointmentItem
+   │        ▲
+   ├──< Lead ──< Quote ──< QuoteItem
    │
-   └──< Task, Note (polymorphic: customer / lead / quote / appointment)
+   └──< Communication, Task, Note (polymorphic: customer / lead / quote / appointment / request)
+Notification, ActivityEvent, AuditEvent — per business
 ```
 
-- A **BookingRequest** becomes at most one **Appointment** on approval.
-- A **Lead** may have many **Quotes**; an accepted **Quote** may produce one or more **Appointments** (e.g., multi-day coating).
-- A **Customer** has many **Vehicles**; an **Appointment** is for exactly one Vehicle in the MVP (multi-vehicle jobs = multiple appointments; revisit later).
-- **Every** foreign key between tenant tables must reference a row in the **same business**. Enforce with composite foreign keys `(business_id, id)` so the database itself rejects cross-tenant references.
+### 8.4 How records stay with the correct business
 
-### 7.4 Slot calculation (conceptual)
+1. **The business is never taken from the client.** For owner actions, `business_id` comes from the authenticated user's membership. For public submissions, it comes from resolving the `[slug]` on the server. Client-provided `business_id` values are ignored.
+2. **Composite foreign keys** `(business_id, id)` on every reference between business-owned tables: a vehicle, appointment, quote or task can only point at rows of the same business. The database rejects anything else.
+3. **`business_id` is immutable** (trigger rejects updates).
+4. **Matching is per business.** Customer de-duplication (by phone/email) only searches within the same business. The same person booking with two businesses has two unrelated customer records; there is no global customer identity.
+5. **RLS** on every table (§9.3) — even a buggy query cannot read another business's rows.
+6. **Exports, scheduled jobs and analytics** run per business.
 
-For a requested date and total duration *D* (sum of selected services/add-ons for the chosen size class):
+### 8.5 Slot calculation
 
-1. Take the business's availability windows for that weekday (local time).
-2. Generate candidate start times every `slot_interval_min` such that `start + D ≤ window_end`.
-3. Remove candidates earlier than `now + min_notice` or later than `today + horizon_days`.
-4. Remove candidates overlapping `TimeOff`.
-5. Remove candidates overlapping any Scheduled/In-progress appointment expanded by `buffer_min` on both sides (and pending requests too, if `hold_pending` is on).
-6. If the day already has `max_jobs_per_day` scheduled appointments, remove all candidates for that day.
+For a date and total duration *D* (selected services + add-ons for the chosen size class):
 
-The public page shows only resulting start times — never other customers' details or why a slot is unavailable. Availability is re-checked at submission and again at approval.
+1. Load the business's working windows for that local weekday.
+2. Generate candidate start instants every `slot_interval_min` (local wall-clock), skipping non-existent DST times, with `start + D ≤ window end`.
+3. Remove candidates before `now + min_notice` or beyond `horizon_days`.
+4. Remove candidates overlapping time off.
+5. Remove candidates overlapping confirmed appointments ± buffer, outstanding proposals, and pending requests if `hold_pending` is on (§6.4).
+6. If the day has reached `max_jobs_per_day`, remove the day.
 
----
-
-## 8. Security, privacy and data isolation
-
-### 8.1 Tenant isolation (non-negotiable)
-
-Defence in depth — three independent layers, each of which must on its own prevent cross-business access:
-
-1. **Application layer.** All tenant data access goes through a single data-access module that requires a `TenantContext` (business_id derived from the authenticated session's membership — never from a URL parameter, form field or header). Route handlers cannot call the database directly. A lint rule or code review checklist enforces this.
-2. **Database layer — Row-Level Security.** RLS enabled and **forced** on every tenant table. Policies compare `business_id` to a per-transaction setting (e.g., `app.current_business_id`) set by the data-access module, or to the auth provider's JWT claim. The application connects with a role that **cannot bypass RLS**; migrations run under a separate owner role.
-3. **Schema layer.** Composite foreign keys `(business_id, id)` prevent a row in one business referencing a row in another, even through a bug.
-
-Additional rules:
-
-- Lookups by ID always include the business filter; a record belonging to another business returns **404**, not 403 (don't confirm existence).
-- Public pages resolve the business by slug and expose only explicitly public fields (allow-list serialisation).
-- Public tokens (`/r/`, `/q/`) are 128+ bit random values; only a **hash** is stored; tokens expose exactly one record, scoped to that business; they can be revoked/regenerated by the owner.
-- Background jobs (expiry, task generation) iterate per business and set tenant context explicitly.
-- CSV exports are generated per business within tenant context and streamed directly; no shared temp storage.
-- An automated **isolation test suite** (two seeded businesses; every endpoint and query attempted cross-tenant) runs in CI and blocks deploys on failure.
-
-### 8.2 Authentication and sessions
-
-- Email + password via a maintained auth provider/library (no hand-rolled crypto). Passwords hashed by the provider (bcrypt/argon2).
-- Minimum 10-character passwords, checked against a common-password list; no composition rules.
-- Email verification required before the booking page can be published.
-- Sessions in `HttpOnly`, `Secure`, `SameSite=Lax` cookies; 30-day rolling session; "sign out other sessions" available.
-- Rate limiting and progressive delays on sign-in, sign-up and reset endpoints.
-- Password reset tokens single-use, expire in 60 minutes.
-- Optional TOTP 2FA: post-MVP but planned.
-
-### 8.3 Public endpoint protection
-
-- Booking/quote request submission: per-IP and per-business rate limits, honeypot field, and a privacy-friendly challenge (e.g., Cloudflare Turnstile, free) when thresholds are exceeded (D-7).
-- Server-side validation of every field (schema validation library); length limits on all text; phone normalised to E.164.
-- Request submissions re-validate availability and service visibility server-side; client-provided prices are ignored and recomputed.
-
-### 8.4 Web security baseline
-
-- HTTPS only, HSTS.
-- Content Security Policy (no inline scripts except nonced), `X-Content-Type-Options`, `Referrer-Policy: strict-origin-when-cross-origin`, `frame-ancestors 'none'` for app pages.
-- CSRF protection for all state-changing requests (framework-native for server actions plus same-site cookies and origin checks).
-- Output encoding by default (framework escaping); no `dangerouslySetInnerHTML` on user content. Owner-entered booking-page text rendered as plain text with line breaks — no HTML/Markdown in MVP.
-- Dependency scanning (GitHub Dependabot, free) and lockfile committed.
-- Secrets only in host environment variables; never in the repo.
-
-### 8.5 Privacy
-
-- **Roles under privacy law:** the business is the controller of its customers' data; DetailerHQ acts as processor/service provider. Terms and Privacy Policy must say this. (Legal review recommended before charging — see risks.)
-- **Data minimisation:** collect only what's needed to perform the job — name, phone and/or email, service address (mobile only), vehicle details. VIN optional. No date of birth, no licence numbers, no payment card data.
-- **No third-party tracking** on the public booking page or dashboard: no ad pixels, no session replay. Marketing site may use cookieless, privacy-friendly analytics only if cost allows (or none).
-- **Logs:** no PII in application logs; IPs stored only as salted hashes for rate limiting/abuse; error monitoring configured to scrub request bodies.
-- **Consent:** booking forms record consent timestamp for being contacted about the request. No marketing consent is collected because we don't send marketing.
-- **Retention:** expired/declined requests without a linked customer purged after 12 months (configurable later). Audit events kept 12 months.
-- **Rights requests:** owners can edit/delete a customer record (hard delete with confirmation, cascading to vehicles/notes; appointments anonymised to keep analytics totals). Export via CSV.
-- **Account deletion:** immediate deactivation, hard deletion after 30 days, backup retention disclosed.
-
-### 8.6 Auditing and operations
-
-- Audit events for: sign-in, password change, request approve/decline, appointment status changes, data export, customer deletion, settings changes, any operator access.
-- Daily automated database backups (provider-managed), with a documented and once-tested restore procedure before first paying customer.
-- Error monitoring with PII scrubbing; uptime check on the booking page.
+Only start times are returned publicly.
 
 ---
 
-## 9. Acceptance criteria
+## 9. Security, privacy and data isolation
 
-Each feature is "done" when all criteria pass on **both** a 375 px-wide phone viewport and a 1280 px desktop viewport, meet the accessibility requirements in `DESIGN_SYSTEM.md` §12, and have automated tests where noted (🧪).
+### 9.1 Principles
 
-### 9.1 Account & authentication
+- Each business can access **only its own data**, enforced in three independent layers: server authorization, **Supabase Row Level Security**, and schema constraints.
+- **Privileged credentials never reach the browser.**
+- Collect the minimum customer data needed to do the job; retain it only as long as disclosed.
 
-- [ ] An owner can sign up with name, email and password and receives a verification email. 🧪
-- [ ] An unverified owner can use onboarding but cannot publish the booking page; the UI explains why.
-- [ ] Sign-in with wrong credentials shows a generic error ("Email or password is incorrect") and is rate-limited after repeated attempts. 🧪
-- [ ] Password reset links expire after 60 minutes and work once. 🧪
-- [ ] Signing out ends the session; "Sign out other sessions" invalidates other sessions. 🧪
-- [ ] Authenticated pages redirect unauthenticated visitors to sign-in and back afterwards. 🧪
+### 9.2 Authorization checks for every operation
 
-### 9.2 Onboarding
+All owner operations run **server-side** (Next.js server actions/route handlers) using a Supabase client bound to the **user's session**, so RLS applies to every query. Public operations call narrowly scoped database functions.
 
-- [ ] A new owner can complete all five steps in under 10 minutes in a moderated test.
-- [ ] Each step saves on continue; refreshing or returning later resumes at the last incomplete step.
-- [ ] Starter service templates have **no prefilled prices**; the owner cannot publish a fixed-price service without a price.
-- [ ] Slug must be unique, 3–40 chars, lowercase letters, numbers and hyphens; reserved words blocked. 🧪
-- [ ] After publishing, the owner sees the full link, a copy button and a downloadable QR code.
+| Operation | Caller | Server-side check | Database protection |
+|---|---|---|---|
+| List / read business records | Owner | Valid session; resolve membership → business | RLS `SELECT` policy: `is_member(business_id)` |
+| Create a business record | Owner | Session + membership; set `business_id` from membership; validate input (Zod); check account can write (§12.4) | RLS `INSERT … WITH CHECK is_member(business_id) AND can_write(business_id)`; composite FKs |
+| Update a record | Owner | Same as create; record ID scoped to business | RLS `UPDATE USING` + `WITH CHECK`; `business_id` immutable trigger; composite FKs |
+| Delete / archive | Owner | Same; destructive actions require typed confirmation for customers and the business | RLS `DELETE` policy |
+| Approve / decline / propose / close duplicate | Owner | Membership; request in an allowed state; inside one transaction | Database function running as the caller (`SECURITY INVOKER`) so RLS applies; exclusion constraint; unique `booking_request_id` |
+| Reschedule / cancel / complete appointment | Owner | Membership; allowed status transition | RLS; exclusion constraint; transition check in function |
+| Configure services, availability, booking page, templates | Owner | Membership; validation | RLS |
+| Export CSV | Owner | Membership; allowed in all non-suspended states | RLS (export uses the user's session) |
+| View analytics | Owner | Membership | RLS; analytics views use `security_invoker` |
+| View public booking page | Anyone | Resolve slug; business published & not suspended | `SECURITY DEFINER` function returning an **allow-list** of public fields only; no direct table access for `anon` |
+| Get available slots | Anyone | Rate limit | Definer function returning start times only |
+| Submit request / inquiry | Anyone | Rate limit, honeypot, idempotency key, validation, accepting requests, open-request cap | Definer function; prices/durations recomputed in the database; `business_id` from slug |
+| View request status / accept / decline proposal / withdraw / cancel | Token holder | Rate limit; hash token; allowed state & cutoff | Definer function looks up by token hash, scoped to one request; allow-listed output |
+| View shared quote | Token holder | Rate limit; hash token | Definer function; allow-listed output |
+| Scheduled jobs (expire requests/proposals/quotes, follow-up due, task rules) | System (`pg_cron`) | — | Runs inside the database; iterates per business |
+| Change account status / billing events *(paid launch)* | Operator / billing webhook | Webhook signature verified; idempotent | Server-only privileged path (§9.4) |
+| Break-glass support access | Operator | Owner permission; reason recorded | Audit event |
 
-### 9.3 Service menu
+A record belonging to another business always yields **404 Not Found**, never 403, so existence isn't revealed.
 
-- [ ] Owner can create, edit, reorder, hide and archive services and categories.
-- [ ] Price type "fixed" requires a price; "starting at" requires a price and displays "From $X"; "quote required" hides price and routes customers to the quote form. 🧪
-- [ ] Per-size-class price/duration overrides take precedence over base values on the booking page and in totals. 🧪
-- [ ] Editing a service's price does not change any existing appointment, request or quote totals. 🧪
-- [ ] Add-ons can only be selected alongside a main service.
+Security-definer functions: fixed `search_path`, owned by a dedicated role, `EXECUTE` granted only to the intended roles, inputs validated, outputs explicitly listed. Each has dedicated tests.
 
-### 9.4 Availability
+### 9.3 Row Level Security
 
-- [ ] Owner can set multiple windows per weekday, interval, notice, horizon, buffer and daily cap.
-- [ ] Time off blocks slots for the whole range across days.
-- [ ] Slot generation unit tests cover: windows, duration fit, notice, horizon, buffer both sides, daily cap, time off, pending holds, and DST start/end days in at least two US timezones. 🧪
-- [ ] Changing availability never modifies existing appointments.
+- RLS **enabled and forced** on every table in exposed schemas. A CI check queries the catalog and fails the build if any table lacks RLS or policies.
+- Helper `is_member(business_id)` (stable, `SECURITY DEFINER`, fixed search path) checks `memberships` against `auth.uid()`.
+- Separate policies per command (`SELECT`, `INSERT`, `UPDATE`, `DELETE`) with both `USING` and `WITH CHECK`.
+- The `anon` role has **no direct privileges** on business tables; public access is only through the definer functions above.
+- Write policies also check `can_write(business_id)` so restricted accounts (§12.4) are read-only at the database level (added in the paid-launch phase; pilot accounts always writable).
+- Run Supabase's security advisor / database linter before each release.
+- RLS is tested with **pgTAP** (supported by the Supabase CLI) as both the app role and `anon`.
 
-### 9.5 Public booking page and request flow
+### 9.4 Secrets and privileged credentials
 
-- [ ] `/b/[slug]` shows only active public services and public business fields; no private data appears in the HTML or network responses. 🧪
-- [ ] Visitors can complete a request on a phone in ≤ 6 steps with no horizontal scrolling and with the keyboard type appropriate to each field (tel, email, numeric).
-- [ ] Only valid slots are offered; if the slot becomes unavailable before submission, the customer is told and asked to choose another — no silent failure. 🧪
-- [ ] Prices and durations shown match the server-computed totals; server ignores client-sent totals. 🧪
-- [ ] Phone or email is required; phone numbers are normalised; consent checkbox required. 🧪
-- [ ] On success, the confirmation screen clearly states the request is **not yet confirmed** and shows a status link.
-- [ ] Submission is rate-limited and honeypot-protected; excessive submissions are rejected without revealing the limit. 🧪
-- [ ] If the business is paused or not accepting requests, the page explains this and shows the business's phone/email instead of forms.
-- [ ] Booking page LCP < 2.5 s on simulated mid-range phone / 4G (Lighthouse).
+- The Supabase **anon (publishable) key** is designed to be public and is only safe because of RLS; it may be present in the browser.
+- The **service-role (secret) key**:
+  - is **never** exposed to the browser, never in a `NEXT_PUBLIC_*` variable, never logged, never committed;
+  - is **not used by the web application's request handlers in the MVP** — public operations use definer functions, and scheduled jobs run in `pg_cron`;
+  - is used only by the operator's local scripts/CLI and, at paid launch, by the billing webhook handler in a server-only module (`import "server-only"`).
+- CI scans the built client bundle for secret patterns and fails if found.
+- Secrets live in the hosting provider's environment variables; `.env*` files are git-ignored; an `.env.example` lists names only.
 
-### 9.6 Requests inbox
+### 9.5 Authentication (Supabase Auth)
 
-- [ ] Pending requests appear within one page refresh of submission, oldest first, with a count badge in navigation.
-- [ ] Request detail shows conflict warnings (overlap incl. buffer, daily cap, outside hours, time off). 🧪
-- [ ] Approve creates exactly one appointment with snapshot items, links/creates customer and vehicle, sets status Approved, and records who/when. Double-clicking or retrying does not create duplicates (idempotent). 🧪
-- [ ] "Approve at a different time" updates the appointment time and the customer's status page.
-- [ ] Decline sets status Declined, optionally stores a customer-facing message (shown on status page) and optional internal reason, and offers "Save as lead".
-- [ ] Requests whose requested time has passed while pending become Expired automatically. 🧪
-- [ ] The "Let the customer know" panel produces correct `sms:`, `mailto:`, `tel:` links and copy text with the business's timezone-formatted date/time; DetailerHQ sends nothing itself.
+- Email + password; email confirmation required before publishing.
+- Server-side session handling with Supabase's SSR helpers; HTTP-only cookies.
+- Password policy configured in Supabase (minimum length ≥ 10; leaked-password protection if available on the plan — verify).
+- Supabase Auth rate limits plus our own limits on sign-in/up forms.
+- Operator accounts (Supabase dashboard) use MFA.
+- Optional owner 2FA (Supabase MFA) — later.
 
-### 9.7 Appointments & calendar
+### 9.6 Web security baseline
 
-- [ ] Day, Week and Agenda views render appointments at correct local times, including across DST changes. 🧪
-- [ ] Pending requests (if shown) are visually distinct from scheduled appointments and are not confused in counts.
-- [ ] Owner can create an appointment manually; overlapping a confirmed appointment requires explicit confirmation.
-- [ ] Status transitions allowed: Scheduled → In progress → Completed; Scheduled/In progress → Cancelled; Scheduled → No-show; Completed can be reopened to Scheduled only with confirmation (correcting mistakes). 🧪
-- [ ] Completing requires a final price (defaults to estimate) and records a payment note; UI wording is "recorded", never "charged" or "collected".
-- [ ] Address opens the device's maps app; phone number opens call/text.
+HTTPS/HSTS; Content Security Policy; CSRF protection (server actions' origin checks + SameSite cookies); framework output escaping, no HTML rendering of user input; owner-entered booking page text rendered as plain text; dependency scanning (Dependabot); lockfile committed; strict input validation and length limits on every field.
 
-### 9.8 Customers & vehicles
+### 9.7 Privacy and data minimization
 
-- [ ] Search finds customers by partial name, phone (any formatting), email or plate within 300 ms for 5,000 customers. 🧪
-- [ ] Customer detail shows vehicles, upcoming and past appointments, quotes, leads, open tasks, notes, and lifetime recorded revenue (sum of completed appointments' final totals).
-- [ ] Duplicate detection suggests existing customers on matching phone or email when creating a customer or approving a request.
-- [ ] Archiving hides a customer from lists but keeps history; deleting (with typed confirmation) removes PII and anonymises historical appointments. 🧪
-- [ ] Vehicle detail shows chronological service history.
+- **Roles:** the detailer is responsible for their customers' data (controller); DetailerHQ processes it on their behalf (service provider/processor). Stated in Terms and Privacy Policy, subject to legal review.
+- **Customer data collected:** name, phone and/or email, preferred contact method, service address (mobile jobs only), vehicle year/make/model/size/color, optional plate, notes. **Not collected:** date of birth, driver's license, payment card data, precise location tracking. VIN not collected in the MVP.
+- **No third-party trackers** (ad pixels, session replay) on the booking page or dashboard.
+- **Logs:** no PII; IPs only as salted hashes for rate limiting; error monitoring (if used) scrubs request bodies.
+- **Consent:** only for being contacted about the request. No marketing consent collected because no marketing is sent.
+- **US considerations:** CAN-SPAM applies to our own outreach email (§15); TCPA/10DLC would apply before any future automated SMS; state privacy laws (e.g., California) to be assessed in legal review. *This plan is not legal advice.*
 
-### 9.9 Leads
+### 9.8 Retention and deletion (summary; details in §12.5)
 
-- [ ] Public quote requests create a Lead with source "Booking page" and status New. 🧪
-- [ ] Owner can create leads manually with any source and move them through statuses; Lost requires a reason.
-- [ ] Creating a quote from a lead links them and sets lead status to Quoted (unless already Won/Lost).
-- [ ] Converting a lead creates or links a Customer without duplicating existing ones.
+| Data | Retention |
+|---|---|
+| Active account data | Kept while the account exists; owner controls edits and deletion |
+| Declined / withdrawn / expired / duplicate requests not linked to a customer | Purged 12 months after closing |
+| Customer deleted by owner | Hard-deleted with vehicles, communications and notes; historical appointments kept **anonymized** so totals remain accurate |
+| Notifications | 90 days |
+| Audit events | 12 months |
+| Restricted accounts (trial expired / subscription ended) | **Not deleted at trial end**; retained per §12.5 |
+| Backups | Provider-managed; deleted data persists until backups rotate (disclosed) |
 
-### 9.10 Quotes
+End customers who ask DetailerHQ to delete their data are directed to the business; we assist the business on request.
 
-- [ ] Quote numbers are sequential and unique per business (Q-0001…), unaffected by other businesses. 🧪
-- [ ] Totals = Σ(line price × qty) − discount, computed server-side in cents. 🧪
-- [ ] Marking Sent sets `sent_at`, generates the share link, and creates a follow-up task per the business's rule. 🧪
-- [ ] `/q/[token]` shows the quote and business contact info only; invalid/revoked tokens show a generic "link not valid" page. 🧪
-- [ ] Quotes past `valid_until` while Sent become Expired automatically. 🧪
-- [ ] The print view fits on US Letter and A4 without clipped content.
-- [ ] "Schedule it" on an accepted quote opens a new appointment prefilled with customer, vehicle and quote items.
+### 9.9 Auditing and operations
 
-### 9.11 Follow-up tasks
-
-- [ ] Owner can create, edit, complete, dismiss and reschedule tasks; tasks can link to a customer, lead, quote or appointment.
-- [ ] Automatic tasks are created exactly once per trigger (quote sent; appointment completed for services with a follow-up interval). 🧪
-- [ ] Today screen shows overdue and due-today tasks; overdue is marked with text, not only color.
-- [ ] No automatic task ever sends a message to a customer.
-
-### 9.12 Analytics
-
-- [ ] Every metric has a written definition visible in the UI and matches a reference SQL query in tests using seeded data. 🧪
-- [ ] Metrics: requests received; approval rate (approved ÷ decided); completed appointments; recorded revenue; average recorded job value; cancellations & no-shows; quote win rate (accepted ÷ (accepted + declined + expired)); top services by count and recorded revenue; leads by source and outcome; new vs. returning customers.
-- [ ] Date ranges are applied in the business's timezone. 🧪
-- [ ] With insufficient data the UI shows "Not enough data yet" with the underlying count rather than a percentage of a tiny sample (threshold: < 5 decided items for rates).
-- [ ] No demo, sample or projected numbers are ever shown in production accounts.
-
-### 9.13 Settings & data
-
-- [ ] Owner can update business profile, timezone, size classes and follow-up rules; timezone changes warn that existing appointments keep their absolute time.
-- [ ] CSV export includes customers, vehicles, appointments (with items), quotes (with items), leads, tasks; files open correctly in Excel and Google Sheets (UTF-8 BOM, ISO dates). 🧪
-- [ ] Deletion request requires typing the business name, deactivates immediately, and schedules hard deletion. 🧪
-
-### 9.14 Data isolation (cross-cutting)
-
-- [ ] For every authenticated route and server action, a test signed in as Business A cannot read, list, create-linked, update or delete any Business B record; responses are 404. 🧪
-- [ ] Direct database tests with the application role prove RLS blocks cross-tenant reads/writes even when the application filter is omitted. 🧪
-- [ ] Attempting to link an appointment to another business's customer fails at the database level. 🧪
-
-### 9.15 Marketing site
-
-- [ ] All claims on the site correspond to shipped features; a checklist review is done before each publish.
-- [ ] No fabricated testimonials, customer logos, user counts or ratings.
-- [ ] Lighthouse: Performance ≥ 90, Accessibility 100, Best Practices ≥ 95 on Home and Pricing (mobile).
+Audit events for sign-in, password change, approve/decline/propose, cancellations, reschedules, exports, customer deletion, settings changes, account status changes and any operator access. Daily provider backups with a restore drill before the first pilot uses real data. Uptime check on the booking page.
 
 ---
 
-## 10. Architecture and operating cost
+## 10. Notifications
 
-### 10.1 Principles
+**MVP: in-app only.** No email, SMS or push notifications are sent to owners or customers. Core functionality must work without any messaging service.
 
-- **One deployable application**, one database. No microservices, no queues, no separate API server.
-- **Boring, well-documented technology** with large communities.
-- **Server-rendered by default**, minimal client JavaScript; the booking page in particular must be fast on poor mobile connections.
-- **Managed services on free or low fixed tiers**; nothing priced per-message.
-
-### 10.2 Proposed stack (recommendation — to confirm in review)
-
-| Layer | Choice | Rationale |
+| Event | In-app notification | Also surfaced in |
 |---|---|---|
-| Language | TypeScript (strict) | One language front to back; type-safe domain model. |
-| Web framework | Next.js (App Router), React server components + server actions | Marketing site, public pages and dashboard in one app; SSR for speed and SEO. |
-| Database | PostgreSQL (managed — Supabase or Neon) | Relational data, RLS for tenant isolation, mature tooling. |
-| Data access | Drizzle ORM + SQL migrations in repo | Typed queries, readable SQL, explicit migrations; easy to set the per-transaction tenant setting for RLS. |
-| Auth | Supabase Auth *or* an open-source library storing users in our Postgres (e.g., Better Auth / Auth.js) | Avoid hand-rolled auth. Decision D-3. |
-| Validation | Zod schemas shared by forms and server | Single source of validation truth. |
-| UI | Hand-built components on accessible headless primitives (e.g., Radix UI) + CSS variables / Tailwind configured **only** with our design tokens | Accessibility for free; visual identity entirely ours (no default theme). |
-| Icons | Lucide (MIT) | Consistent, neutral line icons. |
-| Dates | `date-fns` + `date-fns-tz` (or Temporal polyfill) | Timezone-correct slot logic. |
-| Scheduled work | Host cron (e.g., Vercel Cron) calling one authenticated endpoint every 15 min | Expire requests/quotes, generate tasks. No queue needed. |
-| Transactional email (auth only) | Provider free tier (e.g., Resend) via SMTP | Verification and password reset only. |
-| Bot protection | Cloudflare Turnstile (free) | Only on public forms when needed. |
-| Error monitoring | Sentry free tier with PII scrubbing | |
-| Testing | Vitest, Playwright (E2E), axe-core | See §12. |
-| CI | GitHub Actions (free minutes for small repos) | Lint, type-check, tests, isolation suite. |
+| New appointment request | ✅ | Requests badge, Today |
+| Possible duplicate request | ✅ (grouped) | Request detail |
+| New inquiry (lead) | ✅ | Leads badge, Today |
+| Customer accepted / declined a proposed time | ✅ | Request detail |
+| Customer withdrew a request / cancelled an appointment | ✅ | Today, calendar |
+| Proposal or request expired | ✅ | Requests (Closed) |
+| Quote expired | ✅ | Quotes |
+| Task due / overdue | — | Tasks badge, Today |
+| Pilot / trial ending (≤ 3 days) | Banner | Every page |
 
-### 10.3 Estimated monthly cost
+- **Freshness:** server-rendered on navigation, plus lightweight polling (e.g., every 60 s while the tab is visible) for badge counts. No paid real-time service. Supabase Realtime may be evaluated later if included in the plan.
+- **Installable web app:** owners can add the app to their home screen; no push promises in the MVP.
+- **Customers** get status updates by visiting their status page; the owner's messages include the link.
+- **Later:** owner email notifications once a reliable provider is selected (§3.3).
 
-Prices change; verify at the time of purchase. Nothing is purchased until approved.
+---
 
-| Item | Development | Production (first ~100 businesses) |
+## 11. Analytics definitions
+
+Rules:
+
+- Every metric is computed **only from recorded data** in the selected period, in the **business's timezone**.
+- Every metric shows its definition in the UI (info button).
+- **Rates** require at least **5** items in the denominator; otherwise show "Not enough data yet" with the count (e.g., "3 decided requests").
+- No industry benchmarks, projections, or invented comparisons. Comparisons to the previous period are shown only when both periods meet the threshold.
+- **No causal claims.** The product never states or implies that a follow-up, template or reminder *caused* a booking. Sequential metrics are labelled "after", not "from" or "because of".
+- No demo or sample data is ever shown in a real account.
+
+### 11.1 Three distinct money values
+
+| Term | Definition | Source |
 |---|---|---|
-| Hosting (Vercel Pro — Hobby tier is non-commercial use only) | $0 (Hobby) | ~$20 |
-| Postgres + auth + daily backups (Supabase Pro) | $0 (Free; pauses when idle) | ~$25 |
-| Transactional email (auth emails only) | $0 | $0 (free tier) |
-| Turnstile, Sentry, GitHub, Dependabot | $0 | $0 |
-| Domain | — | ~$1–2 (≈$15–25/year) |
-| **Total** | **$0** | **≈ $45–47/month** |
+| **Quoted value** | Sum of `total` of quotes **sent** in the period (by sent date) | Quotes |
+| **Booked job value** | Sum of `estimated_total` of appointments **scheduled for** the period (by start date) with status Scheduled, In progress or Completed | Appointments |
+| **Recorded revenue** | Sum of `recorded_total` of appointments **completed** with start date in the period, as entered by the owner. Not verified payments. | Completed appointments |
 
-**Lower-cost alternative:** a single small VPS (≈ $5–15/month) running the app and Postgres in containers. Cheaper, but we'd own patching, backups, TLS and uptime. Not recommended for a team that should be spending time with customers.
+UI label for recorded revenue always includes the qualifier: "Recorded revenue — amounts you entered when completing jobs."
 
-**Billing for DetailerHQ itself:** during beta, invoice the first customers manually via Stripe Payment Links / Invoices (no monthly fee; per-transaction only) and set `account_status` by hand. Build in-app subscription billing only once there are enough customers to justify it (D-9).
+### 11.2 Metric catalog
 
-### 10.4 Application structure (proposed)
+| Metric | Definition |
+|---|---|
+| Requests received | Appointment requests created in the period (duplicates closed by the owner shown separately) |
+| Median first response time | Median time from request creation to the owner's first decision (approve, propose, decline) for requests created in the period |
+| Request outcomes | Count of requests created in the period by current status |
+| Request-to-booking rate | Requests created in the period that became an appointment ÷ requests created in the period, excluding closed duplicates and requests still open |
+| Appointments completed | Appointments with status Completed and start date in the period |
+| Average recorded job value | Recorded revenue ÷ appointments completed |
+| Cancellations and no-shows | Counts by who cancelled, and no-shows, for appointments with start date in the period; rate = count ÷ appointments with start date in the period (excluding still-scheduled future ones) |
+| Quote acceptance rate | Quotes sent in the period now Accepted ÷ (Accepted + Declined + Expired). Quotes still open are shown separately and excluded |
+| Leads by source | Leads created in the period grouped by source, with current status breakdown |
+| Lead-to-booked rate (by source) | Leads created in the period now Booked ÷ leads created in the period. Note shown: "Recent leads may not have had time to book." |
+| Follow-up activity | Outbound communications logged and follow-up tasks completed in the period, with recorded outcomes |
+| Leads booked after a logged follow-up | Count of leads that reached Booked **after** at least one outbound communication was logged. Label: "This shows timing only — it doesn't mean the follow-up caused the booking." |
+| Top services | By count of completed appointment items and by recorded line amounts (recorded per item, no allocation) |
+| New vs. returning customers | Customers whose first completed appointment falls in the period vs. customers with an earlier completed appointment |
+
+Each metric has a reference SQL query in the test suite (§16.2).
+
+---
+
+## 12. Pilot, trial, subscription and data retention
+
+### 12.1 Stages
+
+| Stage | Who | Access | Billing |
+|---|---|---|---|
+| **Pilot** (MVP) | Invited businesses | Full features under written pilot terms | None in-product. Any pilot fee is handled manually outside the app (method to be decided). |
+| **Public paid launch** | Anyone in the US | 7-day free trial, then subscription | Integrated subscription billing (§3.2) |
+
+**Pilot access is not a trial.** Pilot businesses are told in writing that they are in a pilot, what it includes, what it costs (if anything), when it ends, and what happens afterwards. The product and site never describe pilot access as a "free trial" or as a fully implemented subscription.
+
+### 12.2 Pilot terms (to draft before inviting pilots)
+
+Covers: pilot duration and end date; price (free or a stated pilot fee) and how it's paid; features included and that they may change; no service-level guarantee; data ownership, export at any time, and deletion on request; what happens at pilot end (offer to convert to a subscription when available, export, or deletion); how feedback is collected; how to contact us.
+
+### 12.3 The 7-day free trial (paid launch)
+
+- **Duration:** exactly 7 × 24 hours, starting when the business is created. `trial_ends_at` is stored; the UI shows it in the business timezone (e.g., "Your trial ends Thu, Nov 6 at 3:42 PM CT").
+- **No credit card required** to start (current preference; revisit if abuse appears).
+- **Includes** all paid features available at the time.
+- **Disclosed** on the pricing page, at sign-up, and in-app: duration, end time, what's included, what happens at the end, that no data is deleted at trial end, and how to subscribe.
+- **In-app reminders:** banner throughout the trial; prominent from 3 days before; on the last day. (Email reminders only once email is available.)
+- One trial per business; operator can extend a trial manually.
+
+### 12.4 Account states and access
+
+| State | Dashboard | Booking page | Customer status links | Export |
+|---|---|---|---|---|
+| `pilot` | Full | Accepting (if switched on) | Full | ✅ |
+| `trialing` | Full | Accepting | Full | ✅ |
+| `active` | Full | Accepting | Full | ✅ |
+| `past_due` (grace, e.g., 7 days — confirm with billing provider behavior) | Full + banner | Accepting | Full | ✅ |
+| `trial_expired` / `inactive` (subscription ended or grace elapsed) | **Restricted:** read-only; can view all data, export, subscribe, manage account, request deletion | **Not accepting new requests**; shows the business's phone/email | Show current status; customers can still withdraw/cancel (frees the owner's calendar); accept-proposal disabled with "Contact [Business]" | ✅ |
+| `cancelled` (cancels at period end) | Full until period end, then `inactive` | Until period end | Full | ✅ |
+| `suspended` (operator, abuse/terms) | Blocked except export & support contact | Offline | Generic "not available" | ✅ (on request) |
+
+Restricted access is enforced in the server layer **and** in RLS write policies (`can_write`). Subscribing restores full access immediately, with all data intact.
+
+### 12.5 Data retention after access ends (proposal — requires approval and legal review before disclosure)
+
+- **No data is deleted when a trial ends or a subscription lapses.**
+- Restricted accounts are retained for **180 days** after access ends. The owner can subscribe and continue at any time during this period.
+- Before deletion, the owner is notified in-app and — once email is available — by email at **30 days** and **7 days** prior.
+- After 180 days, business data is hard-deleted; backups rotate out per provider retention (disclosed).
+- An owner may request earlier deletion at any time (§7.11): booking page offline immediately; hard deletion after a **30-day** grace period during which they can cancel the request.
+- **Automated deletion jobs are not enabled** until the policy is approved, disclosed in Terms/Privacy, and pre-deletion notices can be reliably delivered.
+
+---
+
+## 13. Acceptance criteria
+
+Every feature is done only when it passes on a **375 px phone**, a **768 px tablet** and a **1280 px desktop**, meets `DESIGN_SYSTEM.md` §12 (accessibility), and has the automated tests marked 🧪.
+
+### 13.1 Accounts and authentication (Supabase Auth)
+
+- [ ] Pilot sign-up works only with a valid invite; invalid/used invites show a clear message. 🧪
+- [ ] Sign-up, email confirmation, sign-in, sign-out and password reset work through Supabase Auth; no custom password storage exists in our schema. 🧪
+- [ ] Unconfirmed owners cannot publish the booking page; the UI explains why.
+- [ ] Wrong credentials produce a generic error; repeated attempts are rate-limited. 🧪
+- [ ] Authenticated routes redirect to sign-in and back. 🧪
+
+### 13.2 Onboarding and services
+
+- [ ] Onboarding can be completed in under 10 minutes in a moderated test; progress persists across sessions.
+- [ ] No service is created with a price the owner didn't enter; starter suggestions contain names only. 🧪
+- [ ] Fixed requires a price; "From" requires a price and displays "From $X"; "Quote required" hides price and routes to the inquiry form. 🧪
+- [ ] Only services marked **bookable** appear on the booking page. 🧪
+- [ ] Size-class overrides apply on the booking page and in totals. 🧪
+- [ ] Editing a service never changes existing requests, appointments or quotes. 🧪
+
+### 13.3 Availability and slots
+
+- [ ] Owners can set multiple windows per weekday, time off (full day, range, partial day), interval, notice, horizon, buffer, daily cap and hold setting.
+- [ ] Slot tests cover windows, duration fit, notice, horizon, buffer, cap, time off, holds on/off, and outstanding proposals. 🧪
+- [ ] Changing availability never modifies existing appointments. 🧪
+
+### 13.4 Public booking page and request submission
+
+- [ ] Only allow-listed public fields are returned; no private data appears in HTML or network responses. 🧪
+- [ ] A request can be completed on a phone in ≤ 6 steps without horizontal scrolling, with correct keyboard types.
+- [ ] Only valid slots are offered; if a slot becomes unavailable before submit, the customer is told and asked to pick another. 🧪
+- [ ] Prices and durations are recomputed server-side; client totals are ignored. 🧪
+- [ ] Phone or email required; consent required; phone normalized to E.164 (US numbers). 🧪
+- [ ] Confirmation says "not confirmed yet", explains next steps, and shows the status link with Copy. 
+- [ ] Booking page LCP < 2.5 s on simulated mid-range phone / 4G.
+
+### 13.5 Booking workflow — approve, decline, propose
+
+- [ ] Approve creates exactly one appointment, links/creates customer and vehicle within the same business, and updates the status page. Retrying never duplicates. 🧪
+- [ ] Propose sets `time_proposed`, holds the time, sets an expiry, and shows Accept/Decline on the status page. 🧪
+- [ ] Customer accepting a proposal creates the appointment if hard rules pass; otherwise the request returns to pending, the customer sees a clear message, and the owner is notified. 🧪
+- [ ] Decline stores optional customer message (shown on status page) and internal reason (never shown); "Save as lead" creates a lead. 🧪
+- [ ] Each request status shows the headline, next step and actions defined in §6.3. 🧪
+
+### 13.6 Duplicate requests
+
+- [ ] Resubmitting with the same idempotency key returns the original request; no new row. 🧪
+- [ ] A second open request with the same normalized phone or email for the same business is flagged and linked; different businesses are never linked. 🧪
+- [ ] The 4th open request from the same contact for the same business is rejected with a generic message that does not reveal existing requests. 🧪
+- [ ] "Close as duplicate" sets `closed_duplicate` and the status page shows the combined message. 🧪
+- [ ] Rate limit and honeypot reject automated submissions. 🧪
+
+### 13.7 Cancellations
+
+- [ ] Customer can withdraw a pending/time-proposed request; any hold is released; owner notified. 🧪
+- [ ] Customer can cancel an approved appointment only before the cutoff (and only if self-cancel is enabled); after the cutoff the page shows policy and contact options. Tests cover exactly-at-cutoff. 🧪
+- [ ] Owner cancellation records reason and `cancelled_by = business`, frees the slot, and updates the status page. 🧪
+- [ ] No-show can only be set after the start time. 🧪
+
+### 13.8 Rescheduling
+
+- [ ] Owner reschedule enforces hard rules, warns on soft rules, keeps previous time in history, and shows "Time changed" with old and new times on the status page. 🧪
+- [ ] Rescheduling doesn't change recorded prices. 🧪
+- [ ] Status page offers no self-reschedule; it shows contact options and cancel (before cutoff).
+
+### 13.9 Conflicts
+
+- [ ] The database rejects any overlapping Scheduled/In-progress appointments for the same business, including under concurrent approval attempts (parallel test). 🧪
+- [ ] Appointments of **different** businesses may overlap freely. 🧪
+- [ ] Soft-rule violations (buffer, hours, time off, cap, notice, holds) show specific warnings and require explicit confirmation. 🧪
+- [ ] Approval blocked by a hard conflict offers "Propose a different time".
+
+### 13.10 Time zones and DST
+
+- [ ] Slots and appointments display correctly in Eastern, Central, Mountain, Arizona (no DST), Pacific, Alaska and Hawaii zones. 🧪
+- [ ] Spring-forward: no slot in the missing hour; a job spanning the change keeps its real duration. 🧪
+- [ ] Fall-back: repeated-hour slots are distinct instants with abbreviations. 🧪
+- [ ] Public pages always state the business's timezone; a notice appears when the visitor's device zone differs.
+- [ ] Changing the business timezone warns, lists affected future appointments, and keeps their absolute instants. 🧪
+- [ ] "Today", daily caps, expiry and analytics periods use the business's local day. 🧪
+
+### 13.11 Appointments and calendar
+
+- [ ] Day, Week (≥ 768 px) and Agenda views show correct local times; tentative holds are visually distinct.
+- [ ] Allowed transitions only: Scheduled → In progress → Completed; Scheduled/In progress → Cancelled; Scheduled → No-show (after start); Completed → Scheduled only with confirmation. 🧪
+- [ ] Completion records per-item recorded amounts; wording says "recorded", never "charged"/"collected".
+- [ ] Addresses open maps; phone numbers open call/text.
+
+### 13.12 Customers and vehicles
+
+- [ ] Manual creation of customers and vehicles with only the fields in §9.7. 🧪
+- [ ] Search by partial name, phone (any format), email or plate returns within 300 ms for 5,000 customers. 🧪
+- [ ] Duplicate suggestions search only within the current business. 🧪
+- [ ] Archive hides without losing history; delete removes PII and anonymizes past appointments. 🧪
+
+### 13.13 Leads, quotes and communication log
+
+- [ ] Inquiries create leads, never booking requests; booking requests never appear in the leads list unless saved as a lead. 🧪
+- [ ] Lead status automation: Contacted on first outbound log (from New), Quote sent on quote sent, Follow-up due when `next_follow_up_at` passes without an inbound log, Booked on appointment creation. Manual override always possible and recorded. 🧪
+- [ ] Lost requires a reason.
+- [ ] Quote numbers are sequential per business; totals computed in cents server-side; Expired set automatically after valid-until. 🧪
+- [ ] Quoted value, booked job value and recorded revenue are stored in separate fields and never overwrite each other. 🧪
+- [ ] Communication entries can be added manually with channel, direction, time and summary; entries from templates are created only after the owner confirms "Did you send it?". 🧪
+
+### 13.14 Follow-ups and templates
+
+- [ ] Owners can create, edit, complete (with outcome), dismiss and reschedule tasks.
+- [ ] Automatic rules create each task exactly once per trigger and can be turned off. 🧪
+- [ ] Templates are editable; placeholders render with record data; missing values are highlighted and block copying until edited. 🧪
+- [ ] No feature sends a message automatically; all copy says "Open in Messages" / "Open in Mail" / "Copy". 🧪 (copy lint)
+
+### 13.15 Notifications
+
+- [ ] Each event in §10 creates exactly one notification for the correct business only. 🧪
+- [ ] Badges update on navigation and via polling while visible; read/unread state persists.
+- [ ] No email/SMS/push is sent.
+
+### 13.16 Analytics
+
+- [ ] Every metric in §11 matches its reference SQL query on seeded data. 🧪
+- [ ] Rates under the threshold show "Not enough data yet" with the count. 🧪
+- [ ] The "after a logged follow-up" metric displays the non-causation note.
+- [ ] Quoted, booked and recorded values are labelled distinctly everywhere.
+- [ ] Production accounts never show sample data. 🧪
+
+### 13.17 Authorization and data isolation
+
+- [ ] For every server action and route, Business A's owner receives 404 for Business B's IDs on read, update, delete and linking. 🧪
+- [ ] pgTAP: as an authenticated user of Business A, direct table queries (bypassing app code) return zero Business B rows and writes fail. 🧪
+- [ ] pgTAP: `anon` has no direct access to business tables; definer functions return only allow-listed fields. 🧪
+- [ ] CI fails if any table lacks RLS or policies. 🧪
+- [ ] CI fails if the service-role key or other secret patterns appear in the client bundle. 🧪
+- [ ] Linking a record to another business's customer/vehicle fails at the database level. 🧪
+- [ ] Token endpoints return only the one request/quote and reject guessed or revoked tokens generically. 🧪
+
+### 13.18 Pilot, trial and subscription *(trial and subscription criteria apply at paid launch)*
+
+- [ ] Pilot businesses see "Pilot access until [date]" and never the words "free trial". 🧪
+- [ ] Trial end equals start + 7 days exactly and is displayed in the business timezone. 🧪
+- [ ] At expiry: dashboard read-only (server and RLS), export works, booking page not accepting requests, status links still show status, **no rows deleted**. 🧪
+- [ ] Subscribing restores full access with all data. 🧪
+- [ ] Billing webhooks are signature-verified and idempotent. 🧪
+- [ ] No automated deletion job runs unless the retention policy flag is enabled. 🧪
+
+### 13.19 Settings, export and deletion
+
+- [ ] CSV export opens correctly in Excel and Google Sheets (UTF-8 BOM, ISO dates) and works in restricted states. 🧪
+- [ ] Deletion request requires typing the business name, takes the booking page offline, and schedules deletion per §12.5. 🧪
+
+### 13.20 Marketing site
+
+- [ ] Every claim maps to a shipped feature; reviewed before each publish.
+- [ ] No testimonials, logos, ratings, user counts or performance statistics unless real and documented.
+- [ ] "7-day free trial" copy appears only after §3.2 is complete.
+- [ ] Lighthouse mobile: Performance ≥ 90, Accessibility 100, Best Practices ≥ 95.
+
+---
+
+## 14. Architecture, budget and assumptions to verify
+
+### 14.1 Principles
+
+One deployable web app, one managed Postgres database, no microservices or queues; server-rendered by default; boring, well-documented tools; free or low fixed-price tiers; nothing billed per message.
+
+### 14.2 Stack
+
+| Layer | Choice | Why |
+|---|---|---|
+| Language | TypeScript (strict) | One language, typed domain |
+| Framework | Next.js (App Router), server components and server actions | Marketing site, public pages and dashboard in one app |
+| Database | **Supabase Postgres** | Managed Postgres, RLS, `pg_cron`, backups on paid plan |
+| Auth | **Supabase Auth** (`@supabase/ssr` for server-side sessions) | No hand-built password handling |
+| Data access | `supabase-js` with generated TypeScript types; complex operations as SQL functions | RLS applies automatically with the user's session |
+| Migrations | Supabase CLI SQL migrations in the repo | Reviewable, reproducible schema and policies |
+| Scheduled jobs | `pg_cron` in the database | No dependency on host cron limits; no exposed endpoint |
+| Validation | Zod | Shared client/server validation |
+| UI | Hand-built components on accessible headless primitives (e.g., Radix UI); styling bound to our tokens only | Accessible, distinctive |
+| Icons | Lucide | Consistent line icons |
+| Dates | A timezone-aware library (e.g., `date-fns-tz` or a Temporal polyfill) | DST-correct |
+| Testing | Vitest, Playwright, pgTAP, axe-core | §16.2 |
+| CI | GitHub Actions | Lint, types, tests, RLS checks, bundle secret scan |
+
+### 14.3 Estimated monthly cost
+
+Figures are planning estimates as understood at the time of writing. **Nothing is purchased or registered until explicitly approved.**
+
+| Item | Development | Pilot with real business data | Public paid launch |
+|---|---|---|---|
+| Hosting (Vercel) | $0 (Hobby) | ~$20 (Pro — Hobby is non-commercial) | ~$20 |
+| Supabase | $0 (Free) | ~$25 (Pro — backups, no inactivity pausing) | ~$25 |
+| Auth email (custom SMTP) | $0 (default sender for testing) | $0 (default sender / invites — verify) | $0 on a free tier (provider TBD) |
+| Domain | — | Decision needed (≈$15–25/yr) | ≈$1–2/mo |
+| Billing provider | — | — | No monthly fee expected; % of subscription revenue |
+| Error monitoring (optional) | $0 | $0 free tier | $0 free tier |
+| **Total** | **$0** | **≈ $45/month** | **≈ $45–47/month + billing fees** |
+
+### 14.4 Assumptions that must be verified before launch
+
+| # | Assumption | Why it matters | Verify |
+|---|---|---|---|
+| A-1 | Vercel Hobby prohibits commercial use; Pro is ~$20/user/month | Pilots are commercial use | Current Vercel terms & pricing; alternatively confirm whether another host's free tier permits commercial use with Next.js |
+| A-2 | Supabase Free pauses inactive projects, has limited database size, and doesn't provide the backups we need | Real customer data needs backups | Current Supabase plan limits; Pro price and backup retention |
+| A-3 | `pg_cron` is available on our Supabase plan | Scheduled expiry and follow-up jobs | Supabase extension docs |
+| A-4 | Supabase's default auth email sender is rate-limited and intended for testing | Sign-up/reset emails could fail at scale | Current limits; choose custom SMTP provider and free-tier limits before public launch |
+| A-5 | Supabase Auth features we rely on (invites, email confirmation, password policy, leaked-password protection, MFA) are on our plan | Security baseline | Plan feature matrix |
+| A-6 | No file storage is needed in the MVP | Storage costs | Confirm no uploads are in scope |
+| A-7 | Bandwidth, function execution and database egress stay within included quotas for ~100 businesses | Cost ceiling | Usage estimates after pilot; set spend alerts/caps |
+| A-8 | Billing provider has no fixed monthly fee and acceptable % fees | Margin | Provider pricing at paid launch |
+| A-9 | Booking links on a platform subdomain will change when a domain is bought | Detailers will have shared links | Decide domain timing before pilots share links widely; plan redirects |
+| A-10 | Free bot protection (e.g., Turnstile) remains free | Spam | Only if needed |
+
+Set usage alerts and spend caps on every provider where available.
+
+### 14.5 Repository structure (proposed)
 
 ```
 /app            Next.js routes: (marketing), (auth), onboarding, app/*, b/[slug], r/[token], q/[token]
-/src/domain     Pure business logic: slots, pricing, status transitions, metrics (no I/O; heavily unit-tested)
-/src/data       The only module that talks to the database; requires TenantContext
+/src/domain     Pure logic: slots, DST, pricing, transitions, metrics (no I/O)
+/src/data       Server-only data access using the user's Supabase session
 /src/ui         Design-system components and tokens
-/src/server     Auth, rate limiting, audit, cron handlers
-/db             Schema, migrations, RLS policies, seed scripts (dev only)
-/tests          unit, integration (DB + RLS), e2e, isolation
-/docs           Planning and decision records
+/src/config     Brand and product configuration (name, wordmark, support email)
+/supabase       migrations/, RLS policies, SQL functions, pgTAP tests, seed (dev only)
+/tests          unit, e2e, isolation
+/docs           Plans, decisions (docs/decisions/), pilot terms drafts
 ```
 
 ---
 
-## 11. Implementation phases
+## 15. Customer acquisition plan
 
-Each phase ends with a demo on a real phone and a review before the next begins. Durations are rough for one developer working with Claude Code.
+### 15.1 Target
+
+Independent **mobile detailers and small detailing shops** in the US who already take bookings by text/DM and have steady weekly work. Start with 1–3 metro areas to allow in-person visits if useful.
+
+### 15.2 Finding prospects (manual, respectful)
+
+- Google Maps / Google Business Profiles for "mobile detailing" in target areas.
+- Instagram and Facebook business pages (local hashtags, local car groups), following each platform's rules.
+- Local car meets and detailing supply stores.
+- Maintain a simple prospect sheet: business, contact channel, notes, last contact, outcome. **No scraping tools, no automated DMs, no purchased lists.**
+
+### 15.3 Outreach
+
+- **Personalized** email and social messages, written individually: reference something specific (their service menu, recent work), state who we are, ask for a 20-minute conversation about how they handle bookings. No fake urgency, no claims about features that don't exist.
+- **Email compliance (CAN-SPAM):** accurate sender and subject, identify the message as a business contact, include a physical mailing address and a working opt-out; honor opt-outs promptly. *(Legal confirmation recommended.)*
+- At most one follow-up per prospect unless they reply.
+
+### 15.4 Discovery and pilot
+
+1. **Discovery call** (no pitch first): how requests arrive today, what gets missed, how they quote, follow-up habits, tools used, what they pay for software.
+2. If there's fit → offer the **pilot** with written pilot terms (§12.2). Prefer a **paid** pilot (even small) to validate willingness to pay; pricing to be decided.
+3. Onboard together (screen share or in person); observe the first week.
+4. Weekly 15-minute feedback check-in; log requests against the intake rule (§3.4).
+
+### 15.5 Funnel metrics (tracked manually)
+
+Prospects contacted → replies → discovery calls → pilots started → pilots active after 4 weeks → paying. Review weekly; adjust messaging and the target segment, not the feature list, first.
+
+### 15.6 Expansion criteria
+
+Expand outreach and consider the paid launch when: ≥ 3 businesses are paying, ≥ 5 are actively using it weekly, and no pilot reports a blocking issue that isn't scheduled.
+
+---
+
+## 16. Implementation phases and testing
+
+### 16.1 Phases
 
 | Phase | Scope | Exit criteria |
 |---|---|---|
-| **0. Foundations** (≈1 wk) | Repo, CI, lint/format, TypeScript strict, design tokens + core components (button, input, select, field, table, dialog/sheet, toast, badge, empty state), DB schema v1 with RLS and composite FKs, auth, tenant context, audit log, isolation test harness | Sign up → empty dashboard shell on phone & desktop; isolation tests green |
-| **1. Setup & booking page** (≈1.5 wks) | Onboarding, services & size classes, availability, slot engine, public booking page and request flow, request status page | A real detailer configures their menu and a friend submits a request from a phone |
-| **2. Requests, appointments, calendar** (≈1.5 wks) | Requests inbox, approve/decline, customer matching, notify panel, appointments, calendar views, completion, Today screen | Full loop: request → approve → appointment → complete |
-| **3. Customers & vehicles** (≈1 wk) | Lists, search, detail pages, manual creation, duplicates, archiving/deletion, notes | Owner imports or enters 20 existing customers comfortably on a phone |
-| **4. Leads, quotes, tasks** (≈1.5 wks) | Lead pipeline, quote editor, share and print views, follow-up rules, tasks page, cron jobs | Lead → quote → accepted → scheduled, with follow-up task |
-| **5. Analytics, settings, export** (≈1 wk) | Analytics with definitions, settings, CSV export, deletion request | Metrics verified against reference queries |
-| **6. Hardening & beta** (≈1–2 wks) | Security review, rate limits, CSP, backup restore drill, accessibility audit, performance pass, marketing site, legal pages, monitoring | Invite 3–5 detailers; weekly feedback calls |
-| **Phase 2 candidates** | Owner notification emails (if not in MVP), online quote acceptance, iCal feed, photo uploads, staff accounts, auto-approve, 2FA, in-app subscription billing, SMS (with proper compliance) | Prioritised by beta feedback |
+| **0. Foundations** | Repo, CI, design tokens & core components, Supabase project (local via CLI), schema v1, RLS + pgTAP, Supabase Auth, membership model, audit log, isolation test harness, bundle secret scan | Sign in → empty dashboard shell on phone/tablet/desktop; all isolation and RLS tests green |
+| **1. Setup & booking page** | Onboarding, services, size classes, availability, slot engine (DST), public booking page, request submission, status page (pending state) | Real detailer configures menu; a request is submitted from a phone |
+| **2. Booking workflow & calendar** | Inbox, approve/decline/propose, duplicates, holds, conflicts (exclusion constraint), appointments, calendar, cancel/reschedule, full status page, Today, in-app notifications | Every row of §6.3 demonstrable end to end |
+| **3. Customers & vehicles** | Manual entry, search, detail pages, matching, archive/delete | Owner enters 20 existing customers comfortably on a phone |
+| **4. Leads, quotes, follow-ups** | Leads & statuses, quotes, share/print, communication log, templates, tasks & rules, scheduled jobs | Inquiry → lead → quote → follow-up → booked, with log entries |
+| **5. Analytics, settings, export** | Metric catalog, definitions, thresholds, settings, CSV export, deletion request | Metrics match reference queries |
+| **6. Hardening & pilot** | Security review, rate limits, CSP, restore drill, accessibility audit, performance, marketing site (pilot stage), legal pages, pilot terms | 3–5 pilots invited |
+| **7. Paid-launch readiness** | Billing integration, 7-day trial enforcement, account states and RLS `can_write`, retention policy & notices, custom SMTP, legal review, public sign-up, trial copy | All §13.18 criteria pass; legal sign-off |
+| **Later** | §3.3 items by evidence | — |
+
+### 16.2 Testing strategy
+
+| Level | Tooling | Coverage |
+|---|---|---|
+| Unit | Vitest | Slots, DST, pricing, totals, status transitions, cutoffs, duplicate detection, template rendering, metric calculations; ≥ 90% of `/src/domain` |
+| Database | pgTAP via Supabase CLI | RLS per table and command as owner A/B and `anon`; definer function outputs; exclusion constraint; composite FKs; immutable `business_id`; scheduled jobs |
+| Isolation | Vitest + Playwright | Two seeded businesses; every route/action attempted cross-business → 404 |
+| Concurrency | Integration tests | Parallel approvals/accepts for overlapping times → exactly one succeeds |
+| End-to-end | Playwright (phone, tablet, desktop projects) | Onboarding; request on phone; approve; propose → accept; decline; withdraw; cancel before/after cutoff; reschedule; inquiry → quote → booked; export; restricted state (phase 7) |
+| Accessibility | axe-core + manual keyboard/VoiceOver/TalkBack per phase | Zero serious/critical violations |
+| Performance | Lighthouse CI | Booking page and home budgets |
+| Security | Dependabot, `npm audit`, secret scan, Supabase advisor, OWASP ASVS L1 subset review | Before pilot and paid launch |
+| Copy | Lint for banned claims ("sent", "charged", "free trial" during pilot, "AI") in UI strings | Every PR |
+| Usability | 3–5 sessions with real detailers per phase | Task completion without help |
+
+Test data is fictional (`555-01xx` numbers) and never copied from real customers.
 
 ---
 
-## 12. Testing strategy
+## 17. Decisions, open questions and risks
 
-| Level | Tooling | What it covers |
-|---|---|---|
-| **Unit** | Vitest | Domain logic: slot generation (incl. DST), pricing by size class, totals in cents, status transition rules, quote numbering, metric calculations, phone normalisation. Target ≥ 90% coverage of `/src/domain`. |
-| **Integration (database)** | Vitest + disposable Postgres (local Docker or CI service) | Migrations apply cleanly; RLS policies block cross-tenant access using the app role; composite FKs reject cross-tenant links; idempotent approval; cron jobs expire correctly. |
-| **Tenant isolation suite** | Vitest + Playwright | Two seeded businesses; automatically enumerate routes/actions and assert 404 for cross-tenant IDs. Mandatory, blocks deploy. |
-| **End-to-end** | Playwright (mobile and desktop projects) | Onboarding; customer request on phone viewport; approve/decline; complete appointment; lead → quote → appointment; export. |
-| **Accessibility** | axe-core in Playwright + manual keyboard and VoiceOver/TalkBack passes per phase | Zero serious/critical axe violations; manual checklist in `DESIGN_SYSTEM.md` §12. |
-| **Visual regression** *(optional)* | Playwright screenshots of key components/pages | Catch accidental design drift. |
-| **Performance** | Lighthouse CI on booking page and home | Budgets from §9. |
-| **Security** | Dependabot, `npm audit` in CI, manual review checklist (OWASP ASVS L1 subset) before beta | |
-| **Usability** | 3–5 moderated sessions with real detailers per phase from Phase 1 | Task completion without help; time-to-complete onboarding. |
+### 17.1 Decisions (confirmed in this revision)
 
-Test data: realistic seeded fixtures (dev/test only), clearly fake names and `555-01xx` phone numbers, never real customer data.
+| # | Decision |
+|---|---|
+| D-1 | United States only (USD, US timezones, US phone formats, English) |
+| D-2 | Supabase Auth; no custom password authentication |
+| D-3 | Supabase RLS as a database-level isolation layer, plus server authorization and composite FKs |
+| D-4 | Owner approves, declines or proposes a time; requests are never confirmed bookings |
+| D-5 | Each business defines its own services, prices and durations; no default prices |
+| D-6 | Leads/inquiries and quotes tracked separately from booking requests |
+| D-7 | No automated SMS, email or social messages in the MVP; templates + owner's own apps |
+| D-8 | In-app notifications only in the MVP; owner email notifications later |
+| D-9 | CSV import later unless pilots show it's essential; CSV export in MVP |
+| D-10 | No customer deposits or payments; subscription billing built before public paid launch |
+| D-11 | 7-day free trial, no card (current preference), at public paid launch only |
+| D-12 | Pilot program before paid launch, under written pilot terms, never described as a trial |
+| D-13 | No automatic data deletion at trial end |
+| D-14 | Provisional, configurable branding; no spending |
+| D-15 | Next.js + Supabase (Postgres, Auth, pg_cron) on Vercel; target ≈ $45/month |
 
----
+### 17.2 Decisions proposed in this plan (please confirm)
 
-## 13. Decisions, open questions and risks
+| # | Proposal |
+|---|---|
+| P-1 | Pending requests **don't** hold slots by default; owner can enable holding (48 h max) (§6.4) |
+| P-2 | Owner-proposed times **always** hold the slot until answered or expired (default 48 h) |
+| P-3 | Customer self-cancel allowed until 24 h before start by default; owner configurable |
+| P-4 | Max 3 open requests per contact per business |
+| P-5 | Retain restricted accounts for 180 days after access ends, with notices at 30 and 7 days (§12.5) |
+| P-6 | Owner-requested deletion completes after a 30-day grace period |
+| P-7 | Unlinked closed requests purged after 12 months; notifications after 90 days; audit events after 12 months |
+| P-8 | Rates need ≥ 5 items before displaying a percentage |
+| P-9 | `past_due` grace period of 7 days (to align with billing provider behavior) |
+| P-10 | Pilot fee collected manually outside the product, if any |
 
-### 13.1 Decisions proposed in this plan (please confirm or change)
+### 17.3 Branding
 
-| # | Decision | Proposal |
-|---|---|---|
-| D-1 | Owner approves all requests in v1 | Yes; schema allows auto-approve later |
-| D-2 | Stack | Next.js + TypeScript + Postgres + Drizzle, hosted on Vercel + Supabase (≈$45/mo) |
-| D-3 | Auth provider | Supabase Auth (simplest with Supabase) vs. self-hosted library in our DB (more portable). Recommend Supabase Auth unless portability matters more. |
-| D-4 | One owner, one business in MVP | Yes, with a membership table for future staff |
-| D-5 | Customers never create accounts | Yes; tokenised status/quote links |
-| D-6 | **Owner notification email for new requests** | Recommended for MVP (owner-only, transactional, free tier). Without it, owners must remember to check the app. Needs your approval since it's an email integration. |
-| D-7 | Bot protection | Honeypot + rate limit; add Turnstile (free) when abuse appears or from day one |
-| D-8 | Invite-only sign-up during beta | Yes |
-| D-9 | DetailerHQ's own billing | Manual Stripe invoices/payment links during beta |
-| D-10 | Deletion grace period | 30 days |
-| D-11 | Market & locale | United States, USD, English, US phone formats first |
+- "DetailerHQ" lives only in `/src/config` (name, short name, wordmark text, support email) and is never hard-coded in components, copy files or database values.
+- The booking page shows the **detailer's** brand; our name appears only in a small "Powered by" footer link.
+- No logo commissioned, no domain or social handles purchased, no trademark filings until the name is cleared and spending is approved.
+- Before public launch: trademark search, domain and handle availability, then final naming decision.
 
-### 13.2 Open questions
+### 17.4 Open questions
 
-1. **Market:** US-only at launch? (Affects phone formats, currency, tax wording, privacy law coverage — e.g., CCPA, and whether GDPR applies.)
-2. **Pricing for DetailerHQ:** monthly price point and trial length? (Suggest testing ~$29–49/month with a 30-day trial; validate in interviews.)
-3. **Mobile vs. shop mix** of the first target customers — determines how much we invest in address/service-area handling.
-4. **Deposits:** Is "no deposits" a deal-breaker for coating/correction detailers? (Common pain point; would pull payments forward.)
-5. **Owner notifications:** is email acceptable (D-6), or do owners require push/SMS to notice requests?
-6. **Multi-vehicle bookings** (e.g., two family cars in one visit): how common among target users?
-7. **Existing customer import:** do early adopters need CSV import at launch?
-8. **Brand:** timeline and budget for name clearance (trademark search, domain, social handles).
-9. **Who are the first 5 beta businesses**, and can we observe them using it?
-10. **Tax:** do detailers need tax lines on quotes in their states? (MVP proposal: optional single tax-rate line on quotes, shown as "estimated".)
+1. **Pilot pricing:** free or paid pilot? If paid, amount and manual payment method?
+2. **Subscription price** for the paid launch, and one plan or two?
+3. **Domain timing:** pilots will share booking links — buy a domain (after name clearance) before pilots, or accept a link change later with redirects?
+4. **Trial start:** at business creation (proposed) or at email confirmation?
+5. **Mobile vs. shop mix** among first pilots — affects address and service-area handling.
+6. **Multi-vehicle visits** (two family cars): common enough to support in one request?
+7. **Retention periods** in P-5 to P-7 — acceptable before legal review?
+8. **Who are the first 10–20 prospects**, and which metro areas?
+9. **Tax lines on quotes:** needed in target states, or leave as optional estimated line?
 
-### 13.3 Risks
+### 17.5 Risks
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| **Cross-tenant data leak** | Fatal to trust; legal exposure | Three-layer isolation, mandatory isolation suite, security review before beta |
-| **Brand name not cleared** | Rebrand cost, legal dispute | Name in one config value; no logo spend; trademark search before public launch |
-| **Owners don't see requests quickly** (no notifications) | Lost jobs, churn | D-6 owner email; Today badge; PWA home-screen install |
-| **Expectation gap** — customers assume "booked" when it's a request | Bad experiences for detailers | Explicit "request, not confirmed" copy throughout; status page |
-| **Timezone/DST bugs** in scheduling | Wrong-time appointments | Store UTC, compute in business TZ, DST test cases |
-| **Feature creep** (SMS, payments, deposits) before validation | Delayed launch, cost overrun | Strict exclusion list; Phase 2 only from beta evidence |
-| **Free-tier limits / pricing changes** | Cost rises above budget | Monitor usage; architecture is portable Postgres + Node |
-| **Spam on public forms** | Inbox noise, owner distrust | Rate limit, honeypot, Turnstile |
-| **Privacy/legal obligations** (processor role, CCPA) | Compliance gap | Lawyer review of Terms/Privacy/DPA before charging; minimisation |
-| **Competition from established tools** (general field-service and detailing apps) | Hard to differentiate | Focus on approval-first booking, vehicle-size pricing, honest analytics, and a markedly better mobile experience |
-| **Single developer / bus factor** | Stalled maintenance | Simple architecture, docs, tests, decision records |
-| **Hobby-tier misuse** | Terms violation | Upgrade hosting to a commercial plan before taking payment |
+| Cross-business data leak | Fatal to trust; legal exposure | Server checks + forced RLS + composite FKs; pgTAP and isolation suites block deploys; no service-role key in request handlers |
+| Misconfigured RLS or exposed table via Supabase's Data API | Data exposure | CI catalog check, `anon` grants revoked, Supabase advisor before release |
+| Service-role key leakage | Full database compromise | Server-only module, not used in request handlers, bundle scan, key rotation procedure |
+| Customers think a request is a booking | Bad experiences | Explicit copy and status page; owner message templates include status link |
+| Customers never see status updates (no messaging) | Missed proposals, no-shows | Status link emphasized; owner prompted to contact customer; proposal expiry; later email |
+| Owners miss requests (in-app only) | Lost jobs, churn | Today screen, badges, polling, home-screen install, pending-request task rule; owner email first post-MVP |
+| Timezone/DST bugs | Wrong-time appointments | UTC storage, business-zone calculation, explicit DST tests across US zones |
+| Free-tier/pricing changes | Budget overrun | §14.4 verification, spend alerts, portable Postgres |
+| Pilot misrepresented as a trial | Trust and consumer-protection issues | Written pilot terms; copy lint; trial copy gated on §3.2 |
+| Data deleted unexpectedly after trial | Severe trust damage | No deletion at trial end; deletion jobs disabled until policy approved and notices exist |
+| Brand not cleared | Rebrand cost, legal dispute | Config-only branding, no spend |
+| Feature creep (SMS, payments, deposits) | Delay and cost | Intake rule (§3.4); "later" list |
+| Spam on public forms | Inbox noise | Rate limits, honeypot, open-request cap, optional bot challenge |
+| Outreach seen as spam | Reputation, platform bans | Personalized manual messages, CAN-SPAM compliance, one follow-up max |
+| Legal/privacy gaps (processor role, state laws) | Compliance risk | Legal review before paid launch; data minimization |
+| Single developer | Maintenance stalls | Simple architecture, docs, tests, decision records |

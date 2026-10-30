@@ -6,3 +6,7 @@ node_modules/
 .next/
 next-env.d.ts
 *.tsbuildinfo
+
+# Original film master stays local (28.6 MB); only the encoded web versions are committed.
+media/source/*.mov
+media/source/*.mp4

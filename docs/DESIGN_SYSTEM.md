@@ -1,6 +1,8 @@
 # DetailerHQ — Design System
 
-> **Status:** Final draft for approval · **Revision 4.1** · **Last updated:** 2026-10-30
+> **Status:** Final draft for approval · **Revision 4.2** · **Last updated:** 2026-10-30
+>
+> **Revision 4.2 (approved by the owner):** the homepage opens with one scroll-controlled film that hands over to the product showcase in the same pinned sequence (§8.1). §7.2 allows this one owner-supplied AI-generated film, credited on the page.
 >
 > **Revision 4.1 (approved amendment):** §8 now allows exactly two pinned, scroll-driven sequences on the marketing homepage — the hero opening and the product showcase. Every other motion rule is unchanged.
 > Companion to [`PRODUCT_PLAN.md`](./PRODUCT_PLAN.md). The product name is a placeholder; nothing in this system depends on it.
@@ -79,7 +81,7 @@ The marketing site, the public pages each detailer shares with customers, and th
 | **Imagery** | Licensed, real automotive/detailing photography; real product screenshots | None (the detailer's own logo later) | None |
 | **Type scale** | Up to `display` (56px max) | Up to `h2` | Up to `h2`; dense `body` 15px on desktop |
 | **Density** | Generous (80–128px section padding) | Calm, single column, 640px max | Compact tables and calendars; one task per screen on phones |
-| **Motion** | One subtle image fade; two approved scroll-driven sequences on the homepage (§8.1) | State changes only | State changes only |
+| **Motion** | One subtle image fade; one approved scroll-driven film + showcase sequence on the homepage (§8.1) | State changes only | State changes only |
 | **Primary action** | Apply for early access / Start trial (stage-dependent) | Send request · Accept this time | Approve request · Mark complete, etc. |
 
 If a pattern exists in one context, reuse it in the others before inventing a variant (e.g., the same badge, button and form field everywhere).
@@ -367,6 +369,7 @@ Overlay scrim: `rgba(23,23,22,0.40)`. No colored shadows, no glows, no inner sha
 - **Real, licensed photography of real detailing work**: close-ups of paint correction under inspection lights, a foam cannon mid-wash, microfiber on a hood, a detailer kneeling at a wheel, interior steam cleaning, a finished car in soft overcast light. Process and craft, not just glamour.
 - Natural or workshop light; neutral to cool grading; matte, not over-saturated. Water beading and reflections are fine; lens flares, neon, smoke, and dramatic sunsets are not.
 - Prefer commissioning a local detailer shoot (often affordable in exchange for a free account) or using properly licensed stock with model/property releases. **No AI-generated imagery** — car details (badges, wheel counts, reflections) look wrong and detailers notice immediately.
+- **Exception (revision 4.2):** the homepage film is an owner-supplied, Runway-generated commercial. It is credited on the page ("Film: AI-generated") and never presented as a real customer, job or business. The vehicle is a recognisable Mercedes-AMG GT: the site must not use Mercedes branding or imply partnership or endorsement, and trademark review is required before public launch. No other AI imagery is allowed.
 - No supercars-only imagery; show vehicles the customers actually own: pickups, SUVs, minivans, Teslas, a few enthusiast cars.
 - Avoid visible license plates, car brand logos as focal points, and faces without releases.
 - Images are full-bleed or sharp-edged (radius 0); never in tilted frames, floating cards or with drop shadows.
@@ -398,26 +401,28 @@ Motion explains change; it never decorates.
 
 Rules:
 
-- No scroll-triggered reveal animations in the app. On marketing, at most a single 200ms fade for images on first load — except the two sequences in §8.1.
+- No scroll-triggered reveal animations in the app. On marketing, at most a single 200ms fade for images on first load — except the sequence in §8.1.
 - No parallax, no auto-playing carousels, no animated gradients, no number count-ups in analytics, no bouncing, no confetti.
 - Skeleton loaders: static `graphite-50` blocks matching the final layout; a gentle opacity pulse is allowed, no shimmer sweeps.
 - Respect `prefers-reduced-motion`: replace all transitions with instant changes or opacity-only fades.
 - Never animate layout during user input.
 
-### 8.1 Approved scroll-driven sequences (marketing homepage only)
+### 8.1 Approved scroll-driven sequence (marketing homepage only)
 
-Exactly two pinned sequences are allowed. No other section may use scroll-triggered or scroll-linked motion.
+Exactly one pinned sequence is allowed: the opening film, followed in the same pin by the product showcase. No other section may use scroll-triggered or scroll-linked motion.
 
-| Sequence | What scroll controls | Fallback |
+| Part | What scroll controls | Fallback |
 |---|---|---|
-| **Hero opening** | Licensed stills of one car (3–5 frames, same car, consistent light): a widening crop, a slow push-in (scale ≤ 1.1) and cross-fades between frames. The headline and calls to action stay static and readable on solid graphite. | Phones: shorter, not pinned, scrubbed while the image scrolls past. Reduced motion: the final frame, static. |
-| **Product showcase** | One device frame steps through Today, Requests, Calendar, Customers, Quotes, Follow-ups, Analytics with cross-fades (opacity + ≤ 12px vertical drift), snapping to each screen. The step list is clickable. | Below 1024px wide, short viewports and reduced motion: the same screens as accessible tabs. |
+| **Film** | The film's `currentTime` (forwards and backwards): wash, finish, the detailer, the phone push-in. The headline and calls to action sit on a fixed graphite shade and fade as scrolling starts; short chapter captions sit on dark, quiet areas. | Phones, tablets and short screens: a lighter 16:9 film band, shorter pin. Reduced motion, Data Saver/2G or a load failure: a static poster (plus "Watch the film" with controls for reduced motion and Data Saver). |
+| **Hand-off** | As the black phone screen fills the frame, it fades to graphite and the real interface preview fades in already filling the stage, holds, then shrinks into the showcase frame. | — |
+| **Product showcase** | One device frame steps through Today, Requests, Calendar, Customers, Quotes, Follow-ups, Analytics (opacity + ≤ 12px vertical drift), snapping to each screen. Tabs are clickable step links. | The same screens as accessible tabs in a normal section. |
 
-Rules for both:
-- Animate `transform` and `opacity` only; no animated gradients, parallax layers, blur, colour cycling or counting numbers.
-- Content is real HTML and complete without JavaScript; motion only changes which part is emphasised.
-- Implemented with GSAP + ScrollTrigger (`gsap.matchMedia()` for breakpoints and `prefers-reduced-motion`). No scroll-smoothing or scroll-hijacking libraries; native scrolling, anchors and keyboard scrolling keep working.
-- No AI-generated imagery or 3D models (§7.2). Until licensed photographs exist, the marked photography placeholders are used.
+Rules:
+- Page elements animate `transform` and `opacity` only; no animated gradients, parallax layers, blur, colour cycling or counting numbers.
+- Content is real HTML and complete without JavaScript; the film never replaces content.
+- The interface shown is the existing HTML previews with labelled sample data — never footage or generated screens.
+- Implemented with GSAP + ScrollTrigger (`gsap.matchMedia()`-style mode selection, `prefers-reduced-motion` respected). No scroll-smoothing or scroll-hijacking libraries; native scrolling, anchors and keyboard scrolling keep working; a "Skip film" link is always available.
+- No other AI imagery or 3D models (§7.2). Photography elsewhere stays as marked placeholders until licensed.
 
 ---
 

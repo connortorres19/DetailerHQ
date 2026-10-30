@@ -1,0 +1,297 @@
+/* Homepage film (DESIGN_SYSTEM §8.1). Phones and tablets: a 16:9 film band, then the copy;
+   chapter captions take the copy's place once it fades.
+   ≥ 1024px: the film fills the stage and the copy sits over a fixed shade on the left. */
+.film {
+  background: var(--color-bg-inverse);
+  color: var(--color-text-inverse);
+}
+
+.stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100svh - var(--header-height));
+  padding-bottom: var(--space-6);
+  overflow: hidden;
+  background: var(--color-bg-inverse);
+}
+
+/* ---- Film layer ---- */
+
+.media {
+  position: relative;
+  order: 0;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #0c0c0b;
+}
+
+.poster,
+.poster img,
+.video,
+.curtain {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.poster img,
+.video {
+  object-fit: cover;
+}
+
+.poster {
+  z-index: 1;
+  transition: opacity var(--duration-slow) var(--ease-standard);
+}
+
+.poster[data-hidden='true'] {
+  opacity: 0;
+}
+
+.curtain {
+  z-index: 2;
+  background: var(--color-bg-inverse);
+  opacity: 0;
+  visibility: hidden;
+}
+
+.shade {
+  display: none;
+}
+
+/* ---- Copy ---- */
+
+.overlay {
+  order: 1;
+  padding-block: var(--space-10) var(--space-6);
+}
+
+.copy {
+  max-width: 560px;
+}
+
+.overline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+  font-size: var(--text-overline);
+  line-height: var(--leading-overline);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-brass-inverse);
+}
+
+.overline::before {
+  content: '';
+  width: 24px;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.6;
+}
+
+.title {
+  max-width: 14ch;
+  font-size: var(--text-display);
+  line-height: var(--leading-display);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.lede {
+  max-width: 46ch;
+  margin-top: var(--space-6);
+  font-size: var(--text-body-lg);
+  line-height: var(--leading-body-lg);
+  color: var(--color-text-inverse-muted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-10);
+}
+
+.status {
+  max-width: 46ch;
+  margin-top: var(--space-6);
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+  color: var(--color-text-inverse-muted);
+}
+
+/* ---- Chapter captions (scroll-driven; hidden until the timeline shows them) ---- */
+
+.captions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(56.25vw + var(--space-8));
+}
+
+.chapter {
+  position: absolute;
+  inset: 0 var(--gutter) auto;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.chapter > * {
+  max-width: 560px;
+}
+
+.captionsInner {
+  position: relative;
+  height: 100%;
+}
+
+.chapterLabel {
+  display: flex;
+  gap: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-brass-inverse);
+}
+
+.message {
+  margin-top: var(--space-3);
+  font-size: var(--text-h2);
+  line-height: var(--leading-h2);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+/* ---- Credit, watch and skip ---- */
+
+/* Phones and tablets: credit and skip sit just under the film band, in the copy's top padding. */
+.meta {
+  position: absolute;
+  top: calc(56.25vw + var(--space-2));
+  left: 0;
+  right: 0;
+  z-index: 3;
+}
+
+.metaInner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 16px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-inverse-muted);
+}
+
+.watch,
+.skip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: var(--color-text-brass-inverse);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.skip {
+  margin-left: auto;
+}
+
+.watch:hover,
+.skip:hover {
+  color: var(--color-text-inverse);
+}
+
+/* Before JS decides, and with the static fallback, the stage is an ordinary hero. */
+.film[data-mode='static'] .captions {
+  display: none;
+}
+
+/* ---- Showcase layer (desktop film only) ---- */
+
+.showcase {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  padding-top: var(--space-5);
+  /* The layer spans the stage; only its parts take clicks, and only once the timeline shows them. */
+  pointer-events: none;
+}
+
+.showcase [data-showcase] {
+  pointer-events: auto;
+}
+
+/* ---- Large screens: the film fills the stage ---- */
+
+@media (min-width: 1024px) {
+  .stage {
+    display: block;
+    height: calc(100svh - var(--header-height));
+    min-height: 560px;
+    padding-bottom: 0;
+  }
+
+  .media {
+    position: absolute;
+    inset: 0;
+    aspect-ratio: auto;
+  }
+
+  /* A fixed shade keeps text on dark, quiet areas (§9.3). Not animated. */
+  .shade {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background:
+      linear-gradient(90deg, rgba(23, 23, 22, 0.86) 0%, rgba(23, 23, 22, 0.55) 34%, rgba(23, 23, 22, 0) 62%),
+      linear-gradient(0deg, rgba(23, 23, 22, 0.8) 0%, rgba(23, 23, 22, 0) 32%);
+    pointer-events: none;
+  }
+
+  .overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    padding-block: 0 var(--space-16);
+  }
+
+  .captions {
+    position: absolute;
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 72px;
+    z-index: 2;
+    min-height: 0;
+    margin: 0;
+  }
+
+  .chapter {
+    inset: auto var(--gutter) 0;
+  }
+
+  .meta {
+    top: auto;
+    bottom: 24px;
+  }
+}

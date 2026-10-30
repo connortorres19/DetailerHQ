@@ -24,27 +24,46 @@ Next.js 16 (App Router, `src/app`), React 19, TypeScript 5.9 (strict), ESLint 9 
 | `src/components/ui/` | Container, SectionHeading, ButtonLink (with "preview" tag), StatusBadge, PhotoPlaceholder, InterfaceFrame |
 | `src/components/layout/` | Wordmark, SiteHeader (sticky, accessible mobile menu), SiteFooter, section links |
 | `src/components/previews/` | HTML interface previews with DESIGN_SYSTEM §2.3 sample data: Today, Requests, Calendar (two-bay capacity), Customer, Quote, Follow-ups, Analytics, phone booking page |
-| `src/components/sections/` | Hero (scroll sequence 1), Overview, Features, ProductShowcase (scroll sequence 2 / ARIA tabs), HowItWorks, PhotoBand, Scope, Pricing, Faq, Closing |
-| `src/config/heroFrames.ts` | Shot list for the hero sequence (shots 01–04); add licensed images here |
+| `src/components/film/CinematicFilm.tsx` | The scroll-controlled opening film, the phone hand-off and (on large screens) the showcase inside the same pin |
+| `src/components/sections/` | Overview, Features, ShowcaseStage (shared tabs/frame), ProductShowcase (tab section fallback), HowItWorks, PhotoBand, Scope, Pricing, Faq, Closing |
+| `src/config/film.ts` | Film sources, posters, duration, hand-off time, chapter captions |
 | `src/lib/gsap.ts` | Single GSAP + ScrollTrigger registration |
+| `media/source/` | Untouched film master (**not committed**), README and SHA-256 checksum |
+| `public/media/film/` | Web encodes and posters (committed, ~21 MB) |
+| `scripts/encode-film.sh` | Rebuilds `public/media/film/` from the master with ffmpeg |
 
-## Scroll-driven sequences (DESIGN_SYSTEM §8.1, revision 4.1)
+## Opening film (DESIGN_SYSTEM §8.1, revision 4.2)
 
-GSAP 3.15.0 + ScrollTrigger with `@gsap/react` 2.1.2 (`useGSAP`), set up with `gsap.matchMedia()`. About 46 KB gzipped. No smooth-scroll library; native scrolling, anchors and keyboard scrolling are unchanged.
+Source: owner-supplied Runway commercial (23.5 s, 1920×1080, 60 fps). The master stays untouched in `media/source/` and is git-ignored; web versions are 30 fps H.264 MP4s with short keyframe intervals so seeking works in both directions, no audio, `+faststart`.
 
-| | Large screens (≥ 1024 × 720) | Phones, tablets, short screens | Reduced motion |
-|---|---|---|---|
-| **Hero** | Hero pins for 1.6 viewport heights. The crop widens (0.84 → 1) with a push-in (1.08 → 1), then four frames cross-fade. A counter shows the shot number and label. Copy never moves. | Not pinned. A gentler crop (0.92 → 1) and the same cross-fades, scrubbed while the image scrolls past. | Final frame, static and uncropped. |
-| **Product showcase** | The stage pins for 0.55 viewport heights per step. Seven screens fade out, then in, snapping to the nearest screen. Tabs act as step links and jump to their position. A brass progress rule shows position. The frame scales down to fit shorter windows. | The same screens as accessible tabs. | Tabs. |
+| File | Used for | Size |
+|---|---|---|
+| `film-1080.mp4` (GOP 8) | Large screens where width × DPR ≥ 1500 | 10.9 MB |
+| `film-720.mp4` (GOP 6) | Other desktops; tablets | 7.6 MB |
+| `film-540.mp4` (GOP 10) | Phones | 3.0 MB |
+| `poster-start-*`, `poster-reveal-*` | First paint; static fallback | 54–116 KB each |
 
-Only `transform` and `opacity` are animated. The first paint matches each sequence's start state, so nothing jumps on hydration, and all content is server-rendered HTML.
+How it works:
+- **Modes** (chosen on the client, re-chosen when the viewport or motion preference changes):
+  - Desktop, ≥ 1024 × 640: one pin, 9.85 stage heights.
+  - Compact (phones, tablets, short screens): film band, 2.75 stage heights, then the tab showcase.
+  - Static: reduced motion, Data Saver or 2G, a load failure, or before JavaScript runs.
+- **Scrubbing:** a GSAP timeline tweens a playhead with the scroll position. A ticker sets `video.currentTime` only when the previous seek has finished, so seeks never queue up. The video streams natively (`preload="auto"`, byte-range requests) and isn't copied into memory by script.
+- **Safety:** the start poster stays visible until the video has decoded a frame. If no frame arrives within 15 s, or the video errors, the page switches to static mode. On iOS, a muted play-then-pause primes the element so seeks render.
+- **Phone hand-off (desktop):**
+  1. From 22.45 s the phone screen covers the frame. A graphite curtain fades over the black screen.
+  2. The real Today preview fades in, already scaled so its screen covers the stage. The screen's height is set to the stage's aspect ratio, so nothing is cropped.
+  3. It holds for 0.3 stage heights, then shrinks into the showcase frame while the tabs fade in.
+  4. The seven screens step and snap as before.
+- **Links:** `#product` links (header, "Explore the platform", "Back to the product tour") scroll to the showcase inside the pin. "Skip film" goes to `#overview`.
+- **Credit:** "Film: AI-generated" is shown in the film. No Mercedes branding is used on the site.
 
-To add the licensed hero photographs: put the files in `src/assets/hero/`, import them in `src/config/heroFrames.ts` and set `image: { src, alt }` on each frame. `next/image` then serves responsive AVIF/WebP. Frames 01 and 04 load with priority.
+To rebuild the assets after replacing the master: `scripts/encode-film.sh`. Update `film.duration`/`film.handoff` in `src/config/film.ts` if the timing changes.
 
 ## Honesty constraints applied
 
 - Every CTA navigates within the page. "Join early access" carries a visible "Not open yet" tag; there is no form, sign-up, login or booking.
-- Photography is marked placeholders only. Shots 01–04 (hero sequence, one car) and 05–07 (photo band) describe the licensed image needed. No stock, unlicensed, AI-generated or 3D imagery.
+- Photography elsewhere is marked placeholders only (photo band shots 05–07). The only AI imagery is the owner-supplied opening film, credited on the page.
 - No founder biography; a short mission statement instead.
 - No testimonials, user counts, ratings or performance claims. Analytics figures are labelled sample data.
 - Pricing shows "$25 for your first month" as a **proposal, not available to purchase**; the price after the first month is "to be confirmed" (Q-1 open). $49 is not shown. "Free trial" is not used.
@@ -52,7 +71,9 @@ To add the licensed hero photographs: put the files in `src/assets/hero/`, impor
 
 ## Not done / follow-ups
 
-- Licensed photography: shots 01–04 (one car, one shoot, consistent light) and 05–07. Needs sourcing and licensing.
+- Licensed photography for photo band shots 05–07.
+- Trademark review of the Mercedes-AMG GT footage before public launch.
+- Manual Safari (macOS) and iOS Safari testing of the film; automated tests ran in Chromium only.
 - Contact details, legal pages and early-access terms — placeholders only.
 - Interface previews are hand-built HTML; DESIGN_SYSTEM §2.3 asks for real product screenshots once the dashboard exists.
 - Brand name clearance.

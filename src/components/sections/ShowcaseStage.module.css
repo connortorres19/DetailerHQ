@@ -64,7 +64,7 @@
   color: var(--color-text-brass);
 }
 
-/* Scroll progress — only shown in scroll mode. */
+/* Scroll progress — only shown in film mode. */
 .progress {
   display: none;
   height: 1px;
@@ -114,34 +114,34 @@
   }
 }
 
-/* Scroll mode (set by ProductShowcase.tsx): every screen and note shares one grid cell so the
-   stage keeps a constant height while GSAP cross-fades between them. */
-.stage[data-scroll='on'] .notes,
-.stage[data-scroll='on'] .panels {
+/* Film mode (CinematicFilm.tsx): every screen and note shares one grid cell so the stage keeps
+   a constant height while the film timeline cross-fades between them. */
+.stage[data-mode='film'] .notes,
+.stage[data-mode='film'] .panels {
   display: grid;
 }
 
-.stage[data-scroll='on'] .note,
-.stage[data-scroll='on'] .panel {
+.stage[data-mode='film'] .note,
+.stage[data-mode='film'] .panel {
   display: block;
   grid-area: 1 / 1;
   animation: none;
 }
 
-.stage[data-scroll='on'] .panel {
+.stage[data-mode='film'] .panel {
   will-change: opacity, transform;
 }
 
 /* Shorter screens stretch to the tallest one so the sidebar runs the full height. */
-.stage[data-scroll='on'] .panel > * {
+.stage[data-mode='film'] .panel > * {
   height: 100%;
 }
 
-.stage[data-scroll='on'] .progress {
+.stage[data-mode='film'] .progress {
   display: block;
 }
 
-.stage[data-scroll='on'] .tab::after {
+.stage[data-mode='film'] .tab::after {
   transition-duration: var(--duration-fast);
 }
 
@@ -149,4 +149,42 @@
   .tablist {
     gap: var(--space-10);
   }
+}
+
+/* Dark tone: the stage sits on the film's graphite background. */
+.stage[data-tone='dark'] .tablist {
+  border-bottom-color: var(--color-border-inverse);
+}
+
+.stage[data-tone='dark'] .tab {
+  color: var(--color-text-inverse-muted);
+}
+
+.stage[data-tone='dark'] .tab:hover,
+.stage[data-tone='dark'] .tab[aria-selected='true'] {
+  color: var(--color-text-inverse);
+}
+
+.stage[data-tone='dark'] .tab::after {
+  background: var(--brass-300);
+}
+
+.stage[data-tone='dark'] .tabIndex {
+  color: var(--color-text-brass-inverse);
+}
+
+.stage[data-tone='dark'] .note {
+  color: var(--color-text-inverse-muted);
+}
+
+.stage[data-tone='dark'] .progressBar {
+  background: var(--brass-300);
+}
+
+.stage[data-mode='film'] .notes {
+  margin-block: var(--space-4);
+}
+
+.stage[data-mode='film'] .note {
+  min-height: 0;
 }

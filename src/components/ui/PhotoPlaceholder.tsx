@@ -6,18 +6,16 @@ type PhotoPlaceholderProps = {
   /** What the licensed photograph should show. */
   subject: string;
   ratio?: '4/5' | '3/2' | '16/9' | '1/1' | '3/4';
-  /** Fill the parent instead of keeping `ratio`; the caption is centred so cropping can't cut it. */
-  fill?: boolean;
   className?: string;
 };
 
 // Clearly marked stand-in for licensed photography (no unlicensed or generated images).
 // Styled as a photo-direction slate so the layout can be judged before images exist.
-export function PhotoPlaceholder({ shot, subject, ratio = '3/2', fill = false, className }: PhotoPlaceholderProps) {
+export function PhotoPlaceholder({ shot, subject, ratio = '3/2', className }: PhotoPlaceholderProps) {
   return (
     <figure
-      className={[styles.placeholder, fill && styles.fill, className].filter(Boolean).join(' ')}
-      style={fill ? undefined : { aspectRatio: ratio }}
+      className={[styles.placeholder, className].filter(Boolean).join(' ')}
+      style={{ aspectRatio: ratio }}
       role="img"
       aria-label={`Photography placeholder: ${subject}. Licensed image to be added.`}
     >
@@ -28,7 +26,7 @@ export function PhotoPlaceholder({ shot, subject, ratio = '3/2', fill = false, c
       <figcaption className={styles.caption} aria-hidden="true">
         <span className={styles.label}>Photography placeholder · Shot {shot}</span>
         <span className={styles.subject}>{subject}</span>
-        <span className={styles.meta}>Licensed image required{fill ? '' : ` · ${ratio.replace('/', ':')}`}</span>
+        <span className={styles.meta}>Licensed image required · {ratio.replace('/', ':')}</span>
       </figcaption>
     </figure>
   );

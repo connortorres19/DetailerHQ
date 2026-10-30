@@ -1,9 +1,8 @@
 import { SiteHeader } from '@/components/layout/SiteHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
-import { Hero } from '@/components/sections/Hero';
+import { CinematicFilm } from '@/components/film/CinematicFilm';
 import { Overview } from '@/components/sections/Overview';
 import { Features } from '@/components/sections/Features';
-import { ProductShowcase } from '@/components/sections/ProductShowcase';
 import { HowItWorks } from '@/components/sections/HowItWorks';
 import { PhotoBand } from '@/components/sections/PhotoBand';
 import { Scope } from '@/components/sections/Scope';
@@ -16,10 +15,9 @@ export default function HomePage() {
     <>
       <SiteHeader />
       <main id="main" tabIndex={-1}>
-        <Hero />
+        <CinematicFilm />
         <Overview />
         <Features />
-        <ProductShowcase />
         <HowItWorks />
         <PhotoBand />
         <Scope />

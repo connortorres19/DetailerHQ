@@ -18,7 +18,7 @@ const halves = [
 
 export function Overview() {
   return (
-    <section className={`${s.section} ${s.canvas}`} aria-labelledby="overview-title">
+    <section id="overview" className={`${s.section} ${s.canvas}`} aria-labelledby="overview-title">
       <Container>
         <SectionHeading
           id="overview-title"

@@ -1,0 +1,85 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background-color var(--duration-fast) linear,
+    border-color var(--duration-fast) linear,
+    color var(--duration-fast) linear;
+}
+
+.button svg {
+  transition: transform var(--duration-base) var(--ease-standard);
+}
+
+.button:hover svg {
+  transform: translateX(2px);
+}
+
+.md {
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  font-size: 15px;
+}
+
+.lg {
+  min-height: 48px;
+  padding: 0 var(--space-5);
+  font-size: 16px;
+}
+
+.primary {
+  background: var(--color-action-primary-bg);
+  color: var(--color-action-primary-text);
+}
+
+.primary:hover {
+  background: var(--color-action-primary-bg-hover);
+}
+
+.secondary {
+  background: var(--color-bg-surface);
+  border-color: var(--color-border-strong);
+  color: var(--color-text-primary);
+}
+
+.secondary:hover {
+  background: var(--color-bg-subtle);
+}
+
+.inverse {
+  background: var(--color-action-inverse-bg);
+  color: var(--color-action-inverse-text);
+}
+
+.inverse:hover {
+  background: var(--color-action-inverse-bg-hover);
+}
+
+.outlineInverse {
+  border-color: var(--color-border-inverse-strong);
+  color: var(--color-text-inverse);
+}
+
+.outlineInverse:hover {
+  border-color: rgba(243, 242, 238, 0.4);
+  background: rgba(243, 242, 238, 0.04);
+}
+
+.preview {
+  margin-left: var(--space-1);
+  padding: 1px 6px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  font-size: 11px;
+  line-height: 16px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}

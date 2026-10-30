@@ -1,0 +1,21 @@
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 17px;
+  line-height: 24px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.mark {
+  color: var(--brass-500);
+}
+
+.inverse {
+  color: var(--color-text-inverse);
+}
+
+.default {
+  color: var(--color-text-primary);
+}

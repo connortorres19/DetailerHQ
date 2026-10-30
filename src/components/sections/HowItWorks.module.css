@@ -1,0 +1,68 @@
+.layout {
+  display: grid;
+  gap: var(--space-16);
+}
+
+.steps {
+  position: relative;
+  display: grid;
+  gap: var(--space-8);
+}
+
+/* A single hairline connects the step numbers. */
+.steps::before {
+  content: '';
+  position: absolute;
+  left: 15px;
+  top: 16px;
+  bottom: 16px;
+  width: 1px;
+  background: var(--color-border-default);
+}
+
+.step {
+  position: relative;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: var(--space-5);
+}
+
+.number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 50%;
+  background: var(--color-bg-surface);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--color-text-primary);
+}
+
+.title {
+  padding-top: 4px;
+  font-size: var(--text-h3);
+  line-height: var(--leading-h3);
+  font-weight: 500;
+}
+
+.body {
+  max-width: 50ch;
+  margin-top: var(--space-2);
+  color: var(--graphite-600);
+}
+
+.device {
+  display: flex;
+  justify-content: center;
+}
+
+@media (min-width: 1024px) {
+  .layout {
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+    gap: var(--space-20);
+    align-items: center;
+  }
+}

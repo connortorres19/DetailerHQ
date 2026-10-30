@@ -1,0 +1,77 @@
+.contact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.layout {
+  display: grid;
+  gap: 14px;
+}
+
+.vehicle {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.vehicle:last-child {
+  border-bottom: 0;
+}
+
+.vehicleIcon {
+  margin-top: 2px;
+  color: var(--graphite-400);
+}
+
+.vehicleNote {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--graphite-600);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.table th {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--graphite-50);
+  font-weight: 500;
+  color: var(--color-text-label);
+  text-align: left;
+}
+
+.table td {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  white-space: nowrap;
+}
+
+.table tr:last-child td {
+  border-bottom: 0;
+}
+
+.num {
+  text-align: right !important;
+}
+
+@media (max-width: 899px) {
+  .table th:nth-child(2),
+  .table td:nth-child(2) {
+    display: none;
+  }
+}
+
+@media (min-width: 900px) {
+  .layout {
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+    align-items: start;
+  }
+}

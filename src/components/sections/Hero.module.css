@@ -1,0 +1,112 @@
+.hero {
+  position: relative;
+  padding-top: var(--space-16);
+  background: var(--color-bg-inverse);
+  color: var(--color-text-inverse);
+}
+
+.grid {
+  display: grid;
+  gap: var(--space-12);
+}
+
+.copy {
+  align-self: center;
+}
+
+.overline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+  font-size: var(--text-overline);
+  line-height: var(--leading-overline);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-brass-inverse);
+}
+
+.overline::before {
+  content: '';
+  width: 24px;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.6;
+}
+
+.title {
+  max-width: 14ch;
+  font-size: var(--text-display);
+  line-height: var(--leading-display);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.lede {
+  max-width: 46ch;
+  margin-top: var(--space-6);
+  font-size: var(--text-body-lg);
+  line-height: var(--leading-body-lg);
+  color: var(--color-text-inverse-muted);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-10);
+}
+
+.status {
+  max-width: 46ch;
+  margin-top: var(--space-6);
+  font-size: var(--text-body-sm);
+  line-height: var(--leading-body-sm);
+  color: var(--color-text-inverse-muted);
+}
+
+.photo {
+  max-width: 520px;
+  justify-self: end;
+}
+
+/* The product preview sits across the dark/light boundary: a hard split, not a gradient. */
+.previewBand {
+  margin-top: var(--space-20);
+  background: linear-gradient(to bottom, var(--color-bg-inverse) 0 42%, var(--color-bg-canvas) 42% 100%);
+}
+
+.frame {
+  animation: frameIn var(--duration-slow) var(--ease-standard) both;
+}
+
+@keyframes frameIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@media (min-width: 1024px) {
+  .hero {
+    padding-top: var(--space-24);
+  }
+
+  .grid {
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    gap: var(--space-16);
+  }
+}
+
+@media (max-width: 1023px) {
+  .photo {
+    justify-self: stretch;
+    max-width: none;
+    aspect-ratio: 3 / 2 !important;
+  }
+}

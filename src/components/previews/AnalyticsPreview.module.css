@@ -1,0 +1,99 @@
+.metrics {
+  display: grid;
+  margin-bottom: 14px;
+}
+
+.metric {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.metric:last-child {
+  border-bottom: 0;
+}
+
+.metricLabel {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-label);
+}
+
+.metricValue {
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.layout {
+  display: grid;
+  gap: 14px;
+}
+
+.bars {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.bars li {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr) 76px;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.barLabel {
+  color: var(--graphite-700);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.barTrack {
+  height: 8px;
+  border-radius: 2px;
+  background: var(--graphite-100);
+}
+
+.bar {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--steel-600);
+}
+
+.barValue {
+  color: var(--color-text-secondary);
+  text-align: right;
+}
+
+.insufficient {
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+@media (min-width: 640px) {
+  .metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .metric {
+    border-bottom: 0;
+    border-right: 1px solid var(--color-border-subtle);
+  }
+
+  .metric:last-child {
+    border-right: 0;
+  }
+}
+
+@media (min-width: 900px) {
+  .layout {
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.7fr);
+    align-items: start;
+  }
+}

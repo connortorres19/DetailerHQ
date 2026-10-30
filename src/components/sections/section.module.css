@@ -1,0 +1,23 @@
+/* Shared section surfaces. The page alternates dark → light → dark once (DESIGN_SYSTEM §9.3). */
+.section {
+  padding-block: var(--section-pad);
+}
+
+.canvas {
+  background: var(--color-bg-canvas);
+}
+
+.surface {
+  background: var(--color-bg-surface);
+  border-block: 1px solid var(--color-border-subtle);
+}
+
+.dark {
+  background: var(--color-bg-inverse);
+  color: var(--color-text-inverse);
+}
+
+.hairline {
+  height: 1px;
+  background: rgba(217, 183, 122, 0.36);
+}

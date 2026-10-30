@@ -1,0 +1,81 @@
+.footer {
+  padding: var(--space-16) 0 var(--space-10);
+  background: var(--color-bg-inverse-deep);
+  color: var(--color-text-inverse-muted);
+  border-top: 1px solid var(--color-border-inverse);
+}
+
+.grid {
+  display: grid;
+  gap: var(--space-10);
+}
+
+.tagline {
+  max-width: 30ch;
+  margin-top: var(--space-4);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.heading {
+  margin-bottom: var(--space-4);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-brass-inverse);
+}
+
+.column ul {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.column a {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--color-text-inverse);
+  text-decoration: none;
+}
+
+.column a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.pending {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--color-text-inverse);
+}
+
+.pending span {
+  color: var(--color-text-inverse-muted);
+}
+
+.column > .pending {
+  max-width: 28ch;
+}
+
+.base {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-16);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--color-border-inverse);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+@media (min-width: 768px) {
+  .grid {
+    grid-template-columns: 1.4fr repeat(3, 1fr);
+    gap: var(--space-8);
+  }
+
+  .base {
+    grid-template-columns: 1fr auto;
+  }
+}

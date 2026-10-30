@@ -1,0 +1,249 @@
+/* Shared styles for interface previews. These mirror the planned dashboard
+   (DESIGN_SYSTEM §10, §13) at a reduced scale. */
+
+.app {
+  display: grid;
+  grid-template-columns: 1fr;
+  min-height: 100%;
+  font-size: 13px;
+  line-height: 20px;
+  background: var(--color-bg-canvas);
+}
+
+.withSidebar {
+  grid-template-columns: 1fr;
+}
+
+.sidebar {
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 10px;
+  background: var(--graphite-50);
+  border-right: 1px solid var(--color-border-default);
+}
+
+.sidebarBrand {
+  padding: 2px 8px 14px;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--color-text-primary);
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--graphite-600);
+}
+
+.navItem svg {
+  color: var(--graphite-400);
+}
+
+.navLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.navActive {
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
+  box-shadow: inset 2px 0 0 var(--steel-600);
+}
+
+.navActive svg {
+  color: var(--color-text-primary);
+}
+
+.navCount {
+  font-size: 12px;
+  color: var(--graphite-500);
+}
+
+.navCountAttention {
+  color: var(--color-attention-text);
+  font-weight: 500;
+}
+
+.main {
+  min-width: 0;
+  padding: 16px;
+}
+
+.pageHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 14px;
+}
+
+.pageTitle {
+  font-size: 17px;
+  line-height: 24px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.pageMeta {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.panel {
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-label);
+}
+
+.panelBody {
+  padding: 14px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.row:last-child {
+  border-bottom: 0;
+}
+
+.rowSelected {
+  background: var(--color-bg-selected);
+}
+
+.primaryText {
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.secondaryText {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--color-text-secondary);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-surface);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+.btnPrimary {
+  border-color: var(--graphite-900);
+  background: var(--graphite-900);
+  color: #fff;
+}
+
+.btnGhost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--graphite-700);
+}
+
+.dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 0;
+}
+
+.dl dt {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.dl dd {
+  margin: 0;
+  color: var(--color-text-primary);
+}
+
+.note {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 8px 10px;
+  border: 1px solid var(--color-info-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-info-bg);
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--color-info-text);
+}
+
+.noteAttention {
+  border-color: var(--color-attention-border);
+  background: var(--color-attention-bg);
+  color: var(--color-attention-text);
+}
+
+.divider {
+  height: 1px;
+  margin: 12px 0;
+  background: var(--color-border-subtle);
+}
+
+.sampleTag {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
+  border: 1px dashed var(--graphite-300);
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--graphite-500);
+}
+
+@media (min-width: 900px) {
+  .withSidebar {
+    grid-template-columns: 172px minmax(0, 1fr);
+  }
+
+  .sidebar {
+    display: flex;
+  }
+
+  .main {
+    padding: 20px 22px;
+  }
+}

@@ -1,0 +1,53 @@
+.layout {
+  display: grid;
+  gap: 14px;
+}
+
+.message {
+  padding: 12px;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-canvas);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.token {
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--graphite-100);
+  font-size: 12px;
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.hint {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--color-text-secondary);
+}
+
+.prompt {
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.promptActions {
+  display: inline-flex;
+  gap: 6px;
+}
+
+@media (min-width: 900px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+  }
+}

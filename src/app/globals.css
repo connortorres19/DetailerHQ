@@ -1,0 +1,264 @@
+/* DetailerHQ design tokens — docs/DESIGN_SYSTEM.md §3–§8, §15.
+   Components consume semantic tokens only; raw palette values live here. */
+
+:root {
+  /* Palette: graphite (warm neutral) */
+  --graphite-0: #ffffff;
+  --graphite-25: #fafaf9;
+  --graphite-50: #f4f4f2;
+  --graphite-100: #e9e9e6;
+  --graphite-200: #dadad6;
+  --graphite-300: #bdbdb8;
+  --graphite-400: #8e8e89;
+  --graphite-500: #6b6b66;
+  --graphite-600: #52524e;
+  --graphite-700: #3a3a37;
+  --graphite-800: #262624;
+  --graphite-900: #171716;
+  --graphite-950: #10100f;
+
+  /* Palette: steel (functional accent) and brass (marketing signature only) */
+  --steel-50: #eef3f8;
+  --steel-100: #dce6f0;
+  --steel-500: #3d6e9e;
+  --steel-600: #2f5d8a;
+  --steel-700: #244a70;
+  --brass-300: #d9b77a;
+  --brass-500: #b08a43;
+  --brass-700: #7d5f27;
+
+  /* Surfaces */
+  --color-bg-canvas: var(--graphite-25);
+  --color-bg-surface: var(--graphite-0);
+  --color-bg-subtle: var(--graphite-50);
+  --color-bg-selected: var(--steel-50);
+  --color-bg-inverse: var(--graphite-900);
+  --color-bg-inverse-deep: var(--graphite-950);
+
+  /* Text */
+  --color-text-primary: var(--graphite-900);
+  --color-text-secondary: var(--graphite-500);
+  --color-text-label: var(--graphite-600);
+  --color-text-disabled: var(--graphite-400);
+  --color-text-inverse: #f3f2ee;
+  --color-text-inverse-muted: #a8a7a1;
+  --color-text-link: var(--steel-600);
+  --color-text-link-hover: var(--steel-700);
+  --color-text-brass: var(--brass-700);
+  --color-text-brass-inverse: var(--brass-300);
+
+  /* Borders */
+  --color-border-subtle: var(--graphite-100);
+  --color-border-default: var(--graphite-200);
+  --color-border-strong: var(--graphite-300);
+  --color-border-inverse: rgba(243, 242, 238, 0.12);
+  --color-border-inverse-strong: rgba(243, 242, 238, 0.22);
+  --color-focus-ring: var(--steel-500);
+
+  /* Actions */
+  --color-action-primary-bg: var(--graphite-900);
+  --color-action-primary-bg-hover: var(--graphite-800);
+  --color-action-primary-text: #ffffff;
+  --color-action-inverse-bg: #f3f2ee;
+  --color-action-inverse-bg-hover: #ffffff;
+  --color-action-inverse-text: var(--graphite-900);
+
+  /* Status (text / background / border) */
+  --color-attention-text: #8a5a00;
+  --color-attention-bg: #fbf3e2;
+  --color-attention-border: #ebd6a8;
+  --color-info-text: #2f5d8a;
+  --color-info-bg: #eef3f8;
+  --color-info-border: #c9d8e7;
+  --color-positive-text: #2e6b3f;
+  --color-positive-bg: #eaf3ec;
+  --color-positive-border: #c3ddc9;
+  --color-critical-text: #a6352b;
+  --color-critical-bg: #fbecea;
+  --color-critical-border: #ebc3be;
+  --color-neutral-text: #52524e;
+  --color-neutral-bg: #f0f0ee;
+  --color-neutral-border: #dadad6;
+
+  /* Spacing (4px base) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+  --space-32: 128px;
+
+  /* Layout */
+  --container-max: 1200px;
+  --gutter: 16px;
+  --section-pad: 80px;
+  --header-height: 64px;
+
+  /* Radii — restrained; nothing larger than 8px */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  /* Elevation — floating layers only */
+  --shadow-sm: 0 1px 2px rgba(23, 23, 22, 0.06);
+  --shadow-md: 0 4px 12px rgba(23, 23, 22, 0.08), 0 1px 3px rgba(23, 23, 22, 0.06);
+  --shadow-lg: 0 12px 32px rgba(23, 23, 22, 0.12), 0 2px 6px rgba(23, 23, 22, 0.06);
+  --shadow-frame: 0 24px 60px -24px rgba(16, 16, 15, 0.45), 0 2px 6px rgba(16, 16, 15, 0.12);
+
+  /* Motion */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --duration-fast: 120ms;
+  --duration-base: 160ms;
+  --duration-slow: 200ms;
+
+  /* Type */
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+  --text-display: 36px;
+  --leading-display: 40px;
+  --text-h1: 28px;
+  --leading-h1: 36px;
+  --text-h2: 24px;
+  --leading-h2: 32px;
+  --text-h3: 18px;
+  --leading-h3: 28px;
+  --text-body-lg: 18px;
+  --leading-body-lg: 28px;
+  --text-body: 16px;
+  --leading-body: 24px;
+  --text-body-sm: 13px;
+  --leading-body-sm: 20px;
+  --text-overline: 12px;
+  --leading-overline: 16px;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --gutter: 32px;
+    --section-pad: 112px;
+    --text-display: 48px;
+    --leading-display: 54px;
+    --text-h1: 32px;
+    --leading-h1: 40px;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --section-pad: 128px;
+    --text-display: 56px;
+    --leading-display: 60px;
+    --text-h1: 36px;
+    --leading-h1: 44px;
+  }
+}
+
+/* ------------------------------------------------------------------ base */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  scroll-behavior: smooth;
+  scroll-padding-top: calc(var(--header-height) + 16px);
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg-canvas);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+  font-kerning: normal;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4,
+p,
+ul,
+ol,
+dl,
+dd,
+figure,
+blockquote {
+  margin: 0;
+}
+
+ul[role='list'],
+ol[role='list'] {
+  list-style: none;
+  padding: 0;
+}
+
+a {
+  color: inherit;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+svg {
+  flex-shrink: 0;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+::selection {
+  background: var(--steel-100);
+  color: var(--graphite-900);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,59 @@
+.mission {
+  padding-bottom: var(--space-16);
+}
+
+.overline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+  font-size: var(--text-overline);
+  line-height: var(--leading-overline);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-brass-inverse);
+}
+
+.overline::before {
+  content: '';
+  width: 24px;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.6;
+}
+
+.statement {
+  max-width: 30ch;
+  font-size: var(--text-h1);
+  line-height: var(--leading-h1);
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  color: var(--color-text-inverse);
+  text-wrap: pretty;
+}
+
+.band {
+  display: grid;
+  gap: var(--space-8);
+  padding-top: var(--space-12);
+}
+
+.bandTitle {
+  font-size: var(--text-h2);
+  line-height: var(--leading-h2);
+  font-weight: 500;
+}
+
+.bandText {
+  max-width: 56ch;
+  margin-top: var(--space-3);
+  color: var(--color-text-inverse-muted);
+}
+
+@media (min-width: 900px) {
+  .band {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+  }
+}

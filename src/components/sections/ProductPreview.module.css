@@ -1,0 +1,92 @@
+.tablist {
+  display: flex;
+  gap: var(--space-6);
+  margin-bottom: var(--space-8);
+  border-bottom: 1px solid var(--color-border-default);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tablist::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex: none;
+  padding: var(--space-3) 0 var(--space-4);
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-standard);
+}
+
+.tab::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--graphite-900);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--duration-base) var(--ease-standard);
+}
+
+.tab:hover {
+  color: var(--color-text-primary);
+}
+
+.tab[aria-selected='true'] {
+  color: var(--color-text-primary);
+}
+
+.tab[aria-selected='true']::after {
+  transform: scaleX(1);
+}
+
+.tab:focus-visible {
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.tabIndex {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-brass);
+}
+
+.panel {
+  animation: panelIn 160ms var(--ease-standard) both;
+}
+
+.note {
+  max-width: 64ch;
+  min-height: 48px;
+  margin-bottom: var(--space-6);
+  color: var(--graphite-600);
+}
+
+@keyframes panelIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@media (min-width: 1024px) {
+  .tablist {
+    gap: var(--space-10);
+  }
+}

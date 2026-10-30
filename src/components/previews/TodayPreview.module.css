@@ -1,0 +1,51 @@
+.grid {
+  display: grid;
+  gap: 14px;
+}
+
+.side {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.job {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.time {
+  color: var(--color-text-label);
+}
+
+.next {
+  box-shadow: inset 2px 0 0 var(--steel-600);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.count {
+  font-weight: 500;
+  color: var(--color-attention-text);
+}
+
+.age {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--color-attention-text);
+  white-space: nowrap;
+}
+
+@media (min-width: 900px) {
+  .grid {
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  }
+}

@@ -1,0 +1,77 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100svh;
+  padding: var(--space-10) var(--gutter) var(--space-16);
+  background: var(--graphite-50);
+}
+
+.brand {
+  margin-bottom: var(--space-10);
+}
+
+.card {
+  width: 100%;
+  max-width: 420px;
+  padding: var(--space-8);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+}
+
+.title {
+  font-size: var(--text-h2);
+  line-height: var(--leading-h2);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.intro {
+  margin-top: var(--space-2);
+  color: var(--graphite-600);
+}
+
+.content {
+  margin-top: var(--space-6);
+}
+
+.form {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.submit {
+  width: 100%;
+  margin-top: var(--space-1);
+}
+
+.aside,
+.footer {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--graphite-600);
+}
+
+.aside a,
+.footer a {
+  color: var(--color-text-link);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.footer {
+  max-width: 420px;
+  margin-top: var(--space-6);
+  text-align: center;
+}
+
+@media (max-width: 479px) {
+  .card {
+    padding: var(--space-6) var(--space-5);
+  }
+}
+
+.notice {
+  margin-bottom: var(--space-5);
+}

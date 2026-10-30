@@ -1,0 +1,251 @@
+.shell {
+  min-height: 100svh;
+  background: var(--color-bg-canvas);
+}
+
+.skip {
+  position: absolute;
+  left: 8px;
+  top: -48px;
+  z-index: 100;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--graphite-900);
+  color: #fff;
+}
+
+.skip:focus {
+  top: 8px;
+}
+
+/* ---- Sidebar (≥ 1024px) ---- */
+
+.sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  width: 240px;
+  padding: var(--space-5) var(--space-3);
+  border-right: 1px solid var(--graphite-200);
+  background: var(--graphite-50);
+}
+
+.brand {
+  padding: 0 var(--space-3);
+}
+
+.business {
+  margin: var(--space-6) var(--space-3) var(--space-3);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--graphite-600);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nav {
+  flex: 1;
+}
+
+.navList {
+  display: grid;
+  gap: 2px;
+}
+
+.navLink {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 36px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--graphite-700);
+  text-decoration: none;
+}
+
+.navLink:hover {
+  background: var(--graphite-100);
+  color: var(--graphite-900);
+}
+
+.navLink[aria-current='page'] {
+  background: var(--graphite-0);
+  color: var(--graphite-900);
+  font-weight: 500;
+  box-shadow: inset 2px 0 0 var(--steel-600);
+}
+
+.account {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-3) 0;
+  border-top: 1px solid var(--graphite-200);
+}
+
+.email {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--graphite-600);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.signOut {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  color: var(--graphite-700);
+  cursor: pointer;
+}
+
+.signOut:hover {
+  color: var(--graphite-900);
+}
+
+.main {
+  margin-left: 240px;
+}
+
+.mobileTop {
+  display: none;
+}
+
+.banner {
+  padding: var(--space-4) var(--space-8) 0;
+}
+
+.content {
+  max-width: 1280px;
+  padding: var(--space-8);
+}
+
+.content:focus {
+  outline: none;
+}
+
+/* ---- Tablet rail (768–1023px) ---- */
+
+@media (max-width: 1023px) {
+  .sidebar {
+    width: 80px;
+    padding-inline: var(--space-2);
+  }
+
+  .brand,
+  .business,
+  .email {
+    display: none;
+  }
+
+  .navLink {
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    height: 56px;
+    padding: 0;
+    font-size: 12px;
+  }
+
+  .navLink[aria-current='page'] {
+    box-shadow: inset 0 -2px 0 var(--steel-600);
+  }
+
+  .account {
+    justify-items: center;
+    padding-inline: 0;
+  }
+
+  .signOut span {
+    display: none;
+  }
+
+  .main {
+    margin-left: 80px;
+  }
+
+  .banner {
+    padding-inline: var(--space-6);
+  }
+
+  .content {
+    padding: var(--space-6);
+  }
+}
+
+/* ---- Phone: top bar + bottom tab bar (< 768px) ---- */
+
+@media (max-width: 767px) {
+  .sidebar {
+    inset: auto 0 0 0;
+    width: auto;
+    height: calc(64px + env(safe-area-inset-bottom));
+    padding: 0 0 env(safe-area-inset-bottom);
+    border-right: 0;
+    border-top: 1px solid var(--graphite-200);
+    background: var(--color-bg-surface);
+  }
+
+  .account {
+    display: none;
+  }
+
+  .navList {
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    height: 64px;
+  }
+
+  .navLink {
+    height: 64px;
+    border-radius: 0;
+  }
+
+  .navLink[aria-current='page'] {
+    background: transparent;
+    box-shadow: inset 0 2px 0 var(--steel-600);
+  }
+
+  .main {
+    margin-left: 0;
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  }
+
+  .mobileTop {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    padding: 0 var(--gutter);
+    border-bottom: 1px solid var(--graphite-200);
+    background: var(--color-bg-surface);
+  }
+
+  .mobileBusiness {
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .banner {
+    padding: var(--space-4) var(--gutter) 0;
+  }
+
+  .content {
+    padding: var(--space-5) var(--gutter) var(--space-10);
+  }
+}

@@ -1,0 +1,52 @@
+.panel {
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.title {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 500;
+}
+
+.body {
+  padding: var(--space-5);
+}
+
+.empty {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-1);
+  padding: var(--space-6) var(--space-5);
+}
+
+.emptyIcon {
+  margin-bottom: var(--space-2);
+  color: var(--graphite-400);
+}
+
+.emptyTitle {
+  font-weight: 500;
+}
+
+.emptyBody {
+  max-width: 52ch;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--graphite-600);
+}
+
+.emptyAction {
+  margin-top: var(--space-3);
+}

@@ -1,0 +1,103 @@
+.grid {
+  display: grid;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.column {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.attention {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-attention-text);
+  font-weight: 500;
+}
+
+.list {
+  margin: 0;
+}
+
+.job {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.job:last-child {
+  border-bottom: 0;
+}
+
+.time {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--color-text-label);
+}
+
+.who {
+  font-weight: 500;
+}
+
+.meta,
+.later {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--graphite-600);
+}
+
+.week {
+  color: var(--graphite-800);
+}
+
+.inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.link {
+  font-size: 14px;
+  color: var(--color-text-link);
+}
+
+.checklist {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.checklist li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.checklist li[data-done='true'] {
+  color: var(--graphite-500);
+}
+
+.checklist li[data-done='true'] svg {
+  color: var(--color-positive-text);
+}
+
+.checklist a {
+  color: var(--color-text-link);
+}
+
+.later {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+@media (min-width: 1100px) {
+  .grid {
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  }
+}

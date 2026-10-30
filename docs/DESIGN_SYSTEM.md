@@ -1,7 +1,15 @@
 # DetailerHQ — Design System
 
-> **Status:** Draft for review · **Revision 2** · **Last updated:** 2026-10-29
+> **Status:** Final draft for approval · **Revision 3** · **Last updated:** 2026-10-30
 > Companion to [`PRODUCT_PLAN.md`](./PRODUCT_PLAN.md). The product name is a placeholder; nothing in this system depends on it.
+
+### What changed in revision 3
+
+- **Early-access pricing presentation** ($25 for the first month) and stage rules for showing the $49 target price (§2.4, §9.2, §9.5).
+- **Temporary holds**: calendar, request-detail and status-page treatments; the old "business holds pending times" setting is gone (§13.4, §13.11, §13.12).
+- **One vehicle per request** in the public flow, and a new **customer & vehicle linking** panel for approval (§9.4, §13.17).
+- **Policy settings** form with 24 h shown as a suggestion, and **"Ask to reschedule"** on the status page (§13.11, §13.18).
+- **Activation banner** before the trial starts; masked contact details on status pages; "no tax calculation" wording.
 
 ### What changed in revision 2
 
@@ -61,7 +69,7 @@ The marketing site, the public pages each detailer shares with customers, and th
 | **Type scale** | Up to `display` (56px max) | Up to `h2` | Up to `h2`; dense `body` 15px on desktop |
 | **Density** | Generous (80–128px section padding) | Calm, single column, 640px max | Compact tables and calendars; one task per screen on phones |
 | **Motion** | One subtle image fade at most | State changes only | State changes only |
-| **Primary action** | Apply for the pilot / Start trial (stage-dependent) | Send request · Accept this time | Approve request · Mark complete, etc. |
+| **Primary action** | Apply for early access / Start trial (stage-dependent) | Send request · Accept this time | Approve request · Mark complete, etc. |
 
 If a pattern exists in one context, reuse it in the others before inventing a variant (e.g., the same badge, button and form field everywhere).
 
@@ -82,6 +90,9 @@ Direct, practical, calm — like an experienced shop manager. Short sentences. T
 | "Request sent — not confirmed yet" | "You're booked!" (for a request) |
 | "Recorded amount" | "Payment received" / "Charged" |
 | "Pilot access until Dec 15" (pilot stage) | "Free trial" (before trials exist) |
+| "Early access: $25 for your first month" | "70% off — limited time!" |
+| "Your time is being held — not confirmed yet" | "Reserved!" / "Booked" (for a hold) |
+| "No account needed" (booking page) | "Sign up to book" |
 | "This slot was just taken. Choose another time." | "Oops! Something went wrong." |
 | "Not enough data yet — 2 completed jobs this month." | A chart with two points and a "+100%" badge |
 | "3 leads booked after a logged follow-up" | "Follow-ups generated 3 bookings" |
@@ -120,7 +131,11 @@ Applies to the marketing site, in-app copy, onboarding, emails we write ourselve
 - **No unsupported performance claims** ("Double your bookings", "Never miss a lead", "Save 10 hours a week").
 - **No customer logos** without permission.
 - **No features described before they ship** — including automated texts/emails, payments, deposits, integrations and AI. "Coming soon" lists are avoided; if needed, use "Not available yet" in the included/not-included section.
-- **Stage-correct wording:** during the pilot, use "pilot program" and "pilot access"; "7-day free trial" and "no credit card required" appear only after trial enforcement and billing ship (PRODUCT_PLAN §3.2).
+- **Stage-correct wording:** during the pilot, use "early access", "pilot program" and "pilot access"; "7-day free trial" and "no credit card required" appear only after trial enforcement and billing ship (PRODUCT_PLAN §3.2).
+- **Early-access price:** shown as "Early access: $25 for your first month" with, in the same block, what happens after the first month (as decided — PRODUCT_PLAN §17.3). No implied discount from an unvalidated "regular price", no countdowns, no scarcity claims beyond the true pilot size ("We're working with a small group of 3–5 businesses").
+- **Public price:** the $49/month target is an internal hypothesis and is **not** published until validated (PRODUCT_PLAN §12.1).
+- **Trial start:** wherever the trial is described, say it starts "once you verify your email and set up your business".
+- **Tax:** never imply the product calculates tax or handles payments.
 - **Trial terms are stated plainly** wherever the trial is offered: length, exact end time, what happens at the end, and that data isn't deleted when it ends.
 - A claims checklist is reviewed before each marketing publish (§16).
 
@@ -168,7 +183,7 @@ Muted, slightly desaturated — readable, not alarming. Every status is shown wi
 | Status meaning | Text / icon | Background | Border | Used for |
 |---|---|---|---|---|
 | **Attention** (amber) | `#8A5A00` | `#FBF3E2` | `#EBD6A8` | Pending request, follow-up due, possible duplicate, conflict warning, trial ending |
-| **Scheduled / info** (steel) | `#2F5D8A` | `#EEF3F8` | `#C9D8E7` | Scheduled appointment, time proposed (waiting on customer), quote sent, contacted |
+| **Scheduled / info** (steel) | `#2F5D8A` | `#EEF3F8` | `#C9D8E7` | Scheduled appointment, held time, time proposed (waiting on customer), quote sent, contacted |
 | **Positive** (green) | `#2E6B3F` | `#EAF3EC` | `#C3DDC9` | Approved, completed, accepted, booked |
 | **Critical** (red) | `#A6352B` | `#FBECEA` | `#EBC3BE` | Errors, overdue, no-show, destructive actions, restricted account |
 | **Neutral** (graphite) | `#52524E` | `#F0F0EE` | `#DADAD6` | New, draft, cancelled, declined, withdrawn, expired, duplicate, lost, archived |
@@ -387,7 +402,7 @@ The marketing site may be more atmospheric than the product — dark graphite se
 ### 9.1 Global header
 
 - Left: wordmark (set in Plex Sans 600, letter-spaced −0.01em; placeholder until the name is cleared). Optional small brass mark.
-- Center/right: Product · Pricing (labelled "Pilot program" during the pilot) · Sign in · primary button whose label depends on the stage: **"Apply for the pilot"** during the pilot; **"Start 7-day free trial"** only after trial enforcement and billing ship.
+- Center/right: Product · Pricing (labelled "Early access" during the pilot) · Sign in · primary button whose label depends on the stage: **"Apply for early access"** during the pilot; **"Start 7-day free trial"** only after trial enforcement and billing ship.
 - Height 64px, solid background (dark on the hero, light below). No transparency blur.
 - Mobile: wordmark + "Sign in" + menu button opening a full-screen sheet.
 
@@ -405,7 +420,7 @@ The marketing site may be more atmospheric than the product — dark graphite se
 5. **Leads, quotes and follow-ups** — screenshot of a lead with its quote, communication log and follow-up task; one line explaining templates open in the owner's own Messages or Mail app.
 6. **Honest numbers** — analytics screenshot with the line: "Every number comes from jobs you've actually recorded." Shows quoted value, booked job value and recorded revenue as separate, labelled figures.
 7. **What's included and what isn't (yet)** — a plain two-column list. *Included:* booking page and request status links, approvals and suggested times, calendar, customers & vehicles, leads & quotes, follow-up reminders and message templates, analytics, CSV export. *Not available yet:* automatic texts or emails, online payments and deposits, social media integrations, CSV import. This builds trust.
-8. **Pricing teaser** — **pilot stage:** "Now accepting a small number of pilot businesses" with a link to pilot details; **paid-launch stage:** one plan, price, and the trial stated in full ("7-day free trial. No credit card required. When it ends, subscribe to keep using DetailerHQ — your data isn't deleted.").
+8. **Pricing teaser** — **pilot stage:** "Early access for 3–5 detailing businesses — $25 for your first month," one line on what happens after, and a link to the early-access page; **paid-launch stage (after price validation):** one plan, price, and the trial stated in full ("7-day free trial. No credit card required. When it ends, subscribe to keep using DetailerHQ — your data isn't deleted.").
 9. **Founder note** — short, signed, real person (photo optional), why this is being built and how to reach them. Replaces fake testimonials until real ones exist.
 10. **FAQ** — 5–7 practical questions (data ownership, export, texting, mobile, cancellation).
 11. **Footer** — dark; product links, legal, contact email, © year. Small and tidy.
@@ -426,6 +441,8 @@ This is the detailer's page, not ours. Our branding is a single small "Powered b
 - Owner's intro text (max ~300 chars).
 - Service menu: grouped by category; each row shows name, short description, duration, price (`From $260` / `$65` / `Quote required`). Rows, not cards. Primary button at the bottom (sticky on mobile): "Request an appointment"; secondary: "Request a quote".
 - Request flow: one step per screen on mobile with a step indicator ("Step 2 of 6 · Vehicle"), back link, sticky bottom action bar showing the running estimate ("Full detail · Large SUV · from $310 · 4h 30m"). On desktop, the summary sits in a right rail.
+- **No account needed:** the first screen states it in one quiet line ("No account needed — you'll get a link to check your request"). No sign-in links anywhere in the customer flow.
+- **One vehicle per request:** the Vehicle step asks for a single vehicle (year, make, model, size class, optional color and notes) with the heading "Which vehicle is this for?". Helper text below: "Booking for more than one vehicle? Send a separate request for each." The review step shows the vehicle in its own row.
 - Time selection: date strip (next 14 days, horizontally scrollable) + list of available start times as 48px buttons. Unavailable dates are visibly disabled with an accessible label, not hidden.
 - Confirmation: plain, reassuring, explicit that it is a request: "Request sent to Northside Detail Co. — not confirmed yet." followed by what happens next and the status link with **Copy link** (see §13.11).
 - **Timezone:** a quiet line above the time list — "Times are in Central Time (CT)". If the visitor's device is in another zone, an info banner says so.
@@ -433,7 +450,7 @@ This is the detailer's page, not ours. Our branding is a single small "Powered b
 
 ### 9.5 Pricing page
 
-- **Pilot stage:** title "Pilot program". What pilots get, what we ask in return (feedback), pilot price (or "no charge") stated plainly, pilot length, what happens at the end, data ownership and export. Application form or link to `/contact`. Never the words "free trial".
+- **Pilot stage:** title "Early access". Price block: "$25 for your first month" (`metric` style numerals, no strikethrough), directly followed by what happens after the first month and how payment is collected. Then: what's included, what we ask in return (feedback), pilot size and length, data ownership and export, link to pilot terms, application form or link to `/contact`. Never the words "free trial"; no unvalidated public price.
 - **Paid-launch stage:** one plan card (border only, no shadow), price, billing interval, the full trial statement (length, no card, what happens at the end, data retention), included features list identical to the home page's "included" list, FAQ.
 - No comparison tables against competitors, no "Most popular" ribbons, no strikethrough prices.
 
@@ -470,7 +487,7 @@ This is the detailer's page, not ours. Our branding is a single small "Powered b
 - **Top bar** 56px: page title (h2) left; global search (customers, vehicles by plate, quotes by number), notifications button (bell icon with unread count, opens the notification panel, §13.13) and "New" menu (Appointment, Customer, Lead, Quote, Task, Log communication) right. Sticky with `shadow-sm` once scrolled.
 - **Account banner** (§13.16) sits directly under the top bar on every dashboard page when relevant (pilot ending, trial, restricted).
 - **Page header** within content: title, one-line description if needed, primary page action right-aligned, then filters/tabs below.
-- Sidebar collapses to a 64px icon rail between 1024–1279px if needed (tooltips on icons).
+- At 1024–1279px the sidebar stays at full width (240px); content narrows. Below 1024px the tablet navigation rail (§11.2) takes over.
 
 ### 10.2 Navigation priorities
 
@@ -634,7 +651,8 @@ Rules:
 - **Appointment blocks:** white background, 1px border in status color, 3px left bar in status color, radius 4px; content: time range (mono or tabular), customer name (500), vehicle, first service. Truncate gracefully; full details on click.
   - Scheduled: steel; In progress: graphite-900 outline; Completed: green bar, text slightly muted; Cancelled/no-show: hidden by default (toggle "Show cancelled"), shown struck-through when visible.
 - **Tentative items** (toggle, on by default), always visually distinct from confirmed appointments and never counted as jobs:
-  - *Pending request:* dashed amber outline, transparent fill, label "Request". If the business holds pending times, add a small "Held" label.
+  - *Pending request (no hold):* dashed amber outline, transparent fill, label "Request". Does not block anything; may overlap other items.
+  - *Held request:* solid 1px steel border with diagonal `steel-50` hatch fill, label "Held · until 3:00 PM". Blocks the time like an appointment, but is visibly not a job.
   - *Time proposed (waiting on customer):* dashed steel outline, label "Proposed · held until 3:00 PM".
 - Multiple requests for the same time stack side by side with a "2 requests" label.
 - **Buffers** shown as a faint hatched extension after jobs so the owner understands why slots are blocked.
@@ -683,7 +701,7 @@ Filtered empty states say so: "No completed appointments in October" + "Clear fi
 
 - Height 22px, 4px radius, 8px horizontal padding, `body-sm` 500 weight, status text/background/border from §3.4, optional 6px dot or 12px icon.
 - Labels and tones:
-  - **Booking requests:** Pending (attention) · Time proposed (info) · Approved (positive) · Declined · Proposal declined · Withdrawn · Expired · Duplicate (all neutral)
+  - **Booking requests:** Pending (attention) · Held (info, shown alongside Pending) · Time proposed (info) · Approved (positive) · Declined · Proposal declined · Withdrawn · Expired · Duplicate (all neutral)
   - **Appointments:** Scheduled (info) · In progress (outlined graphite) · Completed (positive) · Cancelled (neutral) · No-show (critical)
   - **Leads:** New (neutral) · Contacted (info) · Quote sent (info) · Follow-up due (attention) · Booked (positive) · Lost (neutral)
   - **Quotes:** Draft (neutral) · Sent (info) · Accepted (positive) · Declined · Expired (neutral)
@@ -722,7 +740,7 @@ The most important customer-facing screen: it replaces confirmation texts in the
 ```
 ┌──────────────────────────────────────────┐
 │ Northside Detail Co.                     │  business name (h3), phone · text links
-│ (512) 555-0142 · Call · Text             │
+│ Call · Text                              │
 ├──────────────────────────────────────────┤
 │ [Pending]                                │  badge
 │ Request received — not confirmed yet     │  headline (h2)
@@ -742,16 +760,22 @@ The most important customer-facing screen: it replaces confirmation texts in the
 └──────────────────────────────────────────┘
 ```
 
-- One state per page, using the headline and next-step text from PRODUCT_PLAN §6.3 verbatim (centralised copy).
-- **Time proposed:** a highlighted block (info tone, 1px border, 6px radius) showing the proposed time, the owner's message, "Held until [time]", and two buttons: **Accept this time** (primary) and **Decline** (secondary). Declining asks for confirmation.
+- One state per page, using the headline and next-step text from PRODUCT_PLAN §6.4 verbatim (centralised copy).
+- **Pending with a hold:** an info-tone note under the headline: "Your requested time (Sat, Nov 8, 9:00 AM CT) is being held while Northside Detail Co. reviews your request. This is not a confirmation yet." The hold expiry is not emphasized to the customer (it's an owner tool), but the page never implies confirmation.
+- **Time proposed:** a highlighted block (info tone, 1px border, 6px radius) showing the proposed time, the owner's message, "Held for you until [time]", and two buttons: **Accept this time** (primary) and **Decline** (secondary). Declining asks for confirmation.
+- **Contact details masked:** the customer's own details appear as "Phone ending 0142 · Email j•••@gmail.com"; the service address is shown in full only for confirmed mobile appointments.
+- **Ask to reschedule** (before the business's rescheduling cutoff): secondary button opening a sheet with available start times and an optional note. Submit label "Send reschedule request". Result state: "Reschedule request sent — your appointment is still [current time] until [Business] changes it." After the cutoff, the button is replaced by the rescheduling policy text and call/text links.
 - **Rescheduled:** new time prominent; previous time shown struck through in `graphite-500` with "Changed on Nov 5".
-- **Cancel before cutoff:** secondary button "Cancel appointment" → confirmation sheet stating the business's policy; after cutoff the button is replaced by the policy text and call/text links.
+- **Cancel before cutoff** (only if the business allows online cancellation): secondary button "Cancel appointment" → confirmation sheet stating the business's policy and cutoff ("Online cancellation is available until Fri, Nov 7, 9:00 AM CT"); after the cutoff the button is replaced by the policy text and call/text links.
 - Dates always include the weekday, date, time and **timezone abbreviation**.
 - No DetailerHQ marketing on this page beyond the "Powered by" footer link.
 
 ### 13.12 Propose a different time & conflict warnings
 
-- **Propose dialog** (sheet on mobile): date picker + available start times computed for the requested duration (same component as the public time picker), optional message to the customer (shown on the status page), and hold expiry (default from settings, editable). Primary: "Propose this time".
+- **Propose dialog** (sheet on mobile): date picker + available start times computed for the requested duration (same component as the public time picker), optional message to the customer (shown on the status page), and "Customer must answer by" (default from settings, 2–72 h). Primary: "Propose this time". Helper: "This time is held for the customer until then."
+- **Hold this time** (request detail, secondary action): small dialog with a duration segmented control — 2 h · 12 h · 24 h · 48 h · 72 h (default from settings; options past the requested start are disabled with the reason) — and a one-line explanation: "Holding removes this time from your booking page. It is not a confirmation. You can release it at any time." Primary: "Hold until Fri 3:00 PM".
+- **Held state on request detail:** info banner "Held until Fri, Nov 7, 3:00 PM CT · Release hold". Approve keeps working ("Approve" converts the hold). In the last 2 hours the banner switches to attention tone: "Hold expires in 1h 40m".
+- **Other requests for a held time** show a neutral line: "This time is held for R-0041 (Jordan Reyes)." Approve is replaced by "Release hold and approve…" which opens a confirmation naming the other request.
 - **Conflict warnings** appear inline above the action bar on request detail, new appointment, reschedule and propose screens:
   - *Hard conflict* (critical tone): "Overlaps Marcus Bell's appointment (9:00–1:00 PM). Choose another time." — the confirm action is disabled and "Propose a different time" is offered.
   - *Soft warnings* (attention tone), listed individually: "Inside the 30-minute buffer after Marcus Bell's job" · "Outside working hours" · "This would be the 4th job on Sat (limit 3)". Confirm button label changes to "Approve anyway" and requires a checkbox "I've checked these warnings".
@@ -784,10 +808,32 @@ The most important customer-facing screen: it replaces confirmation texts in the
 
 - **Banner** under the top bar, full content width, 40px min height, status tone background + 1px border, text + one action:
   - Pilot: neutral — "Pilot access until Dec 15, 2026." · "View pilot terms" (shown only in the final 14 days).
+  - Pending activation: info — "Verify your email to activate your account and publish your booking page." · "Resend email". (Paid-launch stage adds: "Your 7-day trial starts once you're activated.")
   - Trial (paid-launch stage): info — "Trial ends Thu, Nov 6 at 3:42 PM CT." · "Choose a plan"; attention tone from 3 days before.
   - Restricted: critical — "Your trial has ended. Your data is safe and read-only. Subscribe to keep taking requests." · "Subscribe" · secondary "Export data".
 - **Restricted (read-only) state:** create/edit/approve buttons are removed, and each page header shows one plain line instead: "Read-only — subscribe to make changes" (visible text, not a hover tooltip); forms render as read-only text, not disabled inputs; export, account settings and subscription remain fully interactive. The booking page shows the business's contact details with "Not accepting online requests right now."
 - Never use countdown timers, flashing, or urgency language ("Only 2 days left!!").
+- **Closing state:** critical banner "Your account is scheduled for deletion on Dec 14, 2026. Your booking page is offline." · "Cancel closure" · "Export data".
+
+### 13.17 Approve: link customer and vehicle
+
+Shown when the owner taps **Approve** (desktop: side panel 480px; mobile: full-height sheet). Two short steps, each with a clear default:
+
+1. **Customer** — "Matches in your customers" list (only this business; exact phone/email matches first), each row showing name, phone, email and number of vehicles. Options: select a match, or **Create new customer from this request** (default when no match). Never auto-merged.
+2. **Vehicle** — if an existing customer was chosen, radio list of **that customer's** vehicles (`2021 Tesla Model Y · White · plate ABC1234`) with the request's vehicle description shown above for comparison and the closest match pre-selected only when year/make/model match exactly; plus **Add as new vehicle** (pre-filled from the request, editable). For a new customer, the vehicle form is pre-filled.
+
+Footer: conflict summary (if any soft warnings) and primary "Approve request". The vehicle choice is required; the button stays enabled and explains what's missing if pressed early.
+
+### 13.18 Policy settings
+
+`/app/settings/policies` and onboarding step 4 use one form:
+
+- **Online cancellation** — toggle "Let customers cancel from their status link".
+- **Cancellation cutoff** — number input + unit (hours), helper: "Suggested: 24 hours. Choose what works for your business." The value is pre-filled with 24 but labelled as a suggestion, never as required.
+- **Rescheduling cutoff** — same pattern, controls "Ask to reschedule".
+- **Policy texts** — two textareas with neutral examples shown as placeholders-in-helper-text (not prefilled), 1,000-character counters.
+- **Holds and proposals** — "Default hold length" (2–72 h, default 24 h) and "Time customers have to answer a proposed time" (2–72 h, default 48 h).
+- Live preview of how the policy appears on the customer status page.
 
 ---
 

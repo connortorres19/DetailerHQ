@@ -10,13 +10,13 @@ export function PhotoBand() {
       <Container>
         <div className={styles.grid}>
           <PhotoPlaceholder
-            shot="02"
+            shot="05"
             ratio="3/2"
             subject="Foam cannon mid-wash on a pickup in a residential driveway, overcast light"
             className={styles.wide}
           />
-          <PhotoPlaceholder shot="03" ratio="3/4" subject="Interior steam cleaning of a minivan’s second-row seats" />
-          <PhotoPlaceholder shot="04" ratio="3/4" subject="Detailer kneeling at a wheel, microfiber in hand, no visible logos or plates" />
+          <PhotoPlaceholder shot="06" ratio="3/4" subject="Interior steam cleaning of a minivan’s second-row seats" />
+          <PhotoPlaceholder shot="07" ratio="3/4" subject="Detailer kneeling at a wheel, microfiber in hand, no visible logos or plates" />
         </div>
         <p className={styles.caption}>
           Photography will show real, licensed detailing work. These marked frames hold its place until then.

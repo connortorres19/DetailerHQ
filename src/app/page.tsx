@@ -3,7 +3,7 @@ import { SiteFooter } from '@/components/layout/SiteFooter';
 import { Hero } from '@/components/sections/Hero';
 import { Overview } from '@/components/sections/Overview';
 import { Features } from '@/components/sections/Features';
-import { ProductPreview } from '@/components/sections/ProductPreview';
+import { ProductShowcase } from '@/components/sections/ProductShowcase';
 import { HowItWorks } from '@/components/sections/HowItWorks';
 import { PhotoBand } from '@/components/sections/PhotoBand';
 import { Scope } from '@/components/sections/Scope';
@@ -19,7 +19,7 @@ export default function HomePage() {
         <Hero />
         <Overview />
         <Features />
-        <ProductPreview />
+        <ProductShowcase />
         <HowItWorks />
         <PhotoBand />
         <Scope />

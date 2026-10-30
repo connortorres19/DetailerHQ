@@ -1,7 +1,10 @@
+.stage {
+  position: relative;
+}
+
 .tablist {
   display: flex;
   gap: var(--space-6);
-  margin-bottom: var(--space-8);
   border-bottom: 1px solid var(--color-border-default);
   overflow-x: auto;
   scrollbar-width: none;
@@ -41,10 +44,7 @@
   transition: transform var(--duration-base) var(--ease-standard);
 }
 
-.tab:hover {
-  color: var(--color-text-primary);
-}
-
+.tab:hover,
 .tab[aria-selected='true'] {
   color: var(--color-text-primary);
 }
@@ -64,15 +64,44 @@
   color: var(--color-text-brass);
 }
 
-.panel {
-  animation: panelIn 160ms var(--ease-standard) both;
+/* Scroll progress — only shown in scroll mode. */
+.progress {
+  display: none;
+  height: 1px;
+  margin-top: -1px;
+  background: transparent;
+}
+
+.progressBar {
+  display: block;
+  height: 100%;
+  background: var(--brass-500);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.notes {
+  margin-block: var(--space-8) var(--space-6);
 }
 
 .note {
   max-width: 64ch;
   min-height: 48px;
-  margin-bottom: var(--space-6);
   color: var(--graphite-600);
+}
+
+.frameWrap {
+  position: relative;
+}
+
+.panel {
+  animation: panelIn 160ms var(--ease-standard) both;
+}
+
+/* Tab mode: one note and one screen at a time. */
+.note[data-active='false'],
+.panel[data-active='false'] {
+  display: none;
 }
 
 @keyframes panelIn {
@@ -83,6 +112,37 @@
   to {
     opacity: 1;
   }
+}
+
+/* Scroll mode (set by ProductShowcase.tsx): every screen and note shares one grid cell so the
+   stage keeps a constant height while GSAP cross-fades between them. */
+.stage[data-scroll='on'] .notes,
+.stage[data-scroll='on'] .panels {
+  display: grid;
+}
+
+.stage[data-scroll='on'] .note,
+.stage[data-scroll='on'] .panel {
+  display: block;
+  grid-area: 1 / 1;
+  animation: none;
+}
+
+.stage[data-scroll='on'] .panel {
+  will-change: opacity, transform;
+}
+
+/* Shorter screens stretch to the tallest one so the sidebar runs the full height. */
+.stage[data-scroll='on'] .panel > * {
+  height: 100%;
+}
+
+.stage[data-scroll='on'] .progress {
+  display: block;
+}
+
+.stage[data-scroll='on'] .tab::after {
+  transition-duration: var(--duration-fast);
 }
 
 @media (min-width: 1024px) {

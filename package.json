@@ -2,7 +2,7 @@
   "name": "detailerhq",
   "version": "0.0.0",
   "private": true,
-  "description": "DetailerHQ (working name) \u2014 marketing website and database foundation",
+  "description": "DetailerHQ (working name) — marketing website and database foundation",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -32,6 +32,8 @@
     "typescript": "5.9.3"
   },
   "dependencies": {
+    "@gsap/react": "2.1.2",
+    "gsap": "3.15.0",
     "lucide-react": "1.64.0",
     "next": "16.4.3",
     "react": "19.3.1",

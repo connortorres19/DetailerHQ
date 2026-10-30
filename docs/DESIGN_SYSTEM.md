@@ -1,6 +1,8 @@
 # DetailerHQ — Design System
 
-> **Status:** Final draft for approval · **Revision 4** · **Last updated:** 2026-10-30
+> **Status:** Final draft for approval · **Revision 4.1** · **Last updated:** 2026-10-30
+>
+> **Revision 4.1 (approved amendment):** §8 now allows exactly two pinned, scroll-driven sequences on the marketing homepage — the hero opening and the product showcase. Every other motion rule is unchanged.
 > Companion to [`PRODUCT_PLAN.md`](./PRODUCT_PLAN.md). The product name is a placeholder; nothing in this system depends on it.
 > Decision labels (D-n approved, REC-n not approved) follow PRODUCT_PLAN §17. Visual specifications below are design recommendations unless they implement an approved decision.
 
@@ -77,7 +79,7 @@ The marketing site, the public pages each detailer shares with customers, and th
 | **Imagery** | Licensed, real automotive/detailing photography; real product screenshots | None (the detailer's own logo later) | None |
 | **Type scale** | Up to `display` (56px max) | Up to `h2` | Up to `h2`; dense `body` 15px on desktop |
 | **Density** | Generous (80–128px section padding) | Calm, single column, 640px max | Compact tables and calendars; one task per screen on phones |
-| **Motion** | One subtle image fade at most | State changes only | State changes only |
+| **Motion** | One subtle image fade; two approved scroll-driven sequences on the homepage (§8.1) | State changes only | State changes only |
 | **Primary action** | Apply for early access / Start trial (stage-dependent) | Send request · Accept this time | Approve request · Mark complete, etc. |
 
 If a pattern exists in one context, reuse it in the others before inventing a variant (e.g., the same badge, button and form field everywhere).
@@ -396,11 +398,26 @@ Motion explains change; it never decorates.
 
 Rules:
 
-- No scroll-triggered reveal animations in the app. On marketing, at most a single 200ms fade for images on first load.
+- No scroll-triggered reveal animations in the app. On marketing, at most a single 200ms fade for images on first load — except the two sequences in §8.1.
 - No parallax, no auto-playing carousels, no animated gradients, no number count-ups in analytics, no bouncing, no confetti.
 - Skeleton loaders: static `graphite-50` blocks matching the final layout; a gentle opacity pulse is allowed, no shimmer sweeps.
 - Respect `prefers-reduced-motion`: replace all transitions with instant changes or opacity-only fades.
 - Never animate layout during user input.
+
+### 8.1 Approved scroll-driven sequences (marketing homepage only)
+
+Exactly two pinned sequences are allowed. No other section may use scroll-triggered or scroll-linked motion.
+
+| Sequence | What scroll controls | Fallback |
+|---|---|---|
+| **Hero opening** | Licensed stills of one car (3–5 frames, same car, consistent light): a widening crop, a slow push-in (scale ≤ 1.1) and cross-fades between frames. The headline and calls to action stay static and readable on solid graphite. | Phones: shorter, not pinned, scrubbed while the image scrolls past. Reduced motion: the final frame, static. |
+| **Product showcase** | One device frame steps through Today, Requests, Calendar, Customers, Quotes, Follow-ups, Analytics with cross-fades (opacity + ≤ 12px vertical drift), snapping to each screen. The step list is clickable. | Below 1024px wide, short viewports and reduced motion: the same screens as accessible tabs. |
+
+Rules for both:
+- Animate `transform` and `opacity` only; no animated gradients, parallax layers, blur, colour cycling or counting numbers.
+- Content is real HTML and complete without JavaScript; motion only changes which part is emphasised.
+- Implemented with GSAP + ScrollTrigger (`gsap.matchMedia()` for breakpoints and `prefers-reduced-motion`). No scroll-smoothing or scroll-hijacking libraries; native scrolling, anchors and keyboard scrolling keep working.
+- No AI-generated imagery or 3D models (§7.2). Until licensed photographs exist, the marked photography placeholders are used.
 
 ---
 

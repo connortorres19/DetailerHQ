@@ -1,6 +1,6 @@
 .hero {
   position: relative;
-  padding-top: var(--space-16);
+  padding-block: var(--space-16) var(--space-20);
   background: var(--color-bg-inverse);
   color: var(--color-text-inverse);
 }
@@ -67,46 +67,132 @@
   color: var(--color-text-inverse-muted);
 }
 
-.photo {
-  max-width: 520px;
-  justify-self: end;
+/* ---- Photograph sequence (DESIGN_SYSTEM §8.1) ---- */
+
+.stage {
+  display: grid;
+  gap: var(--space-4);
+  width: 100%;
 }
 
-/* The product preview sits across the dark/light boundary: a hard split, not a gradient. */
-.previewBand {
-  margin-top: var(--space-20);
-  background: linear-gradient(to bottom, var(--color-bg-inverse) 0 42%, var(--color-bg-canvas) 42% 100%);
+/* Sharp-edged, no shadow (§7.2). The window is the crop; .inner holds the push-in. */
+.window {
+  position: relative;
+  aspect-ratio: 3 / 2;
+  overflow: hidden;
+  background: var(--color-bg-inverse-deep);
+}
+
+.inner,
+.frame {
+  position: absolute;
+  inset: 0;
 }
 
 .frame {
-  animation: frameIn var(--duration-slow) var(--ease-standard) both;
+  opacity: 0;
 }
 
-@keyframes frameIn {
-  from {
+.frame:last-child {
+  opacity: 1;
+}
+
+.photo {
+  object-fit: cover;
+}
+
+.counter {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 16px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-inverse-muted);
+}
+
+.counterLabel {
+  color: var(--color-text-brass-inverse);
+}
+
+/* Reduced motion (and no motion support) shows the finished frame, uncropped and static.
+   With motion allowed, the first paint already matches the sequence's start values in Hero.tsx. */
+.counter {
+  display: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .window {
+    transform: scale(0.84);
+  }
+
+  .inner {
+    transform: scale(1.2857);
+  }
+
+  .frame:first-child {
+    opacity: 1;
+  }
+
+  .frame:last-child:not(:first-child) {
     opacity: 0;
   }
 
-  to {
-    opacity: 1;
+  .window,
+  .inner {
+    will-change: transform;
+  }
+
+  .counter {
+    display: flex;
+  }
+}
+
+/* Phones, tablets and short screens run the lighter, unpinned version with a gentler crop. */
+@media (prefers-reduced-motion: no-preference) and (max-width: 1023px),
+  (prefers-reduced-motion: no-preference) and (max-height: 719px) {
+  .window {
+    transform: scale(0.92);
+  }
+
+  .inner {
+    transform: scale(1.1739);
   }
 }
 
 @media (min-width: 1024px) {
   .hero {
-    padding-top: var(--space-24);
+    padding-block: var(--space-24);
   }
 
   .grid {
-    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
     gap: var(--space-16);
+    align-items: center;
+  }
+
+  .stage {
+    justify-self: end;
+    max-width: 520px;
+  }
+
+  .window {
+    aspect-ratio: 4 / 5;
   }
 }
 
-@media (max-width: 1023px) {
-  .photo {
-    justify-self: stretch;
-    max-width: none;
-    aspect-ratio: 3 / 2 !important;
+/* Pinned layout: the hero fills the viewport below the header for the length of the sequence. */
+@media (min-width: 1024px) and (min-height: 720px) {
+  .hero {
+    display: flex;
+    align-items: center;
+    min-height: calc(100svh - var(--header-height));
+    padding-block: var(--space-12);
+  }
+
+  .stage {
+    width: min(100%, calc((100svh - var(--header-height) - 136px) * 0.8));
   }
 }

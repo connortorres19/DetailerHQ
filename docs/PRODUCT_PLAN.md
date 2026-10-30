@@ -1,6 +1,7 @@
 # DetailerHQ — Product Plan
 
-> **Status:** Final draft for approval · **Revision 4** · **Last updated:** 2026-10-30
+> **Status:** Approved direction · **Revision 4.1** (Phase 0 documentation verification updates) · **Last updated:** 2026-10-30
+> **Revision 4.1 changes:** limited to items that verified documentation required. Definer functions moved out of the exposed schema (REC-25). REC-21 rationale corrected. Explicit default-privilege revocation statements. Custom SMTP required before pilot. Server-session rules. Capacity-check snapshot and error-handling requirements. Public-path connection settings. Verification status (§14.3). See [`docs/verification/PHASE0_DOCUMENTATION_REVIEW.md`](./verification/PHASE0_DOCUMENTATION_REVIEW.md). No approved decision (D-1–D-27) was changed.
 > **Working name:** DetailerHQ is provisional and has **not** been legally or commercially cleared. It is a configuration value only (§17.6). No domains, services or brand assets are to be purchased or registered without explicit approval.
 > **Companion document:** [`DESIGN_SYSTEM.md`](./DESIGN_SYSTEM.md)
 > **Implementation has not started.** Nothing in this document has been built, deployed or tested. Vendor behavior described here is **unverified** until the checks in §14.3 are completed.
@@ -13,7 +14,7 @@
 | **REC-n** | Recommendation from planning. **Not approved.** Used as the working assumption only where marked, and listed in §17.2 for decision. |
 | **V-n** | Verification item: vendor/documentation behavior that must be checked before the dependent work starts (§14.3). |
 
-Revision 3 used the labels P-1…P-12 and R-1…R-5 for recommendations. The user's revision-4 approvals reused some of those labels with **different meanings**, so revision 4 retires the old labels: approved items are now D-21…D-27 (quoted from the user's wording), and all still-unapproved recommendations are renumbered REC-01…REC-24 (old labels noted for traceability in §17.3).
+Revision 3 used the labels P-1…P-12 and R-1…R-5 for recommendations. The user's revision-4 approvals reused some of those labels with **different meanings**, so revision 4 retires the old labels: approved items are now D-21…D-27 (quoted from the user's wording), and all still-unapproved recommendations are renumbered REC-01…REC-24 (REC-25 and REC-26 were added in revision 4.1) (old labels noted for traceability in §17.3).
 
 ### What changed in revision 4
 
@@ -328,11 +329,14 @@ The revision-3 exclusion constraint can only express C = 1, so it is replaced by
    1. `SELECT … FROM schedule_resources WHERE id = NEW.resource_id FOR UPDATE` — locks the resource row, **serializing every capacity-affecting write for that resource**. Concurrent transactions wait; after the first commits, the second re-reads current blocks.
    2. Computes **peak usage** over `NEW.during` among active blocks of the same resource, excluding the row being updated and any row being replaced in the same operation (e.g., the hold being converted).
    3. Rejects with a named error (`capacity_exceeded`, including the first instant at which the limit is reached) if `peak + 1 > C`.
-3. **Peak usage algorithm:** usage only increases at block starts, so the maximum over `[s, e)` occurs at `s` or at the start of an overlapping block inside `(s, e)`. Candidate instants = `{s} ∪ {lower(b) : b active, b overlaps [s,e), lower(b) > s}`; usage(t) = count of active blocks with `lower(b) ≤ t < upper(b)`; peak = max over candidates. Indexed by `(resource_id, during)`.
+3. **Peak usage algorithm:** usage only increases at block starts, so the maximum over `[s, e)` occurs at `s` or at the start of an overlapping block inside `(s, e)`. Candidate instants = `{s} ∪ {lower(b) : b active, b overlaps [s,e), lower(b) > s}`; usage(t) = count of active blocks with `lower(b) ≤ t < upper(b)`; peak = max over candidates. Indexed by a GiST index on `during` plus a B-tree on `resource_id` (avoids depending on `btree_gist`).
+   - **Snapshot requirement (verified in PostgreSQL docs, Phase 0):** the lock (step 2.1) and the count (step 2.2) must be **separate statements** inside a **`VOLATILE`** function (the default). PostgreSQL gives `VOLATILE` functions a fresh snapshot for each statement, so under Read Committed the count sees the block committed by the transaction it waited for. A `STABLE` function would reuse the calling query's snapshot and could overbook.
 4. **Lock order** (avoids deadlocks): every operation that touches scheduling locks **resource → booking request → appointment**, in that order. Customer withdrawal, owner approval, reschedule and cancel all follow it.
 5. **Transaction time:** "active" uses `now()` (the transaction's start time). Transactions are single short function calls, so the difference from wall-clock time is negligible; a hold expiring during a transaction is treated as active for that transaction (conservative).
 6. **One operation = one database function call = one transaction.** The application never composes multi-step scheduling changes from separate calls, so connection pooling in transaction mode is safe (V-9).
 7. **Why not `SERIALIZABLE` isolation?** It would also be correct but requires retry handling on every caller; an explicit row lock gives deterministic behavior at small-business throughput. (Recorded as an alternative, not chosen.)
+8. **Error handling (verified in PostgreSQL docs):** Read Committed is PostgreSQL's default, and `FOR UPDATE` waits there. If a caller runs at Repeatable Read or Serializable (the Data API's isolation for RPC calls is unverified), the lock raises a serialization failure (`40001`) instead of waiting. That never overbooks, but callers must map `40001` and deadlock aborts (`40P01`) to "This time was just taken — please try again", alongside `capacity_exceeded`.
+9. **Future multiple resources:** a job allocating several resources locks **all** of their rows in ascending id order, checks peak usage per resource, then inserts allocations — one transaction (§8.6.3).
 
 #### 6.6.4 Capacity changes
 
@@ -485,8 +489,8 @@ Conceptual schema for PostgreSQL on Supabase. Final DDL is written in Phase 1 an
 
 | Object | Purpose |
 |---|---|
-| `public` schema (exposed through Data API) | Business-owned tables and owner-callable workflow functions |
-| `app` schema (not exposed) | Helper functions (`is_member`, `can_write`, capacity check), trigger functions |
+| `public` schema (exposed through Data API) | Business-owned tables and thin `SECURITY INVOKER` wrapper functions for owner workflow (no `SECURITY DEFINER` functions here — Supabase guidance, verified Phase 0) |
+| `app` schema (not exposed) | Helper functions (`is_member`, `can_write`, capacity check), trigger functions, and the `SECURITY DEFINER` implementations of owner workflow functions |
 | `public_api` schema (not exposed) | Public booking functions used only by the restricted server path |
 
 | Role | Privileges (everything not listed is revoked) |
@@ -498,9 +502,16 @@ Conceptual schema for PostgreSQL on Supabase. Final DDL is written in Phase 1 an
 | Schema owner (migration role) | Owns tables and definer functions. Not used by the application at runtime. |
 | `PUBLIC` pseudo-role | `EXECUTE` revoked on all functions; no schema `CREATE`. |
 
-**Default privileges (D-22):** migrations run `ALTER DEFAULT PRIVILEGES` (for the role that creates objects) to revoke all table, sequence and function privileges from `anon`, `authenticated` and `PUBLIC` in `public`, `app` and `public_api`; each migration then grants exactly the privileges in the table above. Which roles currently receive default grants on Supabase, and which role runs migrations, must be confirmed (V-1, V-2).
+**Default privileges (D-22) — updated from Phase 0 documentation review:** Supabase documents that, on existing projects, new objects in `public` automatically grant table, sequence and function privileges to `anon`, `authenticated` and `service_role`, and that PostgreSQL grants `EXECUTE` on every new function to `PUBLIC` through a **global** default that a per-schema revoke cannot remove. The first migration therefore:
 
-**Other Supabase surfaces:** GraphQL (`pg_graphql`) disabled or confirmed to obey the same grants (V-3); business tables excluded from Realtime publications; no Storage buckets.
+1. Runs `alter default privileges for role postgres in schema public revoke all on tables / sequences / functions from anon, authenticated, service_role` (and the same for `app` and `public_api`).
+2. Runs `alter default privileges for role postgres revoke execute on functions from public` (global).
+3. Revokes privileges on any pre-existing application objects.
+4. Grants exactly the privileges in the table above, including **explicit `execute` on RLS helper functions** (`app.is_member`, `app.can_write`) and `usage` on schema `app` for `authenticated`.
+
+The Dashboard setting "Automatically expose new tables" is turned off as well. The project's actual default ACLs are checked with Supabase's documented `pg_default_acl` query (default ACLs differ by project age). Migrations run as `postgres`, which owns the objects. Evidence: `docs/verification/PHASE0_DOCUMENTATION_REVIEW.md` §1.
+
+**Other Supabase surfaces:** check whether `pg_graphql` is enabled on the project and drop it if unused; business tables are not added to the `supabase_realtime` publication (tables must be added explicitly); no Storage buckets.
 
 ### 8.3 Tables
 
@@ -518,7 +529,7 @@ Conceptual schema for PostgreSQL on Supabase. Final DDL is written in Phase 1 an
 | Table | Key columns and constraints |
 |---|---|
 | `schedule_resources` | `id`; `business_id`; `unique (business_id, id)`; `kind enum(general)` (later: `staff`, `bay`, `equipment`); `name`; `capacity smallint check (capacity between 1 and 20)` (upper bound REC-19); `active bool`; partial unique `(business_id) where kind = 'general' and active` — exactly one active general resource per business in MVP |
-| `schedule_blocks` | `id`; `business_id`; `(business_id, resource_id) → schedule_resources`; `kind enum(appointment, hold, proposal)`; `during tstzrange not null` (non-empty, finite bounds, `[)`, length 15 min–72 h); `(business_id, appointment_id) → appointments` unique; `(business_id, booking_request_id) → booking_requests`; `expires_at`; `created_by`; checks: `kind = appointment` ⇔ `appointment_id not null and expires_at is null`; `kind in (hold, proposal)` ⇔ `booking_request_id not null and expires_at not null and appointment_id is null`; partial unique `(booking_request_id) where kind in (hold, proposal)`; GiST index on `(resource_id, during)` (requires `btree_gist`, V-11) or GiST on `during` + B-tree on `resource_id` |
+| `schedule_blocks` | `id`; `business_id`; `(business_id, resource_id) → schedule_resources`; `kind enum(appointment, hold, proposal)`; `during tstzrange not null` (non-empty, finite bounds, `[)`, length 15 min–72 h); `(business_id, appointment_id) → appointments` unique; `(business_id, booking_request_id) → booking_requests`; `expires_at`; `created_by`; checks: `kind = appointment` ⇔ `appointment_id not null and expires_at is null`; `kind in (hold, proposal)` ⇔ `booking_request_id not null and expires_at not null and appointment_id is null`; partial unique `(booking_request_id) where kind in (hold, proposal)`; GiST index on `during` + B-tree on `resource_id` (no `btree_gist` dependency) |
 
 **Configuration**
 
@@ -581,7 +592,10 @@ Whether all request workflow changes (not just scheduling) go through functions 
 
 ### 8.5 Owner workflow functions (D-24)
 
-Called by our server actions with the owner's session (role `authenticated`). Each is `SECURITY DEFINER`, `search_path = ''`, owned by the schema owner, `EXECUTE` granted only to `authenticated`, and each begins by checking `app.is_member(business_id)` and `app.can_write(business_id)` for the business of the target row (never a client-supplied business ID).
+Called by our server actions with the owner's session (role `authenticated`). **Structure changed after Phase 0 (REC-25):** Supabase documents that a `SECURITY DEFINER` function in an exposed schema is callable over the Data API with its owner's privileges and must never be placed there. Therefore:
+
+- **Implementation:** `app.<name>_impl(...)` — `SECURITY DEFINER`, `VOLATILE`, `search_path = ''`, owned by `postgres`, in the unexposed `app` schema, `EXECUTE` granted only to `authenticated`; each begins by checking `app.is_member(business_id)` and `app.can_write(business_id)` for the business of the target row (never a client-supplied business ID).
+- **API surface:** `public.<name>(...)` — a thin `SECURITY INVOKER` wrapper that only calls the implementation. This keeps every definer function out of the exposed schema and gives one auditable list of callable operations.
 
 `approve_request`, `place_hold`, `release_hold`, `propose_time`, `retract_proposal`, `decline_request`, `close_duplicate`, `create_appointment`, `reschedule_appointment`, `cancel_appointment`, `start_appointment`, `complete_appointment`, `mark_no_show`, `reopen_appointment`, `set_capacity`, `update_business_profile`, `request_account_closure`, `cancel_account_closure`.
 
@@ -652,7 +666,7 @@ Generate local candidates within working windows (skipping DST gaps); drop those
 ### 9.2 Row Level Security
 
 - RLS **enabled on every table** in `public`. Tables with no owner access have RLS enabled and **no** policies for `anon`/`authenticated`.
-- **Not forced** (REC-21): `FORCE ROW LEVEL SECURITY` would subject our `SECURITY DEFINER` functions (which run as the table owner) to RLS and break the public and workflow functions. Compensating controls: the table-owner role is never used by the application at runtime; definer functions perform explicit membership/token checks and are covered by tests. Whether Supabase's migration role has `BYPASSRLS` must be confirmed (V-4).
+- **Not forced** (REC-21, **rationale corrected after Phase 0**): PostgreSQL docs say roles with `BYPASSRLS` always bypass RLS, and `FORCE ROW LEVEL SECURITY` only affects table owners without that attribute. Supabase docs say objects created by migrations are owned by `postgres`, "which bypasses Row Level Security". So forcing RLS would **neither break nor protect** our `postgres`-owned definer functions. Revision 4 wrongly said it would break them. Protection for definer code comes from explicit membership/token checks inside each function, `search_path = ''`, narrow `EXECUTE` grants, and tests. To confirm on the project: `select rolbypassrls from pg_roles where rolname = 'postgres'`.
 - Helper `app.is_member(business_id)`: definer, stable, `search_path = ''`, compares `memberships.user_id` with `(select auth.uid())` (evaluated once per statement). Index `memberships (user_id, business_id)`.
 - Helper `app.can_write(business_id)` per account state (§12.4).
 - Policies per command for every owner-writable table:
@@ -683,7 +697,16 @@ Another business's record always yields 404.
 
 **Flow:** browser → Next.js server action / route handler → validation and abuse checks → `public_api` function call over a restricted database connection → allow-listed JSON → browser. The browser never talks to the database for booking.
 
-**Mechanism (REC-13, pending verification V-8/V-9):** a dedicated Postgres login role `booking_api` with `EXECUTE` on `public_api` functions only, used by our server through Supabase's connection pooler (transaction mode). The `public_api` schema is not exposed through the Data API, so the public functions cannot be called with the browser-visible key.
+**Mechanism (REC-13; documented as feasible, not yet tested):** a dedicated Postgres login role `booking_api` with `EXECUTE` on `public_api` functions only, used by our server through Supabase's connection pooler. The `public_api` schema is not exposed through the Data API, so the public functions cannot be called with the browser-visible key. Phase 0 documentation findings:
+
+- Supabase documents custom login roles and recommends a separate database user per service. Through the **shared pooler** the username is `booking_api.[PROJECT-REF]`.
+- Use the shared pooler in **transaction mode** (port 6543, IPv4): prepared statements off, `sslmode=require`, module-scope pool with a small maximum.
+  - Supabase advises pool size 1 per serverless instance; Vercel's Fluid-compute guidance reportedly advises against 1. This conflict is unresolved — start at 1–2 and measure.
+  - Avoid `postgres.js` pipelining in transaction mode; a `pg` (node-postgres) pool fits Vercel's `attachDatabasePool` helper (Vercel point from search summaries only).
+- Role attributes: `LOGIN NOINHERIT`, no `BYPASSRLS`, small `CONNECTION LIMIT`, role-level `statement_timeout`; `USAGE` on `public_api` and `EXECUTE` on each `public_api` function — nothing else.
+- Every public operation is a single function call, so it is atomic in any pooler mode (PostgreSQL wraps each statement in an implicit transaction).
+- Next.js Server Actions are reachable by direct POST and allow requests without an `Origin` header, so public actions are treated as a public API. Abuse controls run on the server regardless of origin.
+- Client IP: leftmost `x-forwarded-for`, which Vercel reportedly overwrites to prevent spoofing (search-level evidence).
 
 **Fallback (requires explicit approval; conflicts with "minimum required privileges" because the credential is broader):** server-only module calling the same functions through the Data API with the service-role/secret key, with functions `EXECUTE`-granted to `service_role` only and the module offering only named function calls.
 
@@ -703,15 +726,21 @@ Another business's record always yields 404.
 | Credential | Where it may exist |
 |---|---|
 | Supabase URL and anon/publishable key | Browser allowed (Auth only); `anon` has no data privileges |
-| `booking_api` connection string | Server-only environment variable, marked sensitive; only in modules guarded by `server-only` |
-| Service-role/secret key | **Never** in browser code or `NEXT_PUBLIC_*`; not configured in the deployed app unless the REC-13 fallback is approved |
-| IP-hash salt | Server-only |
+| `booking_api` connection string | Server-only Vercel environment variable of type **Secret** (write-only); only in modules guarded by `import 'server-only'` (build fails if imported by client code) |
+| Supabase secret key (`sb_secret_…`; legacy `service_role` key) | **Never** in browser code or `NEXT_PUBLIC_*`; not configured in the deployed app unless the REC-13 fallback is approved. Use the new key type (rejected by Supabase when sent from a browser); disable legacy keys once unused |
+| IP-hash salt | Server-only Vercel **Secret** variable |
 
-CI scans the production client bundle for secret values and variable names; `.env*` git-ignored; rotation runbook for each credential. Vercel environment variable handling to confirm (V-14, V-15).
+Only `NEXT_PUBLIC_*` variables are inlined into the browser bundle (Next.js, verified); the Supabase URL and publishable key are the only `NEXT_PUBLIC_` values. CI scans the production client bundle for secret values and variable names; `.env*` git-ignored; rotation runbook for each credential. Vercel's Config/Secret variable types were confirmed only from search summaries (re-read pending).
 
 ### 9.6 Authentication
 
-Supabase Auth email + password; email verification required for activation; server-side sessions (Supabase SSR helpers; cookie attributes to confirm, V-13); password policy and leaked-password protection if available (V-12); invite-only sign-up mechanism to confirm (V-12); re-authentication for closure and email change; operator MFA.
+Supabase Auth email + password; email verification required for activation; re-authentication for closure and email change; operator MFA. Updated from Phase 0 documentation review:
+
+- **Custom SMTP is required before the pilot.** Supabase's built-in sender only delivers to members of the project's organization team, with low limits and no SLA. Confirmation, password-reset and invitation emails to pilot owners need a custom SMTP provider — registering one needs user approval (Q-7). No provider has been chosen.
+- **Pilot invite-only:** turn off "Allow new users to sign up" and invite owners from the Supabase Dashboard (no secret key needed in the app). "Confirm Email" on.
+- **Server sessions:** `@supabase/ssr` cookie sessions with a Next.js Proxy file (`proxy.ts`; `middleware.ts` before Next.js 16) refreshing tokens. Server code authorizes with `supabase.auth.getClaims()`, never `getSession()`; `getUser()` for revocation-sensitive actions.
+- **Session cookies are not HttpOnly** (by Supabase design), so XSS would expose owner tokens: strict CSP and output escaping are mandatory, and authenticated responses must never be cached by a CDN.
+- Leaked-password protection requires the Supabase Pro plan (planned); minimum password length set to ≥ 10.
 
 ### 9.7 Web security baseline
 
@@ -936,9 +965,37 @@ All criteria pass at 375, 768 and 1280 px and meet `DESIGN_SYSTEM.md` §12. 🧪
 
 ### 14.2 Estimated monthly cost (unverified)
 
-Development $0; pilot ≈ $45 (Vercel Pro ~$20 + Supabase Pro ~$25); public launch ≈ $45–47 plus billing percentage fees. A custom email provider may be needed before the pilot (V-12) — free tiers are expected but require registration and approval.
+Development $0; pilot ≈ $45 (Vercel Pro ~$20 + Supabase Pro ~$25); public launch ≈ $45–47 plus billing percentage fees. **A custom SMTP email provider is required before the pilot** (Phase 0 finding). Free tiers are expected but were not verified, and registering requires approval. Prices themselves remain unverified (pricing pages not read).
 
-### 14.3 Documentation to check before implementation (none verified yet)
+### 14.3 Documentation verification status (Phase 0, 2026-10-30)
+
+Full evidence, links and uncertainties: [`docs/verification/PHASE0_DOCUMENTATION_REVIEW.md`](./verification/PHASE0_DOCUMENTATION_REVIEW.md). "Documented" means the official documentation states it; **nothing has been tested**.
+
+| # | Status after Phase 0 documentation review |
+|---|---|
+| V-1 | **Documented.** Roles listed; `postgres` owns migration-created objects and bypasses RLS; `service_role` has `BYPASSRLS`. Confirm `rolbypassrls` on the project |
+| V-2 | **Documented, plan changed.** Default grants to `anon`/`authenticated`/`service_role` in `public` on existing projects; global `PUBLIC` execute default; exact revoke statements adopted (§8.2) |
+| V-3 | **Partly documented.** Realtime tables must be added explicitly. `pg_graphql` status on new projects unclear — check the project |
+| V-4 | **Documented, plan changed.** No definer functions in exposed schemas (REC-25); `search_path = ''`; `(select auth.uid())`; FORCE rationale corrected (REC-21) |
+| V-5 | **Documented.** Publishable/secret keys; secret keys bypass RLS and are rejected from browsers; legacy keys coexist |
+| V-6 | **Partly documented.** Single statements are atomic (PostgreSQL). PostgREST isolation/transaction details not read (site blocked) — design tolerates either (§6.6.3 step 8) |
+| V-7 | **Documented.** `@supabase/ssr`, Proxy file, `getClaims()` / `getUser()`, never `getSession()` on the server |
+| V-8 | **Documented, untested.** Custom login role via shared pooler as `[ROLE].[PROJECT-REF]` |
+| V-9 | **Documented with a conflict.** Transaction mode limits documented; Supabase vs Vercel pool-size advice conflicts — measure |
+| V-10 | **Documented.** Supabase Cron available; sub-minute schedules on newer Postgres builds |
+| V-11 | **Partly.** `btree_gist` availability not found in docs — no longer required (GiST on `during` + B-tree) |
+| V-12 | **Documented, plan changed.** Built-in email only reaches team members → **custom SMTP needed before pilot** (Q-7); sign-up can be disabled; Dashboard invites; leaked-password protection is Pro+ |
+| V-13 | **Documented.** Cookies not HttpOnly by design → CSP essential; don't cache authenticated responses |
+| V-14 | **Search-level only.** Vercel Config/Secret variable types; Next.js `NEXT_PUBLIC_` inlining **documented** |
+| V-15 | **Documented.** `import 'server-only'` causes a build error in client code |
+| V-16 | **Search-level only.** `x-forwarded-for` overwritten by Vercel |
+| V-17 | **Documented.** Origin/Host check; no-Origin requests allowed with warning; re-authorize in every action |
+| V-18 | **Documented.** Read Committed default; `FOR UPDATE` waits then returns updated row; deadlock auto-abort; volatile functions take fresh snapshots |
+| V-19 | **Partly.** `supabase test db` + pgTAP documented; GitHub Actions minutes not checked |
+| V-20 | **Search-level only.** Hobby non-commercial confirmed by summaries; prices not checked |
+| V-21 | **Not started** (library not chosen) |
+
+Original checklist (kept for reference):
 
 | # | Topic | What must be confirmed | Where to look | Blocks |
 |---|---|---|---|---|
@@ -996,7 +1053,7 @@ Development $0; pilot ≈ $45 (Vercel Pro ~$20 + Supabase Pro ~$25); public laun
 
 | Phase | Scope | Exit criteria |
 |---|---|---|
-| **0. Verification (documentation only, no code)** | Work through V-1–V-21; record findings with dates and links in `docs/verification/`; resolve REC-13 mechanism, REC-21, email provider need (V-12); user decisions on open questions | Every V-item marked confirmed / changed / blocked; plan updated (revision 5 if anything changes) |
+| **0. Verification (documentation only, no code)** | Work through V-1–V-21; record findings with dates and links in `docs/verification/`; resolve REC-13 mechanism, REC-21, email provider need (V-12); user decisions on open questions | **Documentation review done 2026-10-30** (§14.3). Remaining: full read of Vercel pages and PostgREST docs once those hosts are allowed; user decisions Q-7 (SMTP), REC-25 |
 | **1. Database foundation (recommended first implementation phase)** | Supabase CLI project; schemas; default-privilege revocations and explicit grants; all tables with composite FKs; invariants and triggers; `schedule_resources`/`schedule_blocks` with capacity trigger and lock order; owner workflow functions; `public_api` functions; restricted role; `pg_cron` jobs; pgTAP + Data API matrix; catalog checks; concurrency tests | §13.2 and §13.3 green; no application UI yet |
 | **2. Auth, activation & app shell** | Supabase Auth, invite-only sign-up, activation, server-side sessions, design tokens, core components, dashboard shell | Sign-in → shell at 3 widths; bundle secret scan green |
 | **3. Setup & public booking** | Onboarding (capacity, hours, policies, services), slot engine, public booking/inquiry through restricted server path, status page, abuse controls | Real request submitted from a phone; public isolation tests green |
@@ -1066,10 +1123,12 @@ Development $0; pilot ≈ $45 (Vercel Pro ~$20 + Supabase Pro ~$25); public laun
 | REC-18 | Completed appointments release capacity | Recommended |
 | REC-19 | Maximum capacity 20 | Tunable |
 | REC-20 | Accept that owner workflow functions are callable with the owner's own session outside our UI, since they enforce identical checks | Decision needed (Q-6) |
-| REC-21 | RLS enabled but not forced, with definer functions doing explicit checks | Needed; confirm after V-4 |
+| REC-21 | RLS enabled but not forced, with definer functions doing explicit checks (rationale corrected in Phase 0: forcing has no effect on `postgres`-owned functions because `postgres` bypasses RLS) | Needed |
 | REC-22 | Row lock on the resource (not SERIALIZABLE) for capacity enforcement | Recommended |
 | REC-23 | Peak-usage algorithm in §6.6.3 | Recommended |
-| REC-24 | Remove the revision-3 exclusion constraint | Follows from D-26 |
+| REC-24 | Remove the revision-3 exclusion constraint (PostgreSQL docs confirm exclusion constraints compare pairs of rows and cannot express capacity > 1) | Follows from D-26 |
+| REC-25 | Owner workflow: `SECURITY DEFINER` implementations in unexposed `app` schema; thin `SECURITY INVOKER` wrappers in `public` (Phase 0: Supabase says never put definer functions in exposed schemas) | **Yes** — needed to follow vendor security guidance |
+| REC-26 | Public path driver settings: shared pooler transaction mode, `booking_api.[PROJECT-REF]`, `pg` pool, prepared statements off, SSL require, small pool, measured | Phase 3 |
 
 ### 17.3 Label history (traceability)
 
@@ -1097,13 +1156,15 @@ Development $0; pilot ≈ $45 (Vercel Pro ~$20 + Supabase Pro ~$25); public laun
 1. **Q-1:** What do pilots pay after the $25 first month?
 2. **Q-2:** How is the $25 collected (requires registering a payment provider — approval) and how is it taxed (accountant)?
 3. **Q-3:** Domain timing for stable booking links.
-4. **Q-4:** Approve or modify REC-01–REC-24.
+4. **Q-4:** Approve or modify REC-01–REC-26.
 5. **Q-5:** May mobile-only businesses set capacity above 1 (REC-17)?
 6. **Q-6:** Is REC-20 acceptable, or must scheduling functions be callable only from our server (which would move some authorization out of the database)?
-7. **Q-7:** If V-12 shows the default auth email sender cannot reach pilot owners, approve registering an email provider (free tier) before the pilot?
-8. **Q-8:** If V-8/V-9 show the `booking_api` role is not workable, approve the service-role fallback in REC-13 or choose another mechanism?
+7. **Q-7 (now required):** Supabase docs confirm the default auth email sender only reaches the project's team members. Approve choosing and registering a custom SMTP provider (free tier) before the pilot? Which provider?
+8. **Q-8:** If hands-on testing shows the `booking_api` role is not workable (documentation says it is), approve the service-role fallback in REC-13 or choose another mechanism?
 9. **Q-9:** Which metro areas and first prospects?
 10. **Q-10:** Create a `main` branch and open a pull request for the planning documents?
+11. **Q-11:** Approve REC-25 (definer functions only in the unexposed `app` schema, with invoker wrappers in `public`)?
+12. **Q-12:** Allow `supabase.com`, `www.postgresql.org`, `vercel.com` and `postgrest.org` in the cloud environment's network settings so the remaining pages can be read directly?
 
 ### 17.5 Risks
 
@@ -1115,7 +1176,9 @@ Development $0; pilot ≈ $45 (Vercel Pro ~$20 + Supabase Pro ~$25); public laun
 | Lock contention or deadlocks | Fixed lock order; short single-call transactions; deadlock tests |
 | `booking_api` role not feasible (V-8) | Q-8 fallback decision |
 | Pooler/transaction mismatch (V-9) | One call = one transaction design |
-| Auth email blocked for pilots (V-12) | Q-7 |
+| Auth email blocked for pilots (V-12 — confirmed by docs) | Custom SMTP before pilot (Q-7) |
+| Owner session tokens readable by browser JavaScript (cookies not HttpOnly — documented) | Strict CSP, no `dangerouslySetInnerHTML` on user content, dependency hygiene, short access-token lifetime |
+| Capacity check implemented as `STABLE` or combined lock+count in one statement | §6.6.3 snapshot requirement; concurrency suite |
 | Customers miss status changes | Status link everywhere; owner prompted to contact |
 | Owners miss requests (in-app only) | Today screen, badges, tasks; owner email post-MVP |
 | Multi-resource needs (technician + bay) arrive early | Allocation table extension path (§8.6.3) |

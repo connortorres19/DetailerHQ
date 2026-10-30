@@ -1,0 +1,47 @@
+# Runs the database foundation checks on every push and pull request.
+# Uses only GitHub-hosted runners (free for public repositories) and the local Supabase
+# stack started by the Supabase CLI inside the runner. No secrets, no deployment.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  database:
+    name: Migrations, pgTAP security tests, Node concurrency tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start local Supabase stack
+        run: npx supabase start
+
+      - name: Lint database functions
+        run: npx supabase db lint --level warning --fail-on error
+
+      # Resets to an empty database, applies every migration, then runs pgTAP and Node tests.
+      - name: Test
+        run: npm test
+
+      - name: Stop local Supabase stack
+        if: always()
+        run: npx supabase stop --no-backup

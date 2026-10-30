@@ -1,7 +1,7 @@
 -- Restricted public booking path (D-13, D-21, D-25), executed as the booking_api role.
 begin;
 \ir _helpers.psql
-select plan(32);
+select plan(34);
 
 create temp table ctx as
 select pg_temp.make_business('a@example.com', 'alpha-detail', 'mobile') as biz_a,
@@ -186,6 +186,19 @@ select throws_ok(format('select public_api.submit_booking_request(''bravo-detail
                         pg_temp.payload(pg_temp.at_local(3, '10:00'), array[(select svc_b from k)], (select size_b from k)),
                         sha256('token-b'::bytea), sha256('ip-b'::bytea)),
                  'DH003', 'not accepting requests', 'paused business accepts no requests');
+
+-- Regression (review finding): temp objects created in the caller's session cannot shadow
+-- type names inside SECURITY DEFINER functions (search_path = pg_catalog, pg_temp).
+reset role;
+select pg_temp.as_booking_api();
+create temp table bytea (evil int);
+create temp table jsonb (evil int);
+create temp table text (evil int);
+select throws_ok(format('select public_api.get_request_status(%L, %L)', sha256('guess'::pg_catalog.bytea), sha256('ip-9'::pg_catalog.bytea)),
+                 'DH003', 'link not valid', 'shadowing temp tables do not change definer function behaviour');
+select is(public_api.get_request_status((select tok3 from k), (select ip2 from k)) ->> 'status', 'withdrawn',
+          'definer functions still work normally with shadowing temp tables present');
+reset role;
 
 select * from finish();
 rollback;

@@ -77,9 +77,9 @@ select is(
 
 select is(
   (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-    where n.nspname in ('public', 'app', 'public_api') and p.prosecdef
-      and not exists (select 1 from unnest(coalesce(p.proconfig, '{}')) c where c = 'search_path=""')),
-  0, 'every SECURITY DEFINER function pins search_path to empty');
+    where n.nspname in ('public', 'app', 'public_api') and p.prokind = 'f'
+      and not exists (select 1 from unnest(coalesce(p.proconfig, '{}')) c where c = 'search_path=pg_catalog, pg_temp')),
+  0, 'every application function pins search_path to pg_catalog, pg_temp (temp schema searched last)');
 
 select is(
   (select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace

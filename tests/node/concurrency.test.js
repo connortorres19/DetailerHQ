@@ -287,3 +287,44 @@ test('withRetry retries deadlock victims and does not retry business-rule errors
   );
   assert.equal(calls, 1, 'capacity_exceeded is not retried');
 });
+
+test('housekeeping (expire_stale) running concurrently with approvals, holds and withdrawals: no deadlocks, no overbooking', async () => {
+  const biz = await freshBusiness('shop', 2);
+  const future = await atLocal(pool, 12, '10:00');
+  const stale = [];
+  for (let i = 0; i < 10; i += 1) {
+    // Pending requests whose time has already passed -> expire_stale moves them to expired.
+    stale.push(await insertRequest(pool, biz.businessId, new Date(Date.now() - (i + 1) * 3600_000)));
+  }
+  const live = [];
+  for (let i = 0; i < 10; i += 1) live.push(await insertRequest(pool, biz.businessId, future, 60));
+  // Holds that expire mid-test, so the sweep deletes rows while others insert.
+  for (const r of live.slice(0, 2)) {
+    await asOwner(pool, biz.userId, 'select public.place_hold($1, 24)', [r.id]);
+    await pool.query(
+      "update public.schedule_blocks set expires_at = clock_timestamp() + interval '300 milliseconds' where booking_request_id = $1",
+      [r.id],
+    );
+  }
+  await sleep(400);
+
+  const ops = [];
+  for (let i = 0; i < 6; i += 1) ops.push(pool.query('select app.expire_stale()'));
+  for (const r of live.slice(2)) ops.push(asOwner(pool, biz.userId, 'select public.approve_request($1)', [r.id]));
+  for (const r of stale.slice(0, 3)) ops.push(asOwner(pool, biz.userId, 'select public.decline_request($1)', [r.id]));
+  const { errors } = await settle(ops);
+
+  for (const e of errors) {
+    assert.notEqual(e.code, '40P01', 'no deadlock');
+    assert.ok(['capacity_exceeded', 'invalid_state'].includes(classifyDbError(e).kind), `${e.code} ${e.message}`);
+  }
+  assert.ok(await peakUsage(biz.businessId, future, 60) <= 2, 'capacity never exceeded');
+  const { rows } = await pool.query(
+    `select count(*) filter (where status = 'approved')::int as approved,
+            count(*) filter (where status = 'pending' and requested_start <= now())::int as stale_pending
+       from public.booking_requests where business_id = $1`,
+    [biz.businessId],
+  );
+  assert.equal(rows[0].approved, 2, 'exactly capacity-many approvals succeeded (expired holds did not block)');
+  assert.equal(rows[0].stale_pending, 0, 'every past pending request ended expired or declined');
+});

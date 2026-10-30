@@ -483,7 +483,7 @@ Conceptual schema for PostgreSQL on Supabase. Final DDL is written in Phase 1 an
 - `timestamptz` instants; integer cents (USD); integer minutes; E.164 US phones; `citext` emails.
 - `business_id` and snapshot columns immutable (trigger).
 - Status enums with transition triggers.
-- Functions: `SECURITY DEFINER` only where required; always `SET search_path = ''` with fully qualified names (V-4).
+- Functions: `SECURITY DEFINER` only where required; fully qualified names; `SET search_path = pg_catalog, pg_temp` (temporary schema searched last — hardened in the Phase 1 review, migration `20261030120700`; Supabase's `''` form still searches the temporary schema first for tables and types, see `docs/PHASE1_DATABASE.md`).
 
 ### 8.2 Schemas and database roles (D-21, D-22)
 
@@ -594,7 +594,7 @@ Whether all request workflow changes (not just scheduling) go through functions 
 
 Called by our server actions with the owner's session (role `authenticated`). **Structure changed after Phase 0 (REC-25):** Supabase documents that a `SECURITY DEFINER` function in an exposed schema is callable over the Data API with its owner's privileges and must never be placed there. Therefore:
 
-- **Implementation:** `app.<name>_impl(...)` — `SECURITY DEFINER`, `VOLATILE`, `search_path = ''`, owned by `postgres`, in the unexposed `app` schema, `EXECUTE` granted only to `authenticated`; each begins by checking `app.is_member(business_id)` and `app.can_write(business_id)` for the business of the target row (never a client-supplied business ID).
+- **Implementation:** `app.<name>_impl(...)` — `SECURITY DEFINER`, `VOLATILE`, `search_path = pg_catalog, pg_temp`, owned by `postgres`, in the unexposed `app` schema, `EXECUTE` granted only to `authenticated`; each begins by checking `app.is_member(business_id)` and `app.can_write(business_id)` for the business of the target row (never a client-supplied business ID).
 - **API surface:** `public.<name>(...)` — a thin `SECURITY INVOKER` wrapper that only calls the implementation. This keeps every definer function out of the exposed schema and gives one auditable list of callable operations.
 
 `approve_request`, `place_hold`, `release_hold`, `propose_time`, `retract_proposal`, `decline_request`, `close_duplicate`, `create_appointment`, `reschedule_appointment`, `cancel_appointment`, `start_appointment`, `complete_appointment`, `mark_no_show`, `reopen_appointment`, `set_capacity`, `update_business_profile`, `request_account_closure`, `cancel_account_closure`.
@@ -666,8 +666,8 @@ Generate local candidates within working windows (skipping DST gaps); drop those
 ### 9.2 Row Level Security
 
 - RLS **enabled on every table** in `public`. Tables with no owner access have RLS enabled and **no** policies for `anon`/`authenticated`.
-- **Not forced** (REC-21, **rationale corrected after Phase 0**): PostgreSQL docs say roles with `BYPASSRLS` always bypass RLS, and `FORCE ROW LEVEL SECURITY` only affects table owners without that attribute. Supabase docs say objects created by migrations are owned by `postgres`, "which bypasses Row Level Security". So forcing RLS would **neither break nor protect** our `postgres`-owned definer functions. Revision 4 wrongly said it would break them. Protection for definer code comes from explicit membership/token checks inside each function, `search_path = ''`, narrow `EXECUTE` grants, and tests. To confirm on the project: `select rolbypassrls from pg_roles where rolname = 'postgres'`.
-- Helper `app.is_member(business_id)`: definer, stable, `search_path = ''`, compares `memberships.user_id` with `(select auth.uid())` (evaluated once per statement). Index `memberships (user_id, business_id)`.
+- **Not forced** (REC-21, **rationale corrected after Phase 0**): PostgreSQL docs say roles with `BYPASSRLS` always bypass RLS, and `FORCE ROW LEVEL SECURITY` only affects table owners without that attribute. Supabase docs say objects created by migrations are owned by `postgres`, "which bypasses Row Level Security". So forcing RLS would **neither break nor protect** our `postgres`-owned definer functions. Revision 4 wrongly said it would break them. Protection for definer code comes from explicit membership/token checks inside each function, a pinned `search_path` (`pg_catalog, pg_temp`), narrow `EXECUTE` grants, and tests. To confirm on the project: `select rolbypassrls from pg_roles where rolname = 'postgres'`.
+- Helper `app.is_member(business_id)`: definer, stable, `search_path = pg_catalog, pg_temp`, compares `memberships.user_id` with `(select auth.uid())` (evaluated once per statement). Index `memberships (user_id, business_id)`.
 - Helper `app.can_write(business_id)` per account state (§12.4).
 - Policies per command for every owner-writable table:
   - `SELECT USING (app.is_member(business_id))`
@@ -1054,7 +1054,7 @@ Original checklist (kept for reference):
 | Phase | Scope | Exit criteria |
 |---|---|---|
 | **0. Verification (documentation only, no code)** | Work through V-1–V-21; record findings with dates and links in `docs/verification/`; resolve REC-13 mechanism, REC-21, email provider need (V-12); user decisions on open questions | **Documentation review done 2026-10-30** (§14.3). Remaining: full read of Vercel pages and PostgREST docs once those hosts are allowed; user decisions Q-7 (SMTP), REC-25 |
-| **1. Database foundation (recommended first implementation phase)** | Supabase CLI project; schemas; default-privilege revocations and explicit grants; all tables with composite FKs; invariants and triggers; `schedule_resources`/`schedule_blocks` with capacity trigger and lock order; owner workflow functions; `public_api` functions; restricted role; `pg_cron` jobs; pgTAP + Data API matrix; catalog checks; concurrency tests | §13.2 and §13.3 green; no application UI yet. **Status 2026-10-30: implemented locally; 552 pgTAP assertions + 24 Node tests passing — see [`PHASE1_DATABASE.md`](./PHASE1_DATABASE.md). Awaiting review.** |
+| **1. Database foundation (recommended first implementation phase)** | Supabase CLI project; schemas; default-privilege revocations and explicit grants; all tables with composite FKs; invariants and triggers; `schedule_resources`/`schedule_blocks` with capacity trigger and lock order; owner workflow functions; `public_api` functions; restricted role; `pg_cron` jobs; pgTAP + Data API matrix; catalog checks; concurrency tests | §13.2 and §13.3 green; no application UI yet. **Status 2026-10-30: complete locally — 554 pgTAP assertions + 25 Node tests passing from a clean database; CI workflow added; hosted verification pending — see [`PHASE1_DATABASE.md`](./PHASE1_DATABASE.md).** |
 | **2. Auth, activation & app shell** | Supabase Auth, invite-only sign-up, activation, server-side sessions, design tokens, core components, dashboard shell | Sign-in → shell at 3 widths; bundle secret scan green |
 | **3. Setup & public booking** | Onboarding (capacity, hours, policies, services), slot engine, public booking/inquiry through restricted server path, status page, abuse controls | Real request submitted from a phone; public isolation tests green |
 | **4. Booking workflow & calendar** | Inbox, approve/link, holds, proposals, decline, duplicates, appointments, capacity-aware calendar, cancel, reschedule | E1–E22 demonstrated/tested |
@@ -1171,7 +1171,7 @@ Original checklist (kept for reference):
 | Risk | Mitigation |
 |---|---|
 | Default privileges or exposed surfaces leak data | D-22 revocations; catalog tests; V-1–V-3 |
-| Definer functions bypass RLS incorrectly | Explicit checks, `search_path = ''`, per-function tests, linter |
+| Definer functions bypass RLS incorrectly | Explicit checks, `search_path = pg_catalog, pg_temp`, per-function tests, linter |
 | Capacity check bug → overbooking | Single locked trigger path; concurrency suite; invariant checks |
 | Lock contention or deadlocks | Fixed lock order; short single-call transactions; deadlock tests |
 | `booking_api` role not feasible (V-8) | Q-8 fallback decision |

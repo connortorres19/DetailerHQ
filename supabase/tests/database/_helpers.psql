@@ -1,0 +1,116 @@
+-- Shared pgTAP helpers. Included with \ir inside each test's transaction, so everything
+-- here (including the grants below) is rolled back when the test file finishes.
+
+-- pgTAP's own functions must be callable after switching roles. This only affects the
+-- `extensions` schema inside the test transaction; application schemas are untouched.
+grant usage on schema extensions to anon, authenticated, booking_api;
+grant execute on all functions in schema extensions to anon, authenticated, booking_api;
+-- Lets the test session switch to booking_api (postgres created the role but is not a member).
+grant booking_api to postgres;
+
+create function pg_temp.create_user(p_email text, p_confirmed boolean default true) returns uuid
+language sql as $$
+  insert into auth.users (id, instance_id, aud, role, email, email_confirmed_at, created_at, updated_at)
+  values (gen_random_uuid(), '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+          p_email, case when p_confirmed then now() end, now(), now())
+  returning id
+$$;
+
+-- Act as a signed-in user the way the Data API does: role `authenticated` + JWT claims.
+-- Call only while running as postgres (use `reset role` first when switching users).
+create function pg_temp.as_user(p_uid uuid) returns void
+language plpgsql as $$
+begin
+  perform set_config('request.jwt.claims',
+                     json_build_object('sub', p_uid, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+end
+$$;
+
+create function pg_temp.as_anon() returns void
+language plpgsql as $$
+begin
+  perform set_config('request.jwt.claims', json_build_object('role', 'anon')::text, true);
+  execute 'set local role anon';
+end
+$$;
+
+create function pg_temp.as_booking_api() returns void
+language plpgsql as $$
+begin
+  perform set_config('request.jwt.claims', '', true);
+  execute 'set local role booking_api';
+end
+$$;
+
+-- A published, activated business with working hours 06:00-22:00 every day, no minimum
+-- notice, a bookable main service (120 min), a bookable add-on (30 min) and a
+-- quote-required service. Returns the business id; owner id is in business_owner().
+create function pg_temp.make_business(p_email text, p_slug text, p_mode public.service_mode,
+                                      p_capacity integer default null) returns uuid
+language plpgsql as $$
+declare
+  v_uid uuid := pg_temp.create_user(p_email);
+  v_business uuid;
+begin
+  perform pg_temp.as_user(v_uid);
+  v_business := public.create_business(initcap(replace(p_slug, '-', ' ')), p_slug, 'America/Chicago',
+                                       p_mode, p_capacity, '+15125550142', p_email);
+  execute 'reset role';
+  perform set_config('request.jwt.claims', '', true);
+
+  update public.businesses set published_at = now(), accepting_requests = true, service_area_text = 'Austin, TX'
+   where id = v_business;
+  update public.booking_settings set min_notice_min = 0, horizon_days = 365 where business_id = v_business;
+  insert into public.availability_rules (business_id, weekday, start_time, end_time)
+  select v_business, d, time '06:00', time '22:00' from generate_series(0, 6) d;
+  insert into public.services (business_id, name, price_type, base_price_cents, base_duration_min, is_bookable, sort_order)
+  values (v_business, 'Full detail', 'fixed', 26000, 120, true, 1);
+  insert into public.services (business_id, name, price_type, base_price_cents, base_duration_min, is_bookable, is_addon, sort_order)
+  values (v_business, 'Pet hair removal', 'fixed', 4000, 30, true, true, 2);
+  insert into public.services (business_id, name, price_type, base_duration_min, is_bookable, sort_order)
+  values (v_business, 'Ceramic coating', 'quote_required', 480, false, 3);
+  return v_business;
+end
+$$;
+
+create function pg_temp.owner_of(p_business uuid) returns uuid
+language sql as $$ select user_id from public.memberships where business_id = p_business $$;
+
+create function pg_temp.service_id(p_business uuid, p_name text) returns uuid
+language sql as $$ select id from public.services where business_id = p_business and name = p_name $$;
+
+create function pg_temp.size_class_id(p_business uuid) returns uuid
+language sql as $$ select id from public.vehicle_size_classes where business_id = p_business order by sort_order limit 1 $$;
+
+create function pg_temp.resource_id(p_business uuid) returns uuid
+language sql as $$ select id from public.schedule_resources where business_id = p_business and kind = 'general' $$;
+
+-- Local wall-clock time in the business timezone, N days from today.
+create function pg_temp.at_local(p_days integer, p_time time) returns timestamptz
+language sql as $$
+  select ((now() at time zone 'America/Chicago')::date + p_days + p_time) at time zone 'America/Chicago'
+$$;
+
+-- Inserts a pending request directly (as postgres) for workflow tests.
+create function pg_temp.make_request(p_business uuid, p_start timestamptz, p_minutes integer default 120,
+                                     p_phone text default '+15125550100') returns uuid
+language sql as $$
+  insert into public.booking_requests (business_id, token_hash, idempotency_key, requested_start, requested_end,
+    location_type, service_address_line1, contact_first_name, contact_phone_e164, vehicle_make, vehicle_model,
+    vehicle_size_class_id, consent_at, estimated_total_cents, estimated_duration_min)
+  values (p_business, sha256(gen_random_uuid()::text::bytea), gen_random_uuid(), p_start,
+          p_start + make_interval(mins => p_minutes), 'mobile', '1234 Oak St', 'Jordan', p_phone,
+          'Tesla', 'Model Y', pg_temp.size_class_id(p_business), now(), 26000, p_minutes)
+  returning id
+$$;
+
+-- Test roles may call the read-only helpers above (rolled back with the test).
+do $$
+declare f regprocedure;
+begin
+  for f in select p.oid::regprocedure from pg_proc p where p.pronamespace = pg_my_temp_schema() loop
+    execute format('grant execute on function %s to anon, authenticated, booking_api', f);
+  end loop;
+end
+$$;

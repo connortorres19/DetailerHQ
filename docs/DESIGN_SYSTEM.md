@@ -1,7 +1,16 @@
 # DetailerHQ — Design System
 
-> **Status:** Final draft for approval · **Revision 3** · **Last updated:** 2026-10-30
+> **Status:** Final draft for approval · **Revision 4** · **Last updated:** 2026-10-30
 > Companion to [`PRODUCT_PLAN.md`](./PRODUCT_PLAN.md). The product name is a placeholder; nothing in this system depends on it.
+> Decision labels (D-n approved, REC-n not approved) follow PRODUCT_PLAN §17. Visual specifications below are design recommendations unless they implement an approved decision.
+
+### What changed in revision 4
+
+- **Capacity-aware calendar** (§13.4): concurrent jobs in side-by-side lanes, capacity usage per time band, holds shown as consuming capacity (implements D-26, D-27).
+- **Capacity messages** replace single-overlap conflict wording (§13.12); "full" states never reveal capacity to customers (D-25).
+- New **capacity setting** component used in onboarding and availability (§13.19).
+- Holds described as using one job slot; expired holds disappear from the calendar at expiry.
+- Owner scheduling actions are always explicit buttons that call server-side operations — no inline editing or drag-and-drop of appointments (D-24).
 
 ### What changed in revision 3
 
@@ -650,15 +659,18 @@ Rules:
 - **Outside availability:** subtle diagonal hatch of `graphite-50` on `graphite-25` to show closed hours; time off shown as a labelled neutral block ("Time off · Holiday").
 - **Appointment blocks:** white background, 1px border in status color, 3px left bar in status color, radius 4px; content: time range (mono or tabular), customer name (500), vehicle, first service. Truncate gracefully; full details on click.
   - Scheduled: steel; In progress: graphite-900 outline; Completed: green bar, text slightly muted; Cancelled/no-show: hidden by default (toggle "Show cancelled"), shown struck-through when visible.
-- **Tentative items** (toggle, on by default), always visually distinct from confirmed appointments and never counted as jobs:
-  - *Pending request (no hold):* dashed amber outline, transparent fill, label "Request". Does not block anything; may overlap other items.
-  - *Held request:* solid 1px steel border with diagonal `steel-50` hatch fill, label "Held · until 3:00 PM". Blocks the time like an appointment, but is visibly not a job.
-  - *Time proposed (waiting on customer):* dashed steel outline, label "Proposed · held until 3:00 PM".
-- Multiple requests for the same time stack side by side with a "2 requests" label.
+- **Tentative items** (toggle, on by default), always visually distinct from confirmed appointments and never counted as completed or scheduled jobs:
+  - *Pending request (no hold):* dashed amber outline, transparent fill, label "Request". Uses no capacity; may overlap anything.
+  - *Held request:* solid 1px steel border with diagonal `steel-50` hatch fill, label "Held · until 3:00 PM". **Uses one job slot** like an appointment, but is visibly not a job. Disappears from the grid at its expiry time (on next refresh/poll), matching the database rule that expired holds don't count.
+  - *Time proposed (waiting on customer):* dashed steel outline, label "Proposed · held until 3:00 PM". Uses one job slot.
+- **Concurrent jobs (capacity > 1):** Day and Week views lay out overlapping items in side-by-side lanes. The number of lanes equals the business's capacity; items that use capacity (appointments, holds, proposals) occupy lanes; pending requests without holds render in a narrow overflow column on the right so they never look like they take a slot.
+- **Capacity usage band:** a 4px strip along the left of the day column shaded by usage — `graphite-100` (free), `steel-100` (partly used), `steel-600` (full). Hovering/tapping a band shows "2 of 3 jobs in use, 9:00–11:00 AM". Text equivalents are available to screen readers and in the Agenda view ("Full 9:00–11:00 AM").
+- **Mobile businesses (capacity 1):** single lane — the calendar looks exactly like a normal one-person schedule; no capacity strip is shown unless capacity > 1.
+- Multiple pending requests for the same time stack in the overflow column with a "2 requests" label.
 - **Buffers** shown as a faint hatched extension after jobs so the owner understands why slots are blocked.
 - **Navigation:** "Today" button, previous/next arrows, date label ("Mon, Nov 3 – Sun, Nov 9, 2026"), view switcher as a segmented control.
-- **Creating:** click an empty slot (desktop) or "+" (mobile) opens "New appointment" prefilled with that time. **No drag-and-drop rescheduling in MVP** — rescheduling is an explicit action in the appointment detail to avoid accidental moves.
-- **Daily cap indicator:** day header shows "3 of 3 jobs" when at cap.
+- **Creating:** click an empty slot (desktop) or "+" (mobile) opens "New appointment" prefilled with that time. **No drag-and-drop or inline time editing** — every scheduling change is an explicit action (Reschedule, Cancel, Hold…) that calls an authorized server-side operation (D-24) and shows the database's result.
+- **Daily cap indicator** (optional daily job limit): day header shows "3 of 3 jobs today" when at the cap. This is separate from simultaneous capacity and labelled differently.
 
 ### 13.5 Modals, sheets and popovers
 
@@ -764,7 +776,7 @@ The most important customer-facing screen: it replaces confirmation texts in the
 - **Pending with a hold:** an info-tone note under the headline: "Your requested time (Sat, Nov 8, 9:00 AM CT) is being held while Northside Detail Co. reviews your request. This is not a confirmation yet." The hold expiry is not emphasized to the customer (it's an owner tool), but the page never implies confirmation.
 - **Time proposed:** a highlighted block (info tone, 1px border, 6px radius) showing the proposed time, the owner's message, "Held for you until [time]", and two buttons: **Accept this time** (primary) and **Decline** (secondary). Declining asks for confirmation.
 - **Contact details masked:** the customer's own details appear as "Phone ending 0142 · Email j•••@gmail.com"; the service address is shown in full only for confirmed mobile appointments.
-- **Ask to reschedule** (before the business's rescheduling cutoff): secondary button opening a sheet with available start times and an optional note. Submit label "Send reschedule request". Result state: "Reschedule request sent — your appointment is still [current time] until [Business] changes it." After the cutoff, the button is replaced by the rescheduling policy text and call/text links.
+- **Ask to reschedule** (only if REC-04 is approved; before the business's rescheduling cutoff): secondary button opening a sheet with available start times and an optional note. Submit label "Send reschedule request". Result state: "Reschedule request sent — your appointment is still [current time] until [Business] changes it." After the cutoff, the button is replaced by the rescheduling policy text and call/text links.
 - **Rescheduled:** new time prominent; previous time shown struck through in `graphite-500` with "Changed on Nov 5".
 - **Cancel before cutoff** (only if the business allows online cancellation): secondary button "Cancel appointment" → confirmation sheet stating the business's policy and cutoff ("Online cancellation is available until Fri, Nov 7, 9:00 AM CT"); after the cutoff the button is replaced by the policy text and call/text links.
 - Dates always include the weekday, date, time and **timezone abbreviation**.
@@ -773,11 +785,15 @@ The most important customer-facing screen: it replaces confirmation texts in the
 ### 13.12 Propose a different time & conflict warnings
 
 - **Propose dialog** (sheet on mobile): date picker + available start times computed for the requested duration (same component as the public time picker), optional message to the customer (shown on the status page), and "Customer must answer by" (default from settings, 2–72 h). Primary: "Propose this time". Helper: "This time is held for the customer until then."
-- **Hold this time** (request detail, secondary action): small dialog with a duration segmented control — 2 h · 12 h · 24 h · 48 h · 72 h (default from settings; options past the requested start are disabled with the reason) — and a one-line explanation: "Holding removes this time from your booking page. It is not a confirmation. You can release it at any time." Primary: "Hold until Fri 3:00 PM".
+- **Hold this time** (request detail, secondary action): small dialog with a duration segmented control — 2 h · 12 h · 24 h · 48 h · 72 h (values per REC-01; default from settings; options past the requested start are disabled with the reason) — and a one-line explanation: "Holding uses one job slot for this time and removes it from your booking page if no slots remain. It is not a confirmation. It ends automatically at the time shown, or when you release it." Primary: "Hold until Fri 3:00 PM". If no capacity is left for that interval, the dialog shows the capacity-full message instead of the duration choice.
 - **Held state on request detail:** info banner "Held until Fri, Nov 7, 3:00 PM CT · Release hold". Approve keeps working ("Approve" converts the hold). In the last 2 hours the banner switches to attention tone: "Hold expires in 1h 40m".
 - **Other requests for a held time** show a neutral line: "This time is held for R-0041 (Jordan Reyes)." Approve is replaced by "Release hold and approve…" which opens a confirmation naming the other request.
 - **Conflict warnings** appear inline above the action bar on request detail, new appointment, reschedule and propose screens:
-  - *Hard conflict* (critical tone): "Overlaps Marcus Bell's appointment (9:00–1:00 PM). Choose another time." — the confirm action is disabled and "Propose a different time" is offered.
+  - *Capacity full* (critical tone), worded by capacity:
+    - Capacity 1: "You already have Marcus Bell's appointment 9:00 AM–1:00 PM. Choose another time."
+    - Capacity > 1: "All 3 job slots are in use from 10:30 to 11:00 AM (Marcus Bell, Priya Natarajan, held for R-0041)."
+    The confirm action is disabled; "Propose a different time" is offered; if a hold is part of the reason, "Release hold for R-0041…" is offered as a separate, explicit action.
+  - *Result from the server:* if the database rejects an action because capacity was taken a moment earlier (another device, a customer accepting a proposal), show the same message inline with "This time was just taken" and refresh the capacity view. Never retry silently.
   - *Soft warnings* (attention tone), listed individually: "Inside the 30-minute buffer after Marcus Bell's job" · "Outside working hours" · "This would be the 4th job on Sat (limit 3)". Confirm button label changes to "Approve anyway" and requires a checkbox "I've checked these warnings".
 - **Possible duplicate** flag (attention tone) on request rows and detail: "Possible duplicate — same phone as request R-0041 (pending)". Links to the other request; action "Close as duplicate".
 
@@ -834,6 +850,17 @@ Footer: conflict summary (if any soft warnings) and primary "Approve request". T
 - **Policy texts** — two textareas with neutral examples shown as placeholders-in-helper-text (not prefilled), 1,000-character counters.
 - **Holds and proposals** — "Default hold length" (2–72 h, default 24 h) and "Time customers have to answer a proposed time" (2–72 h, default 48 h).
 - Live preview of how the policy appears on the customer status page.
+
+### 13.19 Capacity setting
+
+Used in onboarding step 2 and on `/app/availability`.
+
+- Question as the label: **"How many vehicles can you work on at the same time?"** Helper: "Count bays or crews that can each run a job at once. Most mobile detailers work on one vehicle at a time."
+- Control: a stepper (− / number / +) with 44px targets, range 1 to the maximum (REC-19), plus direct numeric entry.
+- **Mobile-only businesses:** shown as "1 vehicle at a time" with a quiet "Change" link only if REC-17 is approved; otherwise read-only text explaining how to change service mode.
+- **Shops and mixed businesses:** stepper always shown; onboarding requires an explicit confirmation of the value (REC-16).
+- **Decreasing capacity:** if future bookings would exceed the new value, the save fails with an inline list ("Sat, Nov 8, 9:00–11:00 AM — 3 jobs booked") and links to each appointment. No partial save.
+- Never displayed on public pages.
 
 ---
 
@@ -970,6 +997,7 @@ Use for every new screen or significant change.
 - [ ] Copy is honest about what the system does (no implied sending, charging or automation); requests are never called bookings.
 - [ ] Numbers shown come from recorded data or are clearly labelled sample/estimate; quoted, booked and recorded values are labelled distinctly.
 - [ ] Times on customer-facing screens include the timezone abbreviation.
+- [ ] Scheduling screens show capacity usage and database results honestly; no scheduling change happens without an explicit action (D-24); capacity is never shown on public pages (D-25).
 - [ ] Marketing: passes the claims policy (§2.4) — no fake testimonials, invented statistics, unsupported claims, or stage-inappropriate "free trial" wording.
 - [ ] The product name comes from configuration, not hard-coded text.
 - [ ] Passes the §14 litmus test.

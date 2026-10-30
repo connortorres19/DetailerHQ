@@ -1,22 +1,31 @@
 # DetailerHQ — Product Plan
 
-> **Status:** Final draft for approval · **Revision 3** · **Last updated:** 2026-10-30
-> **Working name:** DetailerHQ is provisional and has **not** been legally or commercially cleared. It is a configuration value only (§17.4). No domains, services or brand assets are to be purchased or registered without explicit approval.
+> **Status:** Final draft for approval · **Revision 4** · **Last updated:** 2026-10-30
+> **Working name:** DetailerHQ is provisional and has **not** been legally or commercially cleared. It is a configuration value only (§17.6). No domains, services or brand assets are to be purchased or registered without explicit approval.
 > **Companion document:** [`DESIGN_SYSTEM.md`](./DESIGN_SYSTEM.md)
-> **Implementation has not started.** Everything below is a plan awaiting approval.
+> **Implementation has not started.** Nothing in this document has been built, deployed or tested. Vendor behavior described here is **unverified** until the checks in §14.3 are completed.
 
-### What changed in revision 3
+### How decisions are labelled
 
-- **Pilot:** 3–5 independent businesses including mobile detailers; **$25 for the first month**, presented as an early-access offer. **Public subscription target: $49/month**, subject to validation.
-- **Trial:** the 7-day trial starts at **account activation** (email verified + business created), not at sign-up.
-- **Vehicles:** customers can have many vehicles; **every request and appointment identifies exactly one vehicle**.
-- **Holds:** pending requests never block availability automatically. The business-wide "hold pending" setting is **replaced by an optional, owner-placed temporary hold per request**, with defined expiry and conflict rules.
-- **Policies:** cancellation and rescheduling cutoffs are **owner-configurable**; 24 hours is only the suggested default. Customers can **ask to reschedule** (a request, not a change).
-- **No tax calculation** anywhere in the MVP (the optional quote tax line was removed). Subscription billing **and tax handling** are pre-launch requirements.
-- **Database:** a concrete schema (§8) with composite foreign keys that make cross-business references impossible, a unified **`schedule_blocks`** table whose exclusion constraint prevents conflicting appointments **and** holds at the database level, explicit (non-polymorphic) links, and state-transition triggers so direct API calls cannot skip workflow rules.
-- **Public endpoints:** served only through our server using a **least-privilege database role**; the browser-visible Supabase anon role has **no** access to application tables or functions (§9.4).
-- **Testing:** a full **RLS test matrix** — every business-owned table × read/insert/update/delete × four identities, via both SQL and the Supabase Data API (§13.2).
-- New sections: **account closure and deletion** and **documentation required before public launch** (§12.6–12.7).
+| Label | Meaning |
+|---|---|
+| **D-n** | Approved by the user. Do not change without the user's approval. |
+| **REC-n** | Recommendation from planning. **Not approved.** Used as the working assumption only where marked, and listed in §17.2 for decision. |
+| **V-n** | Verification item: vendor/documentation behavior that must be checked before the dependent work starts (§14.3). |
+
+Revision 3 used the labels P-1…P-12 and R-1…R-5 for recommendations. The user's revision-4 approvals reused some of those labels with **different meanings**, so revision 4 retires the old labels: approved items are now D-21…D-27 (quoted from the user's wording), and all still-unapproved recommendations are renumbered REC-01…REC-24 (old labels noted for traceability in §17.3).
+
+### What changed in revision 4
+
+- **Approved (D-21–D-27):** restricted server-side public booking endpoint with minimum privileges; explicit database permissions with unnecessary defaults removed; database safeguards for business/customer/vehicle/appointment/status relationships; owners read-only on their schedule with changes only through authorized server-side operations; no private data exposed by public booking; **capacity-aware scheduling**; automatically expiring holds that respect capacity.
+- **Scheduling redesigned around capacity** (§6.6, §8.6): mobile businesses default to 1 simultaneous job; shops configure their capacity. The revision-3 exclusion constraint (which could only express capacity 1) is replaced by a **locked, trigger-enforced capacity check** that is correct under concurrency. The rejected "single-session appointment" idea (old R-5) is withdrawn; multi-day jobs consume one unit of capacity for their duration.
+- **Holds** now consume capacity and expire purely by timestamp — expired holds are ignored by every check, so correctness no longer depends on clean-up jobs.
+- **Permissions model** (§9.2) rewritten: default privileges revoked; per-role grants listed; owners have **no direct write access** to appointments, schedule or workflow columns.
+- **Finding:** revision 3 said "RLS enabled **and forced**". Forcing RLS would also apply policies to our own security-definer functions (which run as the table owner) and break them. Revision 4 recommends **enabled, not forced**, with compensating controls (REC-21, V-4).
+- **Verification checklist** (§14.3) of Supabase, Vercel, Next.js and PostgreSQL documentation to check before implementation.
+- **Roadmap** (§16) now starts with a documentation-only verification phase, then a database-first foundation phase.
+
+Preserved approved decisions include: 7-day free trial starting at activation (D-14), booking requests without customer accounts (D-13), no customer deposits or payments (D-9), no automatic data deletion when a trial ends (D-18), and all other D-1–D-20.
 
 ---
 
@@ -27,18 +36,18 @@
 3. [Final MVP scope](#3-final-mvp-scope)
 4. [User roles and permissions](#4-user-roles-and-permissions)
 5. [Final page inventory](#5-final-page-inventory)
-6. [Booking workflow and edge cases](#6-booking-workflow-and-edge-cases)
+6. [Booking workflow, capacity and edge cases](#6-booking-workflow-capacity-and-edge-cases)
 7. [Other workflows](#7-other-workflows)
-8. [Database schema and relationships](#8-database-schema-and-relationships)
+8. [Database schema, permissions and relationships](#8-database-schema-permissions-and-relationships)
 9. [Security and privacy requirements](#9-security-and-privacy-requirements)
 10. [Notifications](#10-notifications)
 11. [Analytics definitions](#11-analytics-definitions)
 12. [Pricing, pilot, trial, retention, closure and deletion](#12-pricing-pilot-trial-retention-closure-and-deletion)
 13. [Testing and acceptance criteria](#13-testing-and-acceptance-criteria)
-14. [Architecture, budget and assumptions to verify](#14-architecture-budget-and-assumptions-to-verify)
+14. [Architecture, budget and verification requirements](#14-architecture-budget-and-verification-requirements)
 15. [Customer acquisition plan](#15-customer-acquisition-plan)
 16. [Phased implementation roadmap](#16-phased-implementation-roadmap)
-17. [Decisions, open questions and risks](#17-decisions-open-questions-and-risks)
+17. [Decisions, recommendations, open questions and risks](#17-decisions-recommendations-open-questions-and-risks)
 
 ---
 
@@ -48,14 +57,14 @@ DetailerHQ is a web application for **independent auto detailers in the United S
 
 The MVP does six things:
 
-1. A **public booking page** where customers **request** an appointment for a specific vehicle — no customer account required.
+1. A **public booking page** where customers **request** an appointment for a specific vehicle — no customer account required (D-13).
 2. An **approval workflow**: the owner approves, declines, proposes a different time, or temporarily holds the requested time. The customer always sees a clear status and next step.
-3. **Customer and vehicle records** (many vehicles per customer), always tied to the correct business.
-4. **Leads and quotes**, tracked separately from booking requests, with a communication log.
-5. **Follow-ups**: in-app tasks, reminders and editable message templates the owner sends from their own phone or email.
+3. **Capacity-aware scheduling**: the system never lets confirmed appointments and active holds exceed the number of jobs the business can handle at once (D-26).
+4. **Customer and vehicle records** (many vehicles per customer), always tied to the correct business.
+5. **Leads, quotes and follow-ups**, tracked separately from booking requests, with templates the owner sends from their own phone or email.
 6. **Honest analytics** from recorded data only.
 
-Not in the MVP: automated SMS/email/social messages, customer payments or deposits, tax calculation, CSV import, customer accounts.
+Not in the MVP: automated SMS/email/social messages, customer payments or deposits, tax calculation, CSV import, customer accounts, employee management.
 
 ### Success criteria
 
@@ -64,7 +73,7 @@ Not in the MVP: automated SMS/email/social messages, customer payments or deposi
 | Useful | 3–5 pilot businesses (at least one mobile detailer) use it for real requests for 4 consecutive weeks |
 | Worth paying for | ≥ 3 pilots pay the $25 early-access first month; ≥ 2 indicate they would continue at the proposed subscription price |
 | Cheap to run | Infrastructure ≤ ~$50/month through the first ~100 businesses |
-| Trustworthy | Zero cross-business data exposure; RLS and isolation suites pass on every deploy |
+| Trustworthy | Zero cross-business data exposure; zero over-capacity bookings; permission, RLS and concurrency suites pass on every deploy |
 | Honest | Every claim maps to a shipped, tested feature |
 
 ---
@@ -73,7 +82,7 @@ Not in the MVP: automated SMS/email/social messages, customer payments or deposi
 
 ### 2.1 Customer
 
-**Independent mobile detailers and small detailing shops in the US** (1–5 people). Phone-first, low setup tolerance, already rely on texting and Instagram/Facebook, price by vehicle size and condition (**every business sets its own prices**), handle few jobs per day, so each missed request or double-booking matters.
+**Independent mobile detailers and small detailing shops in the US** (1–5 people). Phone-first, low setup tolerance, rely on texting and Instagram/Facebook, price by vehicle size and condition (**every business sets its own prices**, D-4). Mobile detailers typically work one job at a time; shops may work on several vehicles at once (multiple bays, cars left to cure).
 
 ### 2.2 Problems solved
 
@@ -81,17 +90,17 @@ Not in the MVP: automated SMS/email/social messages, customer payments or deposi
 |---|---|
 | Requests arrive everywhere; some get missed | One booking page, one Requests inbox, in-app notifications |
 | Customers don't know if they're booked | A status page per request with a clear next step |
-| Repeated price questions | The business's own published menu, by vehicle size if desired |
-| Double-booking | Database-enforced prevention of overlapping confirmed appointments and holds |
+| Repeated price questions | The business's own published menu |
+| Overbooking | Database-enforced capacity: never more simultaneous jobs and holds than the business can handle |
 | Lost track of which car is whose | Customers with multiple vehicles and per-vehicle history |
 | Quotes never followed up | Leads, quotes, follow-up tasks, templates, communication log |
 | No idea what makes money | Analytics separating quoted value, booked job value and recorded revenue |
 
-### 2.3 Pilot
+### 2.3 Pilot (D-11)
 
-- **3–5 independent businesses**, including **at least one mobile detailer** (preferably two) and at least one fixed-location shop if possible.
-- **Early-access offer: $25 for the first month**, stated plainly as an early-access offer, collected **manually outside the product** (method to be approved; §17.3).
-- Written **pilot terms** (§12.2). Pilot access is never described as a free trial.
+- **3–5 independent businesses**, including mobile detailers.
+- **Early-access offer: $25 for the first month**, presented plainly as an early-access offer, collected **manually outside the product** (method requires approval; §17.4).
+- Written pilot terms (§12.2). Pilot access is never described as a free trial.
 
 ---
 
@@ -103,45 +112,39 @@ Not in the MVP: automated SMS/email/social messages, customer payments or deposi
 |---|---|
 | **Owner accounts** | Supabase Auth (email + password), invite-only during pilot, email verification, password reset; one business per owner |
 | **Business profile** | Name, phone, email, US timezone, service mode (mobile / shop / both), service area, shop address, booking slug |
-| **Onboarding** | Profile → where you work → hours and policies → services → preview and publish |
-| **Service menu** | Owner-defined categories, services, descriptions, prices, durations; price type fixed / "from" / quote required; optional price and duration per vehicle size class; add-ons; **bookable on/off**; ordering. No prefilled prices. |
-| **Availability** | Weekly hours (multiple windows/day), time off, start interval, minimum notice, horizon, buffer, optional daily job cap |
-| **Policies** | Owner-defined cancellation and rescheduling cutoffs (suggested default 24 h; 0–168 h), customer self-cancel on/off, policy texts |
-| **Public booking page** | No customer account. Request flow for **one vehicle per request**; inquiry flow; accepting-requests switch |
-| **Customer status page** | Status and next step; accept/decline proposed time; withdraw; cancel before cutoff; ask to reschedule before cutoff |
-| **Requests inbox** | Approve, decline, propose a different time, **place / release a temporary hold**, close as duplicate; conflicts; customer and vehicle linking |
-| **Appointments & calendar** | Day/Week/Agenda; manual creation; reschedule; cancel; start; complete with recorded amounts; no-show; **database-enforced no-overlap** |
-| **Customers & vehicles** | Manual entry; **multiple vehicles per customer**; search; history; archive; delete/anonymize |
-| **Leads & quotes** | Separate from booking requests; lead statuses New, Contacted, Quote sent, Follow-up due, Booked, Lost; quotes Draft/Sent/Accepted/Declined/Expired; read-only share link; print view. **No tax calculation.** |
-| **Communication log** | Manually logged calls, texts, emails, DMs, in-person (inbound/outbound) |
-| **Follow-ups** | Tasks with outcomes, automatic task rules, editable message templates, "Did you send it?" logging |
-| **Notifications** | In-app only (§10) |
-| **Analytics** | Defined metrics from recorded data (§11) |
-| **Settings & data** | Business settings, templates, account, CSV export, account closure / deletion request |
-| **Pilot status** | `pilot` account status set by operator; pilot end date shown in-app |
-| **Marketing site** | Home, Early access (pricing), Contact/apply, Terms, Privacy, Pilot terms |
+| **Capacity** | Number of simultaneous jobs: **mobile-only businesses default to 1** (D-26); shops and mixed businesses set their own capacity |
+| **Onboarding** | Profile → where you work & capacity → hours → policies → services → preview and publish |
+| **Service menu** | Owner-defined categories, services, descriptions, prices, durations; fixed / "from" / quote required; optional per-size-class price and duration; add-ons; bookable on/off. No prefilled prices. |
+| **Availability** | Weekly hours, time off, start interval, minimum notice, horizon, buffer, optional daily job cap |
+| **Policies** | Owner-defined cancellation and rescheduling cutoffs (24 h suggested, D-17), customer self-cancel on/off, policy texts |
+| **Public booking page** | No customer account. One vehicle per request. Inquiry flow. Accepting-requests switch. Served through a restricted server-side endpoint (D-21) that exposes no private data (D-25). |
+| **Customer status page** | Status and next step; accept/decline proposed time; withdraw; cancel before cutoff |
+| **Requests inbox** | Approve, decline, propose a different time, place/release a temporary hold, close as duplicate; capacity and soft-rule warnings; customer and vehicle linking |
+| **Appointments & calendar** | Day/Week/Agenda with concurrent jobs shown side by side; manual creation; reschedule; cancel; start; complete; no-show — **all changes through authorized server-side operations** (D-24) |
+| **Customers & vehicles** | Manual entry, multiple vehicles per customer, search, history, archive, delete/anonymize |
+| **Leads & quotes** | Separate from requests; lead statuses New, Contacted, Quote sent, Follow-up due, Booked, Lost; quotes without tax calculation |
+| **Communication log, follow-ups, templates** | As in §7.6 |
+| **Notifications** | In-app only |
+| **Analytics** | Defined metrics from recorded data |
+| **Settings & data** | Business settings, templates, account, CSV export, account closure request |
+| **Pilot status** | `pilot` account status; pilot end date in-app |
+| **Marketing site** | Home, Early access, Contact/apply, Terms, Privacy, Pilot terms |
 
-### 3.2 Required before the public paid launch
+### 3.2 Required before the public paid launch (D-10, D-14, D-18)
 
-| Requirement |
-|---|
-| Subscription billing integration (provider to be chosen; webhooks verified) at the validated price (target $49/month) |
-| 7-day free trial starting at activation (§12.3), trial enforcement and account-state handling (§12.4), tested |
-| **Tax handling for subscriptions**: obligations reviewed with an accountant (SaaS taxability varies by state); billing provider's tax features evaluated and configured |
-| Retention, account closure and deletion policy finalized, legally reviewed and **disclosed** (§12.5–12.7) |
-| Pre-deletion notice delivery (requires an email provider) before any automated deletion is enabled |
-| Transactional email provider for auth emails (custom SMTP) |
-| Public self-serve sign-up |
-| Legal review of Terms, Privacy Policy, service-provider language |
-| Name clearance and domain (with spending approval) |
+- Subscription billing at the validated price (target $49/month, D-12), with **tax handling for subscriptions** reviewed with an accountant.
+- 7-day free trial starting at activation; trial enforcement; account-state handling — tested.
+- Retention, closure and deletion policy finalized, legally reviewed and disclosed; pre-deletion notice delivery before any automated deletion is enabled.
+- Transactional email provider for auth emails (possibly needed earlier — V-12).
+- Public self-serve sign-up; legal review; name clearance and domain (approved spending).
 
 ### 3.3 Later — not in the MVP
 
-Not presented as available anywhere until shipped: automated SMS/email to customers; owner email notifications (first post-MVP candidate); social integrations; customer deposits and online payments; **tax calculation on quotes or jobs**; CSV import (could be promoted if pilots prove it essential); online quote acceptance; customer self-service rescheduling; auto-approval; staff accounts and concurrent jobs; calendar sync / iCal; photo uploads; multiple locations; non-US markets; dashboard dark mode; native apps; public API; AI features.
+Automated SMS/email to customers; owner email notifications; social integrations; deposits and online payments; tax calculation; CSV import (unless pilots prove essential, D-8); online quote acceptance; customer self-service rescheduling; auto-approval; **employee management, per-bay or per-resource scheduling** (the data model is prepared for it, §8.6.3); calendar sync; photo uploads; multiple locations; non-US markets; dashboard dark mode; native apps; public API; AI features.
 
 ### 3.4 Feature intake rule
 
-A feature joins the active plan only if (1) two or more pilots independently need it for a described workflow, (2) a pilot says it's the reason they won't pay, or (3) it's required for security, privacy, legal compliance or data integrity. Additions are logged in `docs/decisions/` with the evidence.
+A feature joins the active plan only if two or more pilots independently need it, a pilot says it's the reason they won't pay, or it is required for security, privacy, legal compliance or data integrity. Additions are logged in `docs/decisions/`.
 
 ---
 
@@ -149,23 +152,25 @@ A feature joins the active plan only if (1) two or more pilots independently nee
 
 | Role | Who | How identified | MVP |
 |---|---|---|---|
-| **Owner** | Detailer who created the business | Supabase Auth session (`authenticated` DB role + membership) | ✅ |
-| **Public visitor** | Anyone with the booking link | Nothing — no account | ✅ |
-| **Token holder** | Customer with a request-status or quote link | Unguessable token; only its SHA-256 hash is stored | ✅ |
-| **Operator** | DetailerHQ staff | Supabase dashboard/CLI with MFA; no in-app admin UI | ✅ |
-| **System** | `pg_cron` jobs inside the database | Database role | ✅ |
-| **Staff** | Helpers | — | ❌ Later |
+| **Owner** | Detailer who created the business | Supabase Auth session → `authenticated` database role + membership row | ✅ |
+| **Public visitor** | Anyone with the booking link | Nothing — no account (D-13) | ✅ |
+| **Token holder** | Customer with a request-status or quote link | Unguessable token; only its SHA-256 hash stored | ✅ |
+| **Public booking server path** | Our Next.js server acting for visitors/token holders | Restricted database role (D-21; mechanism REC-13) | ✅ |
+| **Operator** | DetailerHQ staff | Supabase dashboard/CLI with MFA | ✅ |
+| **System** | `pg_cron` jobs | Database role inside the database | ✅ |
+| **Staff / employees** | Helpers, technicians | — | ❌ Later |
 
 | Capability | Owner | Visitor | Token holder | Operator |
 |---|---|---|---|---|
-| View published booking page, bookable services, available start times | ✅ | ✅ | ✅ | ✅ |
-| Submit request or inquiry | — | ✅ (rate-limited) | — | — |
-| View one request; accept/decline proposal; withdraw; cancel/ask to reschedule within policy | ✅ in app | ❌ | ✅ that request only | — |
+| View booking page, bookable services, available start times | ✅ | ✅ | ✅ | ✅ |
+| Submit request or inquiry | — | ✅ via server path, rate-limited | — | — |
+| View/act on one request (accept/decline proposal, withdraw, cancel within policy) | ✅ in app | ❌ | ✅ that request only | — |
 | View one shared quote | ✅ | ❌ | ✅ that quote only | — |
-| Read/write business data | ✅ own business only | ❌ | ❌ | Break-glass only, audited |
-| Configure services, availability, policies, booking page | ✅ own business only | ❌ | ❌ | ❌ |
+| **Read own schedule** (appointments, holds, capacity usage) | ✅ read-only (D-24) | ❌ | ❌ | Break-glass |
+| **Change schedule** (approve, hold, propose, reschedule, cancel, complete, capacity) | ✅ **only through authorized server-side operations** (D-24) | ❌ | Limited (accept proposal, withdraw, cancel) through server path | — |
+| Read/write other business data (customers, vehicles, leads, quotes, tasks, templates…) | ✅ own business only, under RLS | ❌ | ❌ | Break-glass, audited |
 | Analytics, export, closure request | ✅ own business only | ❌ | ❌ | Executes deletion |
-| Set account status (pilot, trial, suspended) | ❌ | ❌ | ❌ | ✅ (billing webhook later) |
+| Set account status | ❌ | ❌ | ❌ | ✅ (billing webhook later) |
 
 ---
 
@@ -178,67 +183,38 @@ A feature joins the active plan only if (1) two or more pilots independently nee
 | Route | Purpose |
 |---|---|
 | `/` | Home: real screenshots, request → approval flow, included / not available yet, early-access CTA |
-| `/pricing` | **Pilot stage:** "Early access" — $25 for the first month, what's included, what happens after the first month, how to apply. **Paid launch:** plan price, 7-day trial terms |
-| `/contact` | Contact and pilot application (stored in our DB) |
-| `/legal/terms` | Terms of Service |
-| `/legal/privacy` | Privacy Policy incl. retention, closure, deletion |
-| `/legal/pilot-terms` | Pilot / early-access terms |
+| `/pricing` | **Pilot stage:** Early access — $25 for the first month, what happens after, how to apply. **Paid launch:** validated price and 7-day trial terms |
+| `/contact` | Contact and pilot application |
+| `/legal/terms`, `/legal/privacy`, `/legal/pilot-terms` | Legal pages |
 
 ### 5.2 Authentication (Supabase Auth)
 
-| Route | Purpose |
-|---|---|
-| `/sign-up` | Pilot: invite code required. Paid launch: open sign-up |
-| `/sign-in` | Email + password |
-| `/auth/confirm` | Email confirmation / recovery callback |
-| `/verify-email` | "Check your inbox" + resend |
-| `/forgot-password`, `/reset-password` | Recovery |
+`/sign-up` (invite-only during pilot), `/sign-in`, `/auth/confirm`, `/verify-email`, `/forgot-password`, `/reset-password`.
 
 ### 5.3 Onboarding
 
-| Route | Purpose |
-|---|---|
-| `/onboarding` | (1) Business profile + US timezone → **activation** once email is verified, (2) Where you work, (3) Hours and booking rules, (4) Cancellation & rescheduling policies (24 h suggested), (5) Services (owner-entered prices), (6) Preview and publish. Resumable. |
+`/onboarding`: (1) Business profile + US timezone → **activation** once email is verified; (2) Where you work **and how many jobs you can handle at the same time** (mobile-only: 1, editable only if REC-17 is approved; shop/both: owner enters, prefilled per REC-16); (3) Hours and booking rules; (4) Cancellation and rescheduling policies (24 h suggested); (5) Services with owner-entered prices; (6) Preview and publish.
 
 ### 5.4 Dashboard (`/app`, authenticated)
 
 | Route | Purpose |
 |---|---|
-| `/app` | Today: needs-action requests, held times expiring soon, today's schedule, tasks due, notifications, account banner, setup checklist |
+| `/app` | Today: needs-action requests, holds expiring soon, today's schedule with concurrent jobs, tasks due, notifications, account banner, setup checklist |
 | `/app/notifications` | Notification list |
-| `/app/requests` | Inbox: Needs action · Held · Waiting on customer · Approved · Closed |
-| `/app/requests/[id]` | Request detail: items, **vehicle**, location, times, contact, conflicts, duplicates/related requests, customer & vehicle linking, hold status, history. Actions: Approve · Hold time · Release hold · Propose a different time · Decline · Close as duplicate |
-| `/app/calendar` | Day / Week / Agenda with appointments, holds, proposals, time off, buffers |
-| `/app/appointments/new` | Manual appointment (customer → **vehicle** → services → time) |
-| `/app/appointments/[id]` | Detail; Start · Complete · Reschedule · Cancel · No-show; reschedule requests from customer; history |
-| `/app/customers` | List and search (name, phone, email, plate) |
-| `/app/customers/new` | Create customer with zero or more vehicles |
-| `/app/customers/[id]` | Profile: contact, **vehicles**, appointments, requests, quotes, leads, tasks, communications, notes |
-| `/app/customers/[id]/vehicles/new` | Add a vehicle to this customer |
-| `/app/vehicles/[id]` | Vehicle detail and service history |
-| `/app/leads`, `/app/leads/new`, `/app/leads/[id]` | Leads |
-| `/app/quotes`, `/app/quotes/new`, `/app/quotes/[id]`, `/app/quotes/[id]/print` | Quotes |
-| `/app/tasks` | Tasks: Overdue · Today · Upcoming · Done |
-| `/app/services`, `/app/services/[id]` | Service menu and editor |
-| `/app/availability` | Hours, time off, booking rules |
-| `/app/booking-page` | Slug, intro, prep instructions, accepting requests, preview, link, QR code |
-| `/app/settings` | Business profile, timezone, size classes, follow-up rules |
-| `/app/settings/policies` | Cancellation and rescheduling policies, hold defaults, proposal expiry |
-| `/app/settings/templates` | Message templates |
-| `/app/settings/account` | Name, email, password, sessions |
-| `/app/settings/plan` | Pilot terms & dates; later trial, subscription, billing |
-| `/app/settings/data` | Export, retention info, account closure and deletion |
+| `/app/requests`, `/app/requests/[id]` | Inbox and request detail (approve, hold, release, propose, decline, close duplicate; capacity status for the requested time; customer & vehicle linking) |
+| `/app/calendar` | Day / Week / Agenda; concurrent jobs side by side; capacity usage per time band; holds, proposals, time off |
+| `/app/appointments/new`, `/app/appointments/[id]` | Manual appointment; detail with Start · Complete · Reschedule · Cancel · No-show |
+| `/app/customers`, `/app/customers/new`, `/app/customers/[id]`, `/app/customers/[id]/vehicles/new`, `/app/vehicles/[id]` | Customers and vehicles |
+| `/app/leads…`, `/app/quotes…`, `/app/tasks` | Leads, quotes (with print view), tasks |
+| `/app/services`, `/app/services/[id]` | Service menu |
+| `/app/availability` | Hours, time off, booking rules, **simultaneous job capacity** |
+| `/app/booking-page` | Slug, intro, prep instructions, accepting requests, preview, link, QR |
+| `/app/settings`, `/app/settings/policies`, `/app/settings/templates`, `/app/settings/account`, `/app/settings/plan`, `/app/settings/data` | Settings |
 | `/app/analytics` | Metrics with definitions |
 
 ### 5.5 Public business pages (no customer account)
 
-| Route | Purpose |
-|---|---|
-| `/b/[slug]` | Booking page: business info, bookable services, policies |
-| `/b/[slug]/request` | Service → **Vehicle (one)** → Location → Time → Contact → Review |
-| `/b/[slug]/inquiry` | Inquiry / quote request → Lead |
-| `/r/[token]` | Request status and permitted actions |
-| `/q/[token]` | Read-only quote |
+`/b/[slug]` booking page · `/b/[slug]/request` (Service → Vehicle (one) → Location → Time → Contact → Review) · `/b/[slug]/inquiry` · `/r/[token]` status · `/q/[token]` quote.
 
 ### 5.6 System
 
@@ -246,184 +222,216 @@ A feature joins the active plan only if (1) two or more pilots independently nee
 
 ---
 
-## 6. Booking workflow and edge cases
+## 6. Booking workflow, capacity and edge cases
 
 ### 6.1 Principle
 
-> **A request is not a booking.** It becomes a confirmed appointment only when the owner approves it or the customer accepts a time the owner proposed. A **hold** reserves time but is **not** a confirmation.
+> **A request is not a booking.** It becomes a confirmed appointment only when the owner approves it or the customer accepts a time the owner proposed. A **hold** reserves capacity but is **not** a confirmation.
 
 ### 6.2 Request statuses
 
 | Status | Meaning | Set by |
 |---|---|---|
-| `pending` | Waiting for the owner (may or may not have an active hold) | Submission |
+| `pending` | Waiting for the owner (may have an active hold) | Submission |
 | `time_proposed` | Owner proposed another time; waiting for customer | Owner |
 | `approved` | Confirmed; appointment exists | Owner, or customer accepting proposal |
 | `declined` | Owner declined | Owner |
 | `proposal_declined` | Customer declined the proposal | Customer |
 | `withdrawn` | Customer withdrew before a decision | Customer |
-| `expired` | Requested time passed while pending, or proposal unanswered by expiry | System |
-| `closed_duplicate` | Closed as duplicate of another request | Owner |
+| `expired` | Requested time passed while pending, or proposal unanswered | System |
+| `closed_duplicate` | Closed as a duplicate | Owner |
 
-Holds are **not** a status: a pending request has an active hold if a `schedule_blocks` row of kind `hold` exists for it and hasn't expired.
-
-Allowed transitions (enforced by a database trigger, so direct API calls can't skip them):
+Allowed transitions (enforced in the database, D-23):
 
 ```
 pending ──► approved | time_proposed | declined | withdrawn | expired | closed_duplicate
-time_proposed ──► approved (customer accepts) | proposal_declined | withdrawn | expired | pending (owner retracts, or accept failed)
-all other states are terminal
+time_proposed ──► approved | proposal_declined | withdrawn | expired | pending (owner retracts, or accept failed)
+other states are terminal
 ```
 
-After approval, the appointment lifecycle applies: `scheduled → in_progress → completed`; `scheduled | in_progress → cancelled`; `scheduled → no_show` (after start); `completed → scheduled` (owner correction, confirmed).
+Appointment lifecycle: `scheduled → in_progress → completed`; `scheduled | in_progress → cancelled`; `scheduled → no_show` (after start); `completed → scheduled` (owner correction, with capacity re-check).
 
-### 6.3 Linking a request to business, services, customer and vehicle
+### 6.3 Linking a request to business, services, customer and vehicle (D-23)
 
-| Link | When | How cross-business references are prevented |
+| Link | When | Database protection |
 |---|---|---|
-| **Business** | At submission | Resolved server-side from `[slug]`; the client never sends a business ID. Every row stores `business_id`, immutable after insert. |
-| **Services** | At submission | Service IDs submitted by the client are re-validated in the database: each must belong to the same business, be active and bookable. Items are stored with composite FK `(business_id, service_id) → services(business_id, id)` plus name/price/duration snapshots computed in the database. |
-| **Vehicle size class** | At submission | Composite FK `(business_id, size_class_id) → vehicle_size_classes(business_id, id)` |
-| **Customer** | On approval (or by owner earlier) | Owner chooses an existing customer of **this** business (suggested by exact match on normalized phone/email within this business only) or creates a new one from the request's contact snapshot. Composite FK `(business_id, customer_id) → customers(business_id, id)`. |
-| **Vehicle** | On approval | Owner picks one of **that customer's** vehicles (suggested by year/make/model/plate match) or creates one from the request's vehicle snapshot. Composite FK `(business_id, customer_id, vehicle_id) → vehicles(business_id, customer_id, id)` guarantees the vehicle belongs to that customer **and** that business. |
-| **Appointment** | On approval | Created in the same transaction with the same customer and vehicle (same composite FK), `booking_request_id` unique, items copied from the request. A check constraint requires `customer_id` and `vehicle_id` on approved requests. |
+| **Business** | Submission | Resolved from `[slug]` inside the public function; never accepted from the client; `business_id` immutable |
+| **Services** | Submission | Each submitted service ID re-validated in the database (same business, active, bookable); items stored with composite FK `(business_id, service_id)`; snapshots computed in the database |
+| **Vehicle size class** | Submission | Composite FK `(business_id, size_class_id)` |
+| **Customer** | Approval | Owner picks an existing customer of this business (matched only within this business) or creates one; composite FK `(business_id, customer_id)`; archived/anonymized customers cannot be newly linked |
+| **Vehicle** | Approval | Owner picks one of **that customer's** vehicles or creates one; FK `(business_id, customer_id, vehicle_id) → vehicles(business_id, customer_id, id)` |
+| **Appointment** | Approval | Created in the same transaction; same customer/vehicle as the request (trigger check); unique `booking_request_id` |
 
-Customers never see or choose existing vehicle records (they have no account); they always describe the vehicle, and the owner links it. **One request = one vehicle.** A two-car visit is two requests (or one manual appointment per vehicle).
+One request = one vehicle. A two-car visit is two requests (or two manual appointments); with capacity ≥ 2 both may run at once.
 
 ### 6.4 Customer status page
 
-Shows only that request: business name and contact buttons, services, vehicle, location, requested/proposed/confirmed time **with timezone**, estimate, policies, the next step, and permitted actions. Contact details are **masked** (e.g., "Phone ending 0142") because links can be forwarded. Never shows internal notes, other customers, or why a time is unavailable.
+Shows only that request with masked contact details (masking is REC-10; the approved requirement is D-25: no private data exposure). Headlines, next steps and actions per state:
 
-| State | Headline | Next step | Actions |
-|---|---|---|---|
-| Pending | Request received — not confirmed yet | "[Business] will confirm, decline, or suggest another time. Check this page for updates." | Withdraw · Call/Text |
-| Pending + hold | Request received — your time is being held | "[Business] is holding Sat, Nov 8, 9:00 AM CT while they review your request. This is not yet a confirmation." | Withdraw · Call/Text |
-| Time proposed | [Business] suggested a different time | "Accept to confirm, or decline and contact them. Held for you until [time]." | **Accept this time** · Decline · Call/Text |
-| Approved / Scheduled | Confirmed for Sat, Nov 8, 9:00 AM CT | Location, prep instructions, cancellation and rescheduling policy | Cancel (before cutoff, if allowed) · Ask to reschedule (before cutoff) · Call/Text |
-| Reschedule asked | Reschedule request sent | "Your appointment is still Sat, Nov 8, 9:00 AM CT until [Business] changes it." | Call/Text |
-| Rescheduled | Time changed — now Sun, Nov 9, 10:00 AM CT | Previous time shown | As Scheduled |
-| Completed | Completed on Nov 8 | — | Call/Text |
-| Declined | [Business] can't take this request | Owner's optional message | Send a new request |
-| Proposal declined / Withdrawn / Expired / Cancelled | Clear past-tense headline, who/what/when | "You can send a new request." | Send a new request · Call/Text |
-| Closed as duplicate | Combined with another request | "[Business] is handling this through another request you sent." | Call/Text |
+| State | Headline | Actions |
+|---|---|---|
+| Pending | Request received — not confirmed yet | Withdraw · Call/Text |
+| Pending + hold | Request received — your time is being held (not a confirmation) | Withdraw · Call/Text |
+| Time proposed | [Business] suggested a different time — held until [time] | **Accept this time** · Decline · Call/Text |
+| Approved / Scheduled | Confirmed for [date, time, TZ] + location, prep, policies | Cancel (before cutoff, if allowed) · Ask to reschedule (REC-04) · Call/Text |
+| Rescheduled | Time changed — now [new time]; previous shown | As Scheduled |
+| Completed | Completed on [date] | Call/Text |
+| Declined / Proposal declined / Withdrawn / Expired / Cancelled / Duplicate | Clear past-tense headline | Send a new request · Call/Text |
 
-The confirmation screen and all default templates include the status link, because DetailerHQ doesn't message customers in the MVP.
+### 6.5 Pending requests and temporary holds (D-16, D-27)
 
-### 6.5 Pending requests and temporary holds
-
-**Default: pending requests do not block availability.** Other customers can request the same time; the owner sees "2 requests for this time".
-
-**Owner-placed temporary hold** (optional, per request):
+**Pending requests never consume capacity or block availability.**
 
 | Rule | Definition |
 |---|---|
-| Who | Owner only, from the request detail ("Hold this time"). Never automatic. |
-| What is held | The request's requested start → end (duration of selected services). Buffers are not part of the hold. |
-| Duration | Owner chooses: 2 h, 12 h, **24 h (default, configurable)**, 48 h, or 72 h (**maximum**). The hold also ends no later than the requested start time. |
-| One per request | A request can have at most one active hold; extending replaces it (still capped at 72 h from the original placement). |
-| Effect | Removed from public availability; shown on the calendar as "Held"; the customer status page shows "your time is being held". |
-| Placement conflicts | A hold **cannot** be placed if it overlaps a confirmed appointment, another active hold, or an outstanding proposal. Enforced by the database (§8.6); the owner sees which item conflicts. |
-| Other requests for a held time | Shown as "Time held for R-0041". They can't be approved for an overlapping time until the hold is released (explicit "Release hold and continue", which records who released it). Proposing a different time remains available. |
-| Manual appointments / reschedules over a hold | Blocked by the same constraint; the UI offers "Release hold and continue" with confirmation. |
-| Approve the held request | Converts the hold into the appointment's block **in the same transaction** — no gap in which another booking could take the time. |
-| Decline / withdraw / close duplicate / expire | Hold released automatically in the same transaction. |
-| Expiry | At `expires_at` the hold stops counting immediately: slot calculation ignores expired holds, and every function that writes schedule blocks first deletes that business's expired holds in the same transaction. A `pg_cron` sweep (every 5 minutes) deletes remaining expired holds and creates a notification: "Hold for R-0041 expired — the request is still pending." |
-| Account restricted | Existing holds keep their expiry; new holds can't be placed. |
+| Who places a hold | Owner only, from the request detail, through an authorized server-side operation (D-24). Never automatic. |
+| What a hold reserves | **One unit of capacity** for the request's interval `[requested_start, requested_end)` (duration of selected services). |
+| Capacity | **Holds are subject to the same capacity check as appointments** (D-27). A hold that would exceed capacity at any instant of its interval is rejected. |
+| Duration | Owner-chosen within limits; ends no later than the requested start. Limits and default are REC-01 (2–72 h, default 24 h). |
+| One per request | At most one active hold or proposal per request (partial unique index). |
+| **Automatic expiry** (D-27) | A hold is active only while `expires_at > now()`. Every capacity check and slot calculation filters on this condition, so an **expired hold stops blocking at its expiry instant with no job needing to run**. |
+| Clean-up | A `pg_cron` sweep (every 5 min) deletes expired hold/proposal rows and creates "Hold expired — request still pending" notifications. Clean-up affects tidiness and notifications only, **not correctness**. |
+| Approve the held request | In one transaction under the capacity lock: the hold row is deleted and the appointment block inserted; the capacity check runs with the hold already removed, so the request does not compete with itself. If the hold had already expired and the capacity was taken meanwhile, approval fails with a clear message. |
+| Decline / withdraw / close duplicate / expire | Hold deleted in the same transaction as the status change (trigger, D-23). |
+| Other requests for a held interval | May still be approved if spare capacity remains. If approving would exceed capacity because of another request's hold, the owner must release that hold explicitly (REC-03). |
+| Restricted account | Existing holds keep their expiry; new holds rejected (`can_write`). |
 
-**Owner proposals** use the same mechanism: proposing creates a block of kind `proposal` that expires at `proposal_expires_at` (default 48 h, configurable 2–72 h, never later than the proposed start minus the minimum notice). Proposal placement has the same conflict rules as holds. If the request had a hold, the proposal replaces it.
+**Owner proposals** create a block of kind `proposal` with `expires_at = proposal_expires_at` (REC-02: default 48 h, 2–72 h, never later than the proposed start minus minimum notice). Same capacity rules as holds; a proposal replaces the request's hold.
 
-### 6.6 Conflicting appointments
+### 6.6 Capacity-aware scheduling (D-26)
 
-**Hard rules — enforced by the database, cannot be overridden:**
+#### 6.6.1 Definitions
 
-1. **No overlap** among a business's schedule blocks: confirmed appointments (Scheduled / In progress, and Completed — see §8.6), active holds and proposals. Enforced by an exclusion constraint on `schedule_blocks` (§8.6). Applies to every path: approve, accept proposal, manual create, reschedule, reopen, hold, propose — including concurrent requests and direct API calls.
-2. Appointment length 15 min – 72 h; `ends_at > starts_at`.
-3. Customer, vehicle, services, request and quote references belong to the same business (composite FKs).
-4. At most one appointment per request (unique `booking_request_id`).
-5. Valid status transitions only (triggers).
+- **Schedule resource:** a pool of capacity. **MVP:** exactly one active resource per business, kind `general`, named "Jobs at the same time".
+- **Capacity `C`:** the maximum number of active blocks that may overlap at any instant on that resource. Integer, minimum 1, maximum per REC-19 (20).
+- **Defaults (D-26):** businesses whose service mode is **mobile** default to **C = 1**. Businesses with a **shop** (shop or both) configure C during onboarding (prefill per REC-16).
+- **Block:** one unit of capacity over a half-open interval `[start, end)` in UTC:
+  - `appointment` — for appointments in `scheduled` or `in_progress`;
+  - `hold` — owner hold, active while unexpired;
+  - `proposal` — owner proposal, active while unexpired.
+- **Active block:** an appointment block, or a hold/proposal block with `expires_at > now()`.
 
-Different businesses never conflict with each other.
+#### 6.6.2 The capacity rule (hard, database-enforced)
 
-**Soft rules — warnings the owner must explicitly confirm:** inside another appointment's buffer; outside working hours; during time off; over the daily job cap; less than minimum notice; in the past.
+> At every instant *t*, the number of active blocks on a resource whose interval contains *t* must be ≤ *C*.
 
-**Public requests** can only select start times passing all hard and soft rules; availability is re-checked at submission and at approval. If approval hits a hard conflict, the owner is offered **Propose a different time**. If a customer accepts a proposal that is no longer possible (only if the owner released it), the acceptance fails safely, the request returns to `pending`, the customer sees "This time is no longer available — [Business] will contact you", and the owner is notified.
+- **Duration is respected:** intervals are `[starts_at, ends_at)`, so a 4-hour job counts during its whole 4 hours; back-to-back jobs (`end = start`) do not overlap.
+- **Buffers are not part of the hard rule** (REC-14): they are a soft warning and are applied when computing public slots.
+- Different businesses never affect each other.
+
+#### 6.6.3 Enforcement under concurrency
+
+The revision-3 exclusion constraint can only express C = 1, so it is replaced by:
+
+1. **All writes to `schedule_blocks`** happen only inside database functions and triggers owned by the schema owner (owners and public callers have no direct write privilege — D-24).
+2. A **`BEFORE INSERT OR UPDATE` trigger on `schedule_blocks`** (and the same check inside each scheduling function) performs, in order:
+   1. `SELECT … FROM schedule_resources WHERE id = NEW.resource_id FOR UPDATE` — locks the resource row, **serializing every capacity-affecting write for that resource**. Concurrent transactions wait; after the first commits, the second re-reads current blocks.
+   2. Computes **peak usage** over `NEW.during` among active blocks of the same resource, excluding the row being updated and any row being replaced in the same operation (e.g., the hold being converted).
+   3. Rejects with a named error (`capacity_exceeded`, including the first instant at which the limit is reached) if `peak + 1 > C`.
+3. **Peak usage algorithm:** usage only increases at block starts, so the maximum over `[s, e)` occurs at `s` or at the start of an overlapping block inside `(s, e)`. Candidate instants = `{s} ∪ {lower(b) : b active, b overlaps [s,e), lower(b) > s}`; usage(t) = count of active blocks with `lower(b) ≤ t < upper(b)`; peak = max over candidates. Indexed by `(resource_id, during)`.
+4. **Lock order** (avoids deadlocks): every operation that touches scheduling locks **resource → booking request → appointment**, in that order. Customer withdrawal, owner approval, reschedule and cancel all follow it.
+5. **Transaction time:** "active" uses `now()` (the transaction's start time). Transactions are single short function calls, so the difference from wall-clock time is negligible; a hold expiring during a transaction is treated as active for that transaction (conservative).
+6. **One operation = one database function call = one transaction.** The application never composes multi-step scheduling changes from separate calls, so connection pooling in transaction mode is safe (V-9).
+7. **Why not `SERIALIZABLE` isolation?** It would also be correct but requires retry handling on every caller; an explicit row lock gives deterministic behavior at small-business throughput. (Recorded as an alternative, not chosen.)
+
+#### 6.6.4 Capacity changes
+
+- **Increase:** always allowed; takes the resource lock.
+- **Decrease:** allowed only if future peak usage (from now) never exceeds the new C; otherwise rejected with the list of over-capacity times so the owner can reschedule first (REC-15). Existing appointments are never silently invalidated.
+- Changing service mode to mobile-only does not silently change C; the owner is asked (REC-17 / open question Q-5).
+
+#### 6.6.5 Lifecycle effects on capacity
+
+| Event | Block effect |
+|---|---|
+| Approve (direct or via accepted proposal) | Insert appointment block (hold/proposal removed in same transaction) |
+| Manual appointment | Insert appointment block |
+| Reschedule | Update block interval; capacity re-checked excluding itself |
+| Start (`in_progress`) | No change |
+| Complete | **Block deleted** (REC-18) — frees capacity if finished early |
+| Reopen completed → scheduled | Block re-inserted with capacity check |
+| Cancel / No-show | Block deleted |
+| Hold placed / released / expired | Insert / delete / ignored then swept |
+| Proposal created / accepted / declined / expired | Insert / converted / delete / ignored then swept |
+
+#### 6.6.6 Soft rules (warnings the owner explicitly confirms)
+
+Inside another job's buffer (when C = 1, or when the overlapping job uses the last unit); outside working hours; during time off; over the daily job cap; less than minimum notice; in the past.
+
+#### 6.6.7 Public slots
+
+A start time is offered only if, for its interval (plus buffers around existing jobs), peak usage + 1 ≤ C and all soft rules pass. The public page never reveals capacity, usage or other customers. Availability is re-checked at submission and at approval.
 
 ### 6.7 Duplicate submissions
 
 | Case | Handling |
 |---|---|
-| Double-click / retry | Idempotency key per form session; unique `(business_id, idempotency_key)`; resubmission returns the original status link |
-| Same contact, same vehicle description, overlapping or same-day time, while another request is open | Accepted, flagged **"Possible duplicate"** and linked; owner may **Close as duplicate** |
-| Same contact, **different vehicle** | Not a duplicate; shown as **"Related request — same customer"** (e.g., two family cars) |
-| More than 3 open requests per contact per business | Rejected with a generic message showing the business's phone — never revealing other requests |
-| Automated spam | Rate limits, honeypot, minimum completion time (§9.4) |
-| Same person, different businesses | Unrelated; never linked |
+| Double-click / retry | Idempotency key; unique `(business_id, idempotency_key)`; same status link returned |
+| Same contact, same vehicle description, overlapping or same-day time, another request open | Accepted, flagged "Possible duplicate"; owner may close as duplicate |
+| Same contact, different vehicle | "Related request — same customer" (not a duplicate) |
+| More than N open requests per contact per business | Generic rejection showing business phone (N = 3 per REC-05) |
+| Spam | Rate limits, honeypot, minimum completion time (§9.4) |
+| Same person, different businesses | Unrelated |
 
 ### 6.8 Expiry
 
 | Item | Rule | Mechanism |
 |---|---|---|
-| Pending request | Expires when the requested start passes without a decision | `pg_cron` every 5 min; also treated as expired on read |
-| Proposal | Expires at `proposal_expires_at`; request → `expired` | Same |
-| Hold | Expires at `expires_at`; request stays pending | Lazy purge + 5-min sweep |
-| Quote | Sent → Expired after `valid_until` (end of that day, business timezone) | Daily job |
-| Unlinked closed requests | Purged after 12 months (§12.5) | Daily job |
+| Pending request | Expires when requested start passes | `pg_cron` every 5 min; treated as expired on read |
+| Proposal | Expires at `proposal_expires_at`; request → `expired` | Same; capacity ignored immediately at expiry |
+| Hold | Inactive at `expires_at`; request stays pending | Filter in every check; sweep for clean-up and notification |
+| Quote | Sent → Expired after `valid_until` (business-local end of day) | Daily job |
 
-### 6.9 Cancellation and rescheduling policies
-
-Each business configures (onboarding step 4 and `/app/settings/policies`):
+### 6.9 Cancellation and rescheduling policies (D-17)
 
 | Setting | Suggested default | Range |
 |---|---|---|
 | Customers can cancel online | On | On / Off |
-| Cancellation cutoff | **24 h** before start (suggested, not required) | 0–168 h |
-| Rescheduling cutoff (for "Ask to reschedule") | **24 h** (suggested) | 0–168 h |
-| Cancellation policy text | Blank, with a neutral example the owner may adapt | ≤ 1,000 chars |
-| Rescheduling policy text | Blank, with a neutral example | ≤ 1,000 chars |
+| Cancellation cutoff | 24 h (suggestion only) | 0–168 h |
+| Rescheduling cutoff (for "Ask to reschedule", REC-04) | 24 h (suggestion only) | 0–168 h |
+| Policy texts | Blank with neutral examples | ≤ 1,000 chars each |
 
-Rules:
-
-- **Customer cancel:** allowed before the cutoff if enabled; frees the slot; owner notified. After the cutoff: policy text + call/text buttons. Exactly at the cutoff counts as *after*.
-- **Customer withdraw** (pending / time proposed): always allowed.
-- **Ask to reschedule:** before the rescheduling cutoff, the customer can send a preferred new time (from available slots) or a note. This creates a notification and an activity entry; **the appointment doesn't change** until the owner reschedules it.
-- **Owner reschedule / cancel:** always allowed (owner is not bound by customer cutoffs); hard rules apply; previous time kept in history; status page updated; owner prompted to inform the customer with a template.
-- Policies are informational and procedural only — **no fees are charged** (no payments in the MVP). Policy changes apply to future evaluations; the status page shows the current policy.
+- Customer cancel: before cutoff if enabled; exactly at cutoff counts as after; frees capacity; owner notified.
+- Customer withdraw (pending / time proposed): always allowed; releases any hold.
+- Owner reschedule/cancel: always allowed; capacity and hard rules enforced; history kept; status page updated.
+- No fees — no payments in the MVP (D-9).
 
 ### 6.10 Time zones and daylight-saving time
 
-1. Each business has one IANA timezone from a **US allow-list** (`America/New_York`, `America/Detroit`, `America/Indiana/Indianapolis`, `America/Chicago`, `America/Denver`, `America/Boise`, `America/Phoenix`, `America/Los_Angeles`, `America/Anchorage`, `Pacific/Honolulu`, and other US IANA zones), enforced by a check constraint.
-2. Instants stored as `timestamptz` (UTC). Working hours stored as local wall-clock `time` per weekday and interpreted in the business timezone.
-3. Public pages always display the business timezone ("Times are in Central Time (CT)") and warn if the visitor's device zone differs. Customer-facing times always include the abbreviation.
-4. **Spring forward:** non-existent local times are never offered; durations are real elapsed time.
-5. **Fall back:** repeated local times are distinct instants, labelled with abbreviation.
-6. `America/Phoenix` and `Pacific/Honolulu` (no DST) covered by tests.
-7. **Timezone change:** existing appointments, holds and time off keep absolute instants; working hours keep wall-clock values; owner sees affected future items and confirms.
-8. "Today", daily caps, analytics periods, quote expiry dates use the business's local day. Cutoffs and expiries compare UTC instants.
+1. One IANA timezone per business from a US allow-list (check constraint).
+2. Instants in `timestamptz`; working hours as local wall-clock times interpreted in the business zone.
+3. Customer-facing times always show the zone abbreviation; public pages state the business zone and warn when the visitor's device differs.
+4. Spring-forward gap times are never offered; durations are real elapsed time. Fall-back repeated times are distinct instants.
+5. Capacity intervals are UTC instants, so DST transitions do not affect overlap counting; a job spanning a transition counts for its real duration.
+6. Changing the business timezone keeps instants; owner confirms a list of affected future items.
+7. Local-day concepts (today, daily cap, analytics periods, quote expiry) use the business zone.
 
 ### 6.11 Edge-case catalogue
 
 | # | Scenario | Expected behavior |
 |---|---|---|
-| E1 | Two owners' sessions (same owner, two devices) approve overlapping requests simultaneously | Exactly one succeeds; the other gets a conflict message (exclusion constraint) |
-| E2 | Customer submits; slot taken before submission completes | Submission rejected with "This time was just taken", other times offered |
-| E3 | Customer double-taps Send | One request (idempotency) |
-| E4 | Same customer requests two different cars for the same morning | Two requests, marked "Related"; can't both be confirmed if they overlap (hard rule) |
-| E5 | Owner holds request A; request B wants overlapping time | B shows "Time held for A"; B can be proposed elsewhere, declined, or approved after releasing A's hold |
-| E6 | Hold expires while owner is mid-approval | Approval re-checks within the transaction; succeeds if still free, otherwise conflict message |
-| E7 | Customer accepts proposal one minute after expiry | Rejected: "This suggestion expired"; request already `expired` |
-| E8 | Customer withdraws while owner is approving | Whichever commits first wins; the other sees a state-changed message (status trigger + row lock) |
-| E9 | Requested time falls in the spring-forward gap | Never offered; direct submission with such a time rejected by validation |
-| E10 | Appointment 1:30 AM on fall-back night | Stored as a single instant; displayed with abbreviation |
-| E11 | Business changes timezone with future appointments | Warning; instants preserved |
-| E12 | Customer tries to cancel exactly at the cutoff | Not allowed; policy shown |
-| E13 | Customer cancels; another pending request wanted that time | Slot free again; owner sees the other request is now approvable |
-| E14 | Owner reschedules onto a held time | Blocked; "Release hold and continue" offered |
-| E15 | Service archived after request submitted | Request keeps snapshot; approval still works; appointment items from snapshot |
-| E16 | Business pauses booking page with pending requests | Pending requests remain actionable; status pages still work |
-| E17 | Account becomes restricted with pending requests | Owner can't act (read-only); requests expire normally; status pages explain the business will contact them |
-| E18 | Customer forwards status link | Recipient sees masked contact details only; actions limited to that request |
-| E19 | Owner deletes the linked customer | Appointment anonymized; request contact snapshot purged; status page shows generic status only |
-| E20 | Invalid / guessed token | Generic "This link isn't valid" (no distinction between wrong and expired) |
+| E1 | Two approvals compete for the last unit of capacity at the same moment | Resource lock serializes; exactly one succeeds; the other receives `capacity_exceeded` |
+| E2 | Shop with C = 3; three 9–1 jobs booked; a 12–2 request arrives | Rejected for 12–1 (peak 3); a 1–3 request succeeds |
+| E3 | C = 2; jobs 9–11 and 10–12; new job 10:30–10:45 | Rejected (peak 2 at 10:30); new job 11–11:30 accepted (peak 1 at 11) |
+| E4 | Customer submits; slot fills before submission completes | Rejected with "This time was just taken", other times offered |
+| E5 | Double-tap submit | One request |
+| E6 | Owner holds request A on C = 1; request B overlaps | B cannot be approved for that interval unless A's hold is released (REC-03); B can be proposed elsewhere or declined |
+| E7 | Hold expires while the owner is approving another overlapping request | Expired hold is not counted; approval succeeds if capacity allows |
+| E8 | Owner approves held request after the hold expired and someone else booked the last unit | Approval fails clearly; owner can propose another time |
+| E9 | Customer accepts a proposal after it expired | Rejected; request already expired |
+| E10 | Customer withdraws while owner approves | Lock order serializes; whichever commits first wins; the other gets a state-changed message |
+| E11 | Owner lowers capacity from 3 to 2 with three overlapping future jobs | Rejected with the conflicting times |
+| E12 | Owner reschedules a job into a full interval | Rejected; block unchanged |
+| E13 | Job completes 2 hours early | Block deleted at completion; capacity free for the rest of the interval |
+| E14 | Multi-day coating (48 h) at a C = 3 shop | Consumes one unit for 48 h; other jobs continue with 2 units |
+| E15 | Spring-forward gap / fall-back repeated hour | Gap never offered; repeated hour distinct instants |
+| E16 | Timezone change with future appointments | Warning; instants preserved |
+| E17 | Customer cancels exactly at cutoff | Not allowed; policy shown |
+| E18 | Account restricted with pending requests and active holds | Owner read-only; holds expire normally; requests expire normally |
+| E19 | Forwarded status link | Only that request; masked contact details |
+| E20 | Owner calls a scheduling function directly via the Data API with their own session | Same authorization and capacity checks apply as from the app (§9.3, REC-20) |
+| E21 | Attempt to insert a schedule block directly through the Data API | Permission denied (no write privilege) |
+| E22 | Guessed or invalid token | Generic "This link isn't valid" |
 
 ---
 
@@ -431,57 +439,27 @@ Rules:
 
 ### 7.1 Sign-up, activation and onboarding
 
-1. **Pilot:** operator issues an invite code; owner signs up and accepts pilot terms. **Paid launch:** open sign-up.
-2. Owner verifies email (Supabase Auth).
-3. Owner completes onboarding step 1 (business profile). **Activation = email verified AND business created.** At activation: pilot accounts → `pilot`; paid-launch accounts → `trialing` with `trial_ends_at = activated_at + 7 days`.
-4. Remaining steps; publish requires activation.
+Pilot: invite → sign-up → accept pilot terms. Paid launch: open sign-up. Email verification via Supabase Auth. **Activation = email verified AND business created** (D-14). At activation: pilot accounts → `pilot`; paid-launch accounts → `trialing` with `trial_ends_at = activated_at + 7 days`. During onboarding the business's general schedule resource is created with C = 1 for mobile-only businesses or the owner's chosen capacity for shops.
 
 ### 7.2 Owner handles a request
 
-Open request → review conflicts, duplicates/related requests, hold status → choose:
-
-- **Approve** → link or create customer, then select or create **that customer's vehicle** → appointment created.
-- **Hold this time** → choose duration → status page shows hold.
-- **Propose a different time** → time + optional message + expiry.
-- **Decline** → optional customer message, internal reason, optional "Save as lead".
-- **Close as duplicate**.
-
-Then the **Let the customer know** panel: template with `{status_link}`, Copy / Open in Messages / Open in Mail / Call, followed by **"Did you send it?"** (logs a communication only on Yes). DetailerHQ sends nothing.
+Open request → see capacity status for the requested interval ("1 of 3 jobs in use 9–1"), soft warnings, duplicates/related requests, hold status → Approve (link customer, then that customer's vehicle) · Hold · Propose · Decline (optional "Save as lead") · Close duplicate. Then the **Let the customer know** panel (template with `{status_link}`; Copy / Open in Messages / Open in Mail / Call; "Did you send it?" logs a communication only on Yes). DetailerHQ sends nothing (D-6).
 
 ### 7.3 Day of the job
 
-Today → next job (map link, call/text, vehicle, notes, last visit) → Start → Complete with **recorded amounts per line** and optional payment note ("Recorded amounts are for your records. DetailerHQ doesn't process payments or calculate tax.") → follow-up rules create tasks.
+Today → jobs in time order (concurrent jobs grouped) → Start → Complete with recorded amounts per line and optional payment note ("Recorded amounts are for your records. DetailerHQ doesn't process payments or calculate tax.") → follow-up rules create tasks.
 
 ### 7.4 Customers and vehicles
 
-- Create customers manually with name and at least one of phone/email; add **any number of vehicles** (year, make, model, trim, color, size class, optional plate, notes).
-- Vehicles can be archived (sold car) without affecting history.
-- Manual appointments and quotes always select one specific vehicle (or create one inline).
-- De-duplication suggestions search **only within the business**.
+Manual creation; any number of vehicles per customer (D-15); archive sold vehicles; appointments and quotes reference exactly one vehicle; de-duplication within the business only.
 
 ### 7.5 Leads and quotes
 
-Leads (from inquiries, declined requests saved as leads, or manual entry) are separate from booking requests.
-
-| Lead status | Transition |
-|---|---|
-| New | On creation |
-| Contacted | Manual, or first outbound communication logged on a New lead |
-| Quote sent | A linked quote is marked Sent |
-| Follow-up due | `next_follow_up_at` passed with no inbound communication since (daily job) or manual |
-| Booked | An appointment created from the lead or its accepted quote |
-| Lost | Manual, with reason |
-
-Quotes: owner-defined line items (from services or custom), vehicle, valid-until, notes, terms, optional discount. **No tax calculation** (owners can add a custom line item if they wish; the product performs no tax computation). Statuses Draft → Sent → Accepted / Declined / Expired. Accepted → "Schedule it" pre-fills an appointment.
-
-**Quoted value** (quote total), **booked job value** (appointment estimate) and **recorded revenue** (completed appointment recorded amounts) are stored separately and never overwrite each other.
+Leads separate from requests (D-5): New → Contacted → Quote sent → Follow-up due → Booked / Lost. Quotes Draft → Sent → Accepted / Declined / Expired; no tax calculation (D-9). Quoted value, booked job value and recorded revenue stored separately.
 
 ### 7.6 Follow-ups and templates
 
-- Tasks with due date, linked record, status, outcome (Responded / No response / Booked / Not interested / Other).
-- Automatic rules (editable, can be disabled): quote sent → follow-up in 3 days; appointment completed → maintenance reminder after the service's interval (blank by default); request pending > 24 h → respond; hold expiring in < 2 h → decide; optional day-before reminder task.
-- Templates with placeholders (`{customer_first_name}`, `{business_name}`, `{business_phone}`, `{service_names}`, `{vehicle}`, `{appointment_date}`, `{appointment_time}`, `{appointment_address}`, `{proposed_time}`, `{hold_until}`, `{status_link}`, `{quote_link}`, `{quote_total}`, `{quote_valid_until}`, `{cancellation_policy}`), default texts with no prices or claims; missing values block copying until edited.
-- Communication log entries are created manually or after "Did you send it? → Yes". Never auto-claimed.
+Tasks with outcomes; automatic rules (quote follow-up, maintenance reminder, pending request > 24 h, hold expiring < 2 h); editable templates with placeholders; communication log entries only manual or after "Did you send it? → Yes".
 
 ### 7.7 Export, closure and deletion
 
@@ -489,31 +467,40 @@ See §12.6.
 
 ---
 
-## 8. Database schema and relationships
+## 8. Database schema, permissions and relationships
 
-Conceptual schema for PostgreSQL on Supabase. Column types are indicative; final DDL is written during Phase 0 and reviewed before use.
+Conceptual schema for PostgreSQL on Supabase. Final DDL is written in Phase 1 and reviewed before use.
 
 ### 8.1 Conventions
 
-- Every **business-owned table** has `business_id uuid not null` and `unique (business_id, id)` so other tables can reference `(business_id, id)`.
-- **All references between business-owned tables are composite foreign keys including `business_id`.** No polymorphic `related_type/related_id` columns — each optional link is its own nullable composite FK.
-- `id uuid` primary keys (random). Display numbers (`R-0042`, `Q-0012`, `A-0107`) from a per-business counter.
-- `created_at`, `updated_at` (`timestamptz`), `created_by uuid` where applicable.
-- `business_id` and snapshot columns are **immutable** (trigger).
-- Money: `integer` cents, USD. Durations: `integer` minutes. Phones: E.164 US (`+1…`). Emails: `citext`.
-- Status columns use Postgres enums; transitions validated by triggers.
+- Every **business-owned table** has `business_id uuid not null` and `unique (business_id, id)`.
+- **All references between business-owned tables are composite foreign keys including `business_id`** (D-23). No polymorphic links.
+- Random UUID primary keys; per-business display numbers from `business_counters`.
+- `timestamptz` instants; integer cents (USD); integer minutes; E.164 US phones; `citext` emails.
+- `business_id` and snapshot columns immutable (trigger).
+- Status enums with transition triggers.
+- Functions: `SECURITY DEFINER` only where required; always `SET search_path = ''` with fully qualified names (V-4).
 
-### 8.2 Database roles and schemas
+### 8.2 Schemas and database roles (D-21, D-22)
 
-| Role / schema | Purpose | Privileges |
-|---|---|---|
-| `public` schema (exposed through Supabase Data API) | Business-owned tables | RLS enabled **and forced** on every table |
-| `app` schema (not exposed) | Helper functions (`is_member`, `can_write`), triggers, internal functions | — |
-| `public_api` schema (not exposed) | `SECURITY DEFINER` functions for the public booking page, slots, submissions, token actions | `EXECUTE` granted **only** to `booking_api` |
-| `anon` | Browser-visible Supabase role | **No** privileges on any application table, view, sequence or function |
-| `authenticated` | Signed-in owners via Data API | Table privileges limited per table (below); every row filtered by RLS |
-| `booking_api` | Custom login role used **only by our server** for public operations | `EXECUTE` on `public_api` functions only; no table privileges |
-| `service_role` | Supabase admin | **Not used by the web app**; operator scripts only |
+| Object | Purpose |
+|---|---|
+| `public` schema (exposed through Data API) | Business-owned tables and owner-callable workflow functions |
+| `app` schema (not exposed) | Helper functions (`is_member`, `can_write`, capacity check), trigger functions |
+| `public_api` schema (not exposed) | Public booking functions used only by the restricted server path |
+
+| Role | Privileges (everything not listed is revoked) |
+|---|---|
+| `anon` | **None** on any application table, view, sequence or function. Used only by Supabase Auth flows. |
+| `authenticated` | `SELECT` on business-owned tables (filtered by RLS). `INSERT/UPDATE/DELETE` only on non-scheduling tables listed in §8.4. **No write privilege** on `schedule_resources`, `schedule_blocks`, `appointments`, `appointment_items`, `booking_requests`, `booking_request_items`, `activity_events`, `audit_events`, billing tables. `UPDATE (read_at)` only on `notifications`. `EXECUTE` on owner workflow functions (§8.5). |
+| Restricted public role (`booking_api`, mechanism REC-13) | `EXECUTE` on `public_api` functions only. No table, view or sequence privileges. Connection limit and `statement_timeout` set. |
+| `service_role` | Not used by the deployed application (unless the fallback in REC-13 is explicitly approved). Operator scripts only. |
+| Schema owner (migration role) | Owns tables and definer functions. Not used by the application at runtime. |
+| `PUBLIC` pseudo-role | `EXECUTE` revoked on all functions; no schema `CREATE`. |
+
+**Default privileges (D-22):** migrations run `ALTER DEFAULT PRIVILEGES` (for the role that creates objects) to revoke all table, sequence and function privileges from `anon`, `authenticated` and `PUBLIC` in `public`, `app` and `public_api`; each migration then grants exactly the privileges in the table above. Which roles currently receive default grants on Supabase, and which role runs migrations, must be confirmed (V-1, V-2).
+
+**Other Supabase surfaces:** GraphQL (`pg_graphql`) disabled or confirmed to obey the same grants (V-3); business tables excluded from Realtime publications; no Storage buckets.
 
 ### 8.3 Tables
 
@@ -521,18 +508,25 @@ Conceptual schema for PostgreSQL on Supabase. Column types are indicative; final
 
 | Table | Key columns and constraints |
 |---|---|
-| `businesses` | `id`; `name`; `slug citext unique` (3–40, `^[a-z0-9-]+$`, reserved words blocked); `phone_e164`; `email`; `timezone` (US allow-list check); `service_mode enum(mobile, shop, both)`; `service_area_text`; `shop_address_*`; `accepting_requests bool`; `published_at`; `account_status enum(pending_activation, pilot, trialing, active, past_due, trial_expired, inactive, cancelled, suspended, closing)`; `activated_at`; `pilot_ends_at`; `trial_started_at`; `trial_ends_at`; `access_restricted_at`; `closure_requested_at`; `deletion_scheduled_for` |
-| `memberships` | `business_id → businesses`, `user_id → auth.users`, `role enum(owner)`; PK `(business_id, user_id)`; `unique (user_id)` in MVP |
-| `pilot_invites` | `code_hash unique`, `email`, `expires_at`, `used_at`, `used_by` — operator-managed; no `authenticated` access |
-| `business_counters` | `(business_id, kind)` PK, `next_value` — numbering for requests, appointments, quotes |
+| `businesses` | `id`; `name`; `slug citext unique` (3–40, pattern, reserved words); `phone_e164`; `email`; `timezone` (US allow-list); `service_mode enum(mobile, shop, both)`; `service_area_text`; `shop_address_*`; `accepting_requests`; `published_at`; `account_status enum(pending_activation, pilot, trialing, active, past_due, trial_expired, inactive, cancelled, suspended, closing)`; `activated_at`; `pilot_ends_at`; `trial_started_at`; `trial_ends_at`; `access_restricted_at`; `closure_requested_at`; `deletion_scheduled_for` |
+| `memberships` | PK `(business_id, user_id)`; `role enum(owner)`; `unique (user_id)` in MVP |
+| `pilot_invites` | `code_hash unique`, `email`, `expires_at`, `used_at` — operator only |
+| `business_counters` | PK `(business_id, kind)`, `next_value` |
+
+**Scheduling (D-26, D-27)**
+
+| Table | Key columns and constraints |
+|---|---|
+| `schedule_resources` | `id`; `business_id`; `unique (business_id, id)`; `kind enum(general)` (later: `staff`, `bay`, `equipment`); `name`; `capacity smallint check (capacity between 1 and 20)` (upper bound REC-19); `active bool`; partial unique `(business_id) where kind = 'general' and active` — exactly one active general resource per business in MVP |
+| `schedule_blocks` | `id`; `business_id`; `(business_id, resource_id) → schedule_resources`; `kind enum(appointment, hold, proposal)`; `during tstzrange not null` (non-empty, finite bounds, `[)`, length 15 min–72 h); `(business_id, appointment_id) → appointments` unique; `(business_id, booking_request_id) → booking_requests`; `expires_at`; `created_by`; checks: `kind = appointment` ⇔ `appointment_id not null and expires_at is null`; `kind in (hold, proposal)` ⇔ `booking_request_id not null and expires_at not null and appointment_id is null`; partial unique `(booking_request_id) where kind in (hold, proposal)`; GiST index on `(resource_id, during)` (requires `btree_gist`, V-11) or GiST on `during` + B-tree on `resource_id` |
 
 **Configuration**
 
 | Table | Key columns and constraints |
 |---|---|
-| `booking_settings` | `business_id` PK/FK; `slot_interval_min` (15–240); `min_notice_min`; `horizon_days` (1–365); `buffer_min` (0–240); `max_jobs_per_day` (nullable); `default_hold_hours` (default 24; 2–72); `proposal_expiry_hours` (default 48; 2–72); `customer_can_cancel bool`; `cancel_cutoff_hours` (default 24; 0–168); `reschedule_cutoff_hours` (default 24; 0–168); `cancellation_policy_text`; `reschedule_policy_text`; `intro_text`; `prep_instructions` |
-| `availability_rules` | `business_id`; `weekday smallint 0–6`; `start_time time`; `end_time time`; check `end_time > start_time` |
-| `time_off` | `business_id`; `during tstzrange`; `all_day bool`; `label` |
+| `booking_settings` | `business_id` PK; `slot_interval_min`; `min_notice_min`; `horizon_days`; `buffer_min`; `max_jobs_per_day`; `default_hold_hours`; `proposal_expiry_hours`; `customer_can_cancel`; `cancel_cutoff_hours` (default 24, 0–168); `reschedule_cutoff_hours` (default 24, 0–168); policy texts; `intro_text`; `prep_instructions` |
+| `availability_rules` | `business_id`; `weekday`; `start_time`; `end_time` |
+| `time_off` | `business_id`; `during tstzrange`; `all_day`; `label` |
 | `vehicle_size_classes` | `business_id`; `name`; `examples`; `sort_order`; `archived_at` |
 | `service_categories` | `business_id`; `name`; `sort_order` |
 | `services` | `business_id`; `(business_id, category_id) → service_categories`; `name`; `description`; `price_type enum(fixed, starting_at, quote_required)`; `base_price_cents` (required unless `quote_required`; ≥ 0); `base_duration_min` (15–4320); `is_addon`; `is_bookable`; `follow_up_after_days`; `sort_order`; `archived_at` |
@@ -543,87 +537,106 @@ Conceptual schema for PostgreSQL on Supabase. Column types are indicative; final
 
 | Table | Key columns and constraints |
 |---|---|
-| `customers` | `business_id`; `first_name`; `last_name`; `phone_e164`; `email`; check (`phone_e164` or `email` not null, unless `anonymized_at` set); `preferred_contact enum(call, text, email)`; `address_*` (nullable); `notes`; `source enum`; `archived_at`; `anonymized_at`; indexes on `(business_id, phone_e164)`, `(business_id, email)`, trigram on name |
-| `vehicles` | `business_id`; `(business_id, customer_id) → customers`; `unique (business_id, customer_id, id)`; `year smallint` (1900–next year + 1); `make`; `model`; `trim`; `color`; `(business_id, size_class_id) → vehicle_size_classes`; `plate`; `notes`; `archived_at` |
+| `customers` | `business_id`; names; `phone_e164`; `email`; check phone or email unless anonymized; `preferred_contact`; address (nullable); `notes`; `source`; `archived_at`; `anonymized_at` |
+| `vehicles` | `business_id`; `(business_id, customer_id) → customers`; `unique (business_id, customer_id, id)`; year/make/model/trim/color; `(business_id, size_class_id)`; `plate`; `notes`; `archived_at` |
 
 **Booking**
 
 | Table | Key columns and constraints |
 |---|---|
-| `booking_requests` | `business_id`; `number`; `status enum`; `token_hash bytea unique`; `idempotency_key uuid`, `unique (business_id, idempotency_key)`; `requested_start`, `requested_end timestamptz`; `alternate_start`; `location_type enum(mobile, shop)`; `service_address_*`; contact snapshot (`contact_first_name`, `contact_last_name`, `contact_phone_e164`, `contact_email`, `preferred_contact`); **vehicle snapshot** (`vehicle_year`, `vehicle_make`, `vehicle_model`, `vehicle_color`, `(business_id, vehicle_size_class_id) → vehicle_size_classes`, `vehicle_notes`) — **required**; `customer_notes`; `consent_at not null`; `estimated_total_cents`; `estimated_duration_min`; `customer_id`, `vehicle_id` with FKs `(business_id, customer_id) → customers` and `(business_id, customer_id, vehicle_id) → vehicles(business_id, customer_id, id)`; check: `status = 'approved'` ⇒ both not null; `(business_id, duplicate_of_id) → booking_requests`; `proposed_start`, `proposed_end`, `proposal_message`, `proposal_expires_at`; `decline_message`; `decline_reason`; `reschedule_note`; `decided_at`, `decided_by`; `ip_hash` |
-| `booking_request_items` | `business_id`; `(business_id, booking_request_id) → booking_requests`; `(business_id, service_id) → services`; snapshot `name`, `price_type`, `price_cents`, `duration_min`, `is_addon` |
-| `appointments` | `business_id`; `number`; `(business_id, customer_id) → customers`; **`vehicle_id not null`** with `(business_id, customer_id, vehicle_id) → vehicles(business_id, customer_id, id)`; `(business_id, booking_request_id) → booking_requests`, `unique (booking_request_id)`; `(business_id, quote_id) → quotes`; `(business_id, lead_id) → leads`; `starts_at`, `ends_at` (check 15 min–72 h); `location_type`; `service_address_*`; `status enum(scheduled, in_progress, completed, cancelled, no_show)`; `estimated_total_cents`; `recorded_total_cents`; `payment_note enum(not_recorded, unpaid, paid_cash, paid_card, paid_transfer, paid_other)`; `cancelled_by enum(customer, business)`; `cancelled_at`; `cancel_reason`; `customer_message`; `reschedule_requested_at`; `completed_at`; `internal_notes` |
-| `appointment_items` | `business_id`; `(business_id, appointment_id) → appointments`; `(business_id, service_id) → services` (nullable for custom lines); `name`; `quantity`; `estimated_price_cents`; `recorded_price_cents`; `duration_min` |
-| `schedule_blocks` | `business_id`; `kind enum(appointment, hold, proposal)`; `during tstzrange not null` (non-empty, `[)` bounds); `(business_id, appointment_id) → appointments` unique, required iff `kind = appointment`; `(business_id, booking_request_id) → booking_requests`, required for `hold`/`proposal`; `expires_at` required for `hold`/`proposal`, null for `appointment`; `created_by`; **`EXCLUDE USING gist (business_id WITH =, during WITH &&)`** (requires `btree_gist`); partial unique: one hold/proposal per request |
+| `booking_requests` | `business_id`; `number`; `status`; `token_hash unique`; `idempotency_key` with `unique (business_id, idempotency_key)`; `requested_start/end`; `alternate_start`; `location_type`; service address; contact snapshot; **required vehicle snapshot** incl. `(business_id, vehicle_size_class_id)`; `customer_notes`; `consent_at`; `estimated_total_cents`; `estimated_duration_min`; `(business_id, customer_id) → customers`; `(business_id, customer_id, vehicle_id) → vehicles(business_id, customer_id, id)`; check approved ⇒ customer & vehicle set; `(business_id, duplicate_of_id)`; proposal fields; decline fields; `decided_at/by`; `ip_hash` |
+| `booking_request_items` | Composite FKs to request and service; snapshots |
+| `appointments` | `business_id`; `number`; `(business_id, customer_id)`; `vehicle_id not null` with `(business_id, customer_id, vehicle_id) → vehicles(…)`; `(business_id, booking_request_id)` unique; `(business_id, quote_id)`; `(business_id, lead_id)`; `starts_at`, `ends_at` (15 min–72 h); location; `status`; `estimated_total_cents`; `recorded_total_cents`; `payment_note`; cancellation fields; `completed_at`; `internal_notes` |
+| `appointment_items` | Composite FKs; estimated and recorded prices |
 
 **Leads, quotes, follow-ups**
 
 | Table | Key columns and constraints |
 |---|---|
-| `leads` | `business_id`; `status enum(new, contacted, quote_sent, follow_up_due, booked, lost)`; `source enum(booking_page, phone, text, instagram, facebook, google, referral, walk_in, repeat, other)`; `lost_reason enum`; contact snapshot; `(business_id, customer_id) → customers`; `(business_id, customer_id, vehicle_id) → vehicles`; `vehicle_description`; `request_text`; `(business_id, booking_request_id) → booking_requests` (if saved from a declined request); `next_follow_up_at`; `last_inbound_at` |
-| `quotes` | `business_id`; `number`; `status enum(draft, sent, accepted, declined, expired)`; `(business_id, lead_id) → leads`; `(business_id, customer_id) → customers`; `(business_id, customer_id, vehicle_id) → vehicles`; `vehicle_text`; `valid_until date`; `notes`; `terms`; `subtotal_cents`; `discount_cents`; `total_cents` (check = subtotal − discount ≥ 0); `token_hash unique`; `sent_at`; `decided_at`. **No tax columns.** |
-| `quote_items` | `business_id`; `(business_id, quote_id) → quotes`; `(business_id, service_id) → services` nullable; `name`; `description`; `quantity`; `price_cents`; `duration_min` |
-| `tasks` | `business_id`; `title`; `due_at`; `status enum(open, done, dismissed)`; `outcome enum`; `kind enum(manual, rule)`; `rule_key`; `dedupe_key`, `unique (business_id, dedupe_key)`; optional composite FKs to `customers`, `leads`, `quotes`, `appointments`, `booking_requests` |
-| `communications` | `business_id`; `channel enum(call, text, email, instagram, facebook, in_person, other)`; `direction enum(inbound, outbound)`; `occurred_at`; `summary`; `(business_id, template_id) → message_templates`; optional composite FKs to `customers`, `leads`, `quotes`, `appointments`, `booking_requests`; check at least one of `customer_id`, `lead_id` |
-| `notes` | `business_id`; `body`; optional composite FKs as above |
+| `leads` | `business_id`; `status enum(new, contacted, quote_sent, follow_up_due, booked, lost)`; `source enum(booking_page, phone, text, instagram, facebook, google, referral, walk_in, repeat, other)`; `lost_reason enum`; contact snapshot; `(business_id, customer_id) → customers`; `(business_id, customer_id, vehicle_id) → vehicles`; `vehicle_description`; `request_text`; `(business_id, booking_request_id) → booking_requests`; `next_follow_up_at`; `last_inbound_at` |
+| `quotes` | `business_id`; `number`; `status enum(draft, sent, accepted, declined, expired)`; `(business_id, lead_id)`; `(business_id, customer_id)`; `(business_id, customer_id, vehicle_id) → vehicles`; `vehicle_text`; `valid_until date`; `notes`; `terms`; `subtotal_cents`; `discount_cents`; `total_cents` (= subtotal − discount ≥ 0); `token_hash unique`; `sent_at`; `decided_at`. **No tax columns.** |
+| `quote_items` | `business_id`; `(business_id, quote_id)`; `(business_id, service_id)` nullable; `name`; `description`; `quantity`; `price_cents`; `duration_min` |
+| `tasks` | `business_id`; `title`; `due_at`; `status enum(open, done, dismissed)`; `outcome enum`; `kind enum(manual, rule)`; `rule_key`; `dedupe_key` with `unique (business_id, dedupe_key)`; optional composite FKs to customers, leads, quotes, appointments, booking requests |
+| `communications` | `business_id`; `channel enum(call, text, email, instagram, facebook, in_person, other)`; `direction enum(inbound, outbound)`; `occurred_at`; `summary`; `(business_id, template_id)`; optional composite FKs as above; at least one of `customer_id`, `lead_id` |
+| `notes` | `business_id`; `body`; optional composite FKs |
 
 **System**
 
 | Table | Key columns and constraints |
 |---|---|
-| `notifications` | `business_id`; `type enum`; optional composite FKs; `title`; `read_at` |
-| `activity_events` | `business_id`; optional composite FKs; `kind`; `from_status`; `to_status`; `actor_type enum(owner, customer, system, operator)`; `actor_user_id`; `metadata jsonb` (no PII); append-only |
-| `audit_events` | `business_id` nullable; `actor_type`; `actor_id`; `action`; `entity`; `metadata` (no PII); `ip_hash`; append-only |
-| `rate_limit_events` | `key_hash`, `action`, `business_id` nullable, `created_at` — RLS enabled with **no** policies; written only by `public_api` functions |
-| `contact_submissions` | Marketing applications — RLS enabled, no `authenticated`/`anon` policies; written by `booking_api` function |
-| `subscriptions`, `billing_events` *(Phase 7)* | Provider IDs, status, period end; webhook event IDs for idempotency — no owner write access |
+| `notifications` | `business_id`; `type`; optional composite FKs; `title`; `read_at` |
+| `activity_events` | `business_id`; optional composite FKs; `kind`; `from_status`; `to_status`; `actor_type`; `actor_user_id`; `metadata` (no PII); append-only |
+| `audit_events` | `business_id` nullable; actor; action; entity; metadata (no PII); `ip_hash`; append-only |
+| `rate_limit_events` | `key_hash`, `action`, `business_id`, `created_at`; RLS enabled, no policies; written only by `public_api` functions |
+| `contact_submissions` | Marketing applications; RLS enabled, no policies; written by a `public_api` function |
+| `subscriptions`, `billing_events` *(Phase 8)* | Provider IDs, status, period end; webhook idempotency; no owner write access |
 
-### 8.4 Relationships
+### 8.4 Owner write access by table (authenticated role, under RLS)
+
+| Direct `INSERT/UPDATE/DELETE` allowed (with RLS `can_write`) | Read-only for owners; changed only through authorized functions |
+|---|---|
+| `services`, `service_categories`, `service_prices`, `vehicle_size_classes`, `availability_rules`, `time_off`, `booking_settings` (except capacity-related fields — none live here), `message_templates`, `customers`, `vehicles`, `leads`, `quotes`, `quote_items`, `tasks`, `communications`, `notes`, `notifications.read_at` | `schedule_resources`, `schedule_blocks`, `appointments`, `appointment_items`, `booking_requests`, `booking_request_items`, `businesses` (profile changes via function), `memberships`, `activity_events`, `audit_events`, `business_counters`, billing tables |
+
+Whether all request workflow changes (not just scheduling) go through functions is REC-12; this table assumes it.
+
+### 8.5 Owner workflow functions (D-24)
+
+Called by our server actions with the owner's session (role `authenticated`). Each is `SECURITY DEFINER`, `search_path = ''`, owned by the schema owner, `EXECUTE` granted only to `authenticated`, and each begins by checking `app.is_member(business_id)` and `app.can_write(business_id)` for the business of the target row (never a client-supplied business ID).
+
+`approve_request`, `place_hold`, `release_hold`, `propose_time`, `retract_proposal`, `decline_request`, `close_duplicate`, `create_appointment`, `reschedule_appointment`, `cancel_appointment`, `start_appointment`, `complete_appointment`, `mark_no_show`, `reopen_appointment`, `set_capacity`, `update_business_profile`, `request_account_closure`, `cancel_account_closure`.
+
+Because these functions are callable by the owner's own session through the Data API, a technically capable owner could call them without our UI; they would still be bound by identical authorization, state and capacity checks (E20). Whether that is acceptable is REC-20 / open question Q-6.
+
+### 8.6 Database safeguards (D-23)
+
+#### 8.6.1 Invariants and enforcement
+
+| # | Invariant | Enforcement |
+|---|---|---|
+| I-1 | No row references a row in another business | Composite FKs everywhere |
+| I-2 | `business_id` never changes | Immutable trigger |
+| I-3 | A vehicle on a request/appointment/quote/lead belongs to that customer | FK `(business_id, customer_id, vehicle_id) → vehicles(business_id, customer_id, id)` |
+| I-4 | Approved request ⇔ exactly one appointment with that `booking_request_id` | Created in the same function; unique index; deferred constraint trigger verifies at commit |
+| I-5 | Appointment created from a request uses the request's linked customer and vehicle | Trigger check |
+| I-6 | Appointment in `scheduled`/`in_progress` ⇔ exactly one appointment block with identical interval on the business's general resource | Triggers on `appointments` maintain the block; no direct block writes |
+| I-7 | Hold exists only while request is `pending`; proposal only while `time_proposed` | Trigger on request status deletes blocks; check in `place_hold`/`propose_time` |
+| I-8 | Active blocks never exceed resource capacity at any instant | Capacity trigger with resource lock (§6.6.3) |
+| I-9 | Status changes follow allowed transitions | Transition triggers on requests, appointments, leads, quotes |
+| I-10 | Archived or anonymized customers/vehicles and archived/non-bookable services cannot be newly linked | Trigger checks on insert/link |
+| I-11 | Snapshots (names, prices, durations) immutable after creation | Immutable trigger |
+| I-12 | Appointment interval valid (15 min–72 h, end > start) | Check constraints |
+| I-13 | Restricted accounts cannot write | `can_write` in RLS policies and in every workflow function |
+
+#### 8.6.2 Relationships
 
 ```
 auth.users ─< memberships >─ businesses ─1 booking_settings
                                 │
-  availability_rules, time_off, vehicle_size_classes, service_categories ─< services ─< service_prices
-                                │
-  customers ─< vehicles                          (vehicles keyed by business_id + customer_id + id)
-     │           │
-     │           ├──────────────┐
+  schedule_resources (1 general in MVP) ─< schedule_blocks
+                                │             ▲      ▲
+  availability_rules, time_off, size classes, categories ─< services ─< service_prices
+                                │             │      │
+  customers ─< vehicles         │             │      │
+     │                          │             │      │
      ├─< booking_requests ─< booking_request_items >─ services
-     │        │ (0..1)          │
-     │        ▼                 │
+     │        │  └──────── 0..1 hold/proposal block ─┘
+     │        ▼ 0..1
      ├─< appointments ─< appointment_items >─ services
-     │        │
-     │        └─1 schedule_blocks (kind=appointment)
-     │   booking_requests ─0..1 schedule_blocks (kind=hold | proposal)
-     │
-     ├─< leads ─< quotes ─< quote_items >─ services
-     │
+     │        └──────── 0..1 appointment block (while scheduled / in progress)
+     ├─< leads ─< quotes ─< quote_items
      └─ tasks, communications, notes, notifications, activity_events (explicit optional FKs)
 ```
 
-### 8.5 Cross-business integrity — summary of guarantees
+#### 8.6.3 Extensibility for employees, bays and resources (not built in MVP)
 
-| Guarantee | Mechanism |
-|---|---|
-| A row can't be moved to another business | `business_id` immutable trigger |
-| A row can't reference another business's row | Composite FKs `(business_id, x_id)` on every reference |
-| A vehicle on a request/appointment/quote belongs to that customer | FK `(business_id, customer_id, vehicle_id) → vehicles(business_id, customer_id, id)` |
-| An owner can't read/write another business's rows | RLS policies on every table (§9.2) |
-| Public callers can't touch tables | `anon` has no grants; `booking_api` only executes definer functions |
-| Public submissions can't choose a business ID or prices | Functions derive business from slug and compute prices |
-| Workflow can't be skipped via API | Status-transition triggers; schedule blocks writable only within rules |
-
-### 8.6 Schedule blocks — database-level conflict prevention
-
-- Every **active** time reservation is one `schedule_blocks` row: confirmed appointments, owner holds, and proposals.
-- Appointment blocks are maintained by triggers on `appointments`: created when an appointment is Scheduled, moved when it is rescheduled, kept while In progress and after **Completed** (so history stays consistent and reopening is checked), and deleted when it becomes **Cancelled** or **No-show**.
-- The exclusion constraint makes any overlap within a business fail the whole transaction, whichever path created it.
-- Expired holds/proposals are deleted lazily (start of every block-writing function, scoped to the business) and by a 5-minute sweep; slot calculation also filters `expires_at > now()`.
-- Approving a held/proposed request deletes the hold/proposal row and inserts the appointment block in **one transaction**.
+- `schedule_resources.kind` gains `staff`, `bay`, `equipment`; each with its own capacity (staff typically 1).
+- A future `schedule_block_allocations (block_id, resource_id)` table lets one job consume several resources (e.g., one technician + one bay); the capacity trigger then runs per allocated resource, locking resources in a fixed order (by `id`) to avoid deadlocks.
+- MVP blocks reference a single `resource_id`; migration to allocations is additive (one allocation per existing block).
+- Employee management, permissions and assignment UI are explicitly out of scope (D-26).
 
 ### 8.7 Slot calculation
 
-For a date and duration *D*: generate local wall-clock candidates every `slot_interval_min` within working windows (skipping non-existent DST times) where `start + D ≤ window end`; drop those before `now + min_notice` or beyond the horizon; drop overlaps with time off, with active schedule blocks (appointments ± buffer, unexpired holds and proposals); drop days at the job cap. Return start times only.
+Generate local candidates within working windows (skipping DST gaps); drop those violating notice/horizon/time off/daily cap; for each candidate interval, compute peak usage including active blocks, with buffers added around existing appointment blocks; keep candidates where peak + 1 ≤ C. Return start times only.
 
 ---
 
@@ -631,160 +644,106 @@ For a date and duration *D*: generate local wall-clock candidates every `slot_in
 
 ### 9.1 Principles
 
-1. Each business accesses **only its own data**, enforced independently by server checks, **RLS**, and schema constraints.
-2. **Privileged credentials never reach the browser.**
-3. Public endpoints reveal only what a customer needs, validate everything, and resist abuse.
-4. Collect the minimum; retain only as disclosed.
+1. Each business accesses only its own data — server checks, RLS, explicit grants and schema constraints are each independently sufficient for reads/writes they cover.
+2. Minimum privileges for every role (D-21, D-22).
+3. Public booking exposes no private business or customer information (D-25).
+4. Privileged credentials never reach browser code.
 
-### 9.2 Row Level Security requirements
+### 9.2 Row Level Security
 
-- **Every business-owned table** listed in §8.3 has RLS **enabled and forced**. Tables with no owner access (`rate_limit_events`, `contact_submissions`, `pilot_invites`, `audit_events` writes, billing tables) have RLS enabled with **no** permissive policies for `authenticated`/`anon`.
-- Helper `app.is_member(business_id)`: `SECURITY DEFINER`, `STABLE`, fixed `search_path`, checks `memberships.user_id = auth.uid()`.
-- Helper `app.can_write(business_id)`: true for `pilot`, `trialing`, `active`, `past_due`, `cancelled` (until period end); false for `pending_activation` (except onboarding tables), `trial_expired`, `inactive`, `suspended`, `closing`.
-- Separate policies per command:
-  - `SELECT … USING (app.is_member(business_id))`
-  - `INSERT … WITH CHECK (app.is_member(business_id) AND app.can_write(business_id))`
-  - `UPDATE … USING (app.is_member(business_id)) WITH CHECK (app.is_member(business_id) AND app.can_write(business_id))`
-  - `DELETE … USING (app.is_member(business_id) AND app.can_write(business_id))` — only on tables where deletion is allowed.
-- **Table privileges for `authenticated` are minimal**: e.g., no direct `INSERT` on `businesses`/`memberships` (created by `app.create_business()`); no `DELETE` on `booking_requests`, `appointments`, `quotes`, `activity_events`, `audit_events`; `notifications` updatable only on `read_at` (column privilege).
-- **Triggers** enforce status transitions, immutable columns and snapshot integrity even for direct Data API calls.
-- **Views** use `security_invoker = true`; no materialized views over business data are exposed.
-- **Realtime** publications do not include business tables (not used in MVP).
-- **No Supabase Storage** buckets in MVP.
-- **CI checks** (on every push): every table in `public` has RLS enabled and forced, at least one policy for each granted command, and `anon` holds no privileges on application objects. Supabase's database linter / security advisor is run before every release.
+- RLS **enabled on every table** in `public`. Tables with no owner access have RLS enabled and **no** policies for `anon`/`authenticated`.
+- **Not forced** (REC-21): `FORCE ROW LEVEL SECURITY` would subject our `SECURITY DEFINER` functions (which run as the table owner) to RLS and break the public and workflow functions. Compensating controls: the table-owner role is never used by the application at runtime; definer functions perform explicit membership/token checks and are covered by tests. Whether Supabase's migration role has `BYPASSRLS` must be confirmed (V-4).
+- Helper `app.is_member(business_id)`: definer, stable, `search_path = ''`, compares `memberships.user_id` with `(select auth.uid())` (evaluated once per statement). Index `memberships (user_id, business_id)`.
+- Helper `app.can_write(business_id)` per account state (§12.4).
+- Policies per command for every owner-writable table:
+  - `SELECT USING (app.is_member(business_id))`
+  - `INSERT WITH CHECK (app.is_member(business_id) AND app.can_write(business_id))`
+  - `UPDATE USING (app.is_member(business_id)) WITH CHECK (app.is_member(business_id) AND app.can_write(business_id))`
+  - `DELETE USING (app.is_member(business_id) AND app.can_write(business_id))` where deletion is permitted
+- Read-only tables (§8.4) have only a `SELECT` policy and no write grants.
+- Views `security_invoker = true`. Business tables not in Realtime. CI catalog checks (§13.2).
 
-### 9.3 Authorization check for every operation
+### 9.3 Authorization for every operation
 
 | Operation | Server check | Database protection |
 |---|---|---|
-| Read/list owner data | Session valid → membership | RLS `SELECT` |
-| Create record | Session + membership; `business_id` from membership (never from input); Zod validation | RLS `INSERT WITH CHECK`; composite FKs; triggers |
-| Update record | As above; record scoped to business | RLS `UPDATE USING/WITH CHECK`; immutable trigger; composite FKs |
-| Delete / archive / anonymize customer | As above + typed confirmation | RLS `DELETE`/`UPDATE`; anonymization function (`SECURITY INVOKER`) |
-| Approve / decline / propose / hold / release / close duplicate | Membership; expected current status (optimistic check) | `SECURITY INVOKER` functions in one transaction; status trigger; exclusion constraint; unique `booking_request_id` |
-| Appointment start / complete / cancel / reschedule / no-show | Membership; allowed transition | Status trigger; exclusion constraint |
-| Settings, services, availability, templates | Membership; validation | RLS |
-| Export | Membership; any non-suspended state | RLS (runs with user session) |
-| Analytics | Membership | RLS; invoker views/functions |
-| Account closure / deletion request | Membership + typed confirmation + re-authentication | `SECURITY INVOKER` function; audit event |
-| Public: booking page, slots | Rate limit | `public_api` definer function returning allow-listed fields |
-| Public: submit request / inquiry | Validation, rate limit, honeypot, timing, idempotency, open-request cap | Definer function: business from slug; services re-validated; prices computed; inserts with fixed `business_id` |
-| Token: status / accept / decline / withdraw / cancel / ask to reschedule / view quote | Rate limit; token → SHA-256 | Definer function scoped to the one row matching the hash; state and cutoff checks; allow-listed output |
-| Scheduled jobs | — | `pg_cron` inside DB, per business |
-| Billing webhook *(Phase 7)* | Signature verification, idempotency | Server-only privileged path; audit |
-| Operator support access | Owner permission, reason | Audit event |
+| Read owner data | Session → membership | RLS `SELECT` |
+| Create/update/delete non-scheduling records | Session; Zod validation; `business_id` from membership | Grants + RLS + composite FKs + triggers |
+| Scheduling and workflow operations (approve, hold, propose, reschedule, cancel, complete, capacity) | Session; validation; expected current state | Definer function: membership + `can_write`; lock order; capacity trigger; transition triggers; invariants I-1–I-13 |
+| Export, analytics | Session | RLS (user session) |
+| Account closure | Session + re-authentication + typed confirmation | Definer function; audit |
+| Public: booking page, slots, submit, inquiry | Validation, rate limits, honeypot, timing, idempotency | `public_api` functions via restricted role (D-21); allow-listed outputs (D-25) |
+| Token actions (status, accept/decline proposal, withdraw, cancel, view quote) | Rate limit; SHA-256 of token | `public_api` function scoped to the one matching row; state/cutoff checks; capacity trigger for accept |
+| Scheduled jobs | — | `pg_cron` inside database |
+| Billing webhook (Phase 8) | Signature, idempotency | Server-only privileged path |
 
-Another business's record always yields **404**.
+Another business's record always yields 404.
 
-### 9.4 Public booking endpoints
+### 9.4 Public booking endpoint (D-21, D-25)
 
-**Architecture.** Browsers call **our Next.js server** (route handlers / server actions). The server calls `public_api` functions over a pooled Postgres connection as the least-privilege `booking_api` role. Public functions are **not** reachable through the Supabase Data API (schema not exposed; no grants to `anon`), so rate limits and validation cannot be bypassed by calling Supabase directly. *(Feasibility of a custom login role on our Supabase plan is assumption A-11; fallback in §17.5.)*
+**Flow:** browser → Next.js server action / route handler → validation and abuse checks → `public_api` function call over a restricted database connection → allow-listed JSON → browser. The browser never talks to the database for booking.
 
-**Input validation** (server with Zod, then again in the database):
+**Mechanism (REC-13, pending verification V-8/V-9):** a dedicated Postgres login role `booking_api` with `EXECUTE` on `public_api` functions only, used by our server through Supabase's connection pooler (transaction mode). The `public_api` schema is not exposed through the Data API, so the public functions cannot be called with the browser-visible key.
 
-- Allowed fields only; unknown fields rejected; maximum request body 16 KB.
-- Lengths: names ≤ 60, notes ≤ 1,000, address lines ≤ 120, vehicle make/model ≤ 40; year 1900–next year + 1.
-- US phone → E.164 `+1XXXXXXXXXX`; email syntax; at least one of phone/email.
-- Service IDs must belong to the business, be bookable and active; add-ons only with a main service; size class must belong to the business.
-- Requested start must be one of the currently computed slots for that duration (re-computed in the database).
-- Consent required. Text stored as plain text; rendered escaped.
+**Fallback (requires explicit approval; conflicts with "minimum required privileges" because the credential is broader):** server-only module calling the same functions through the Data API with the service-role/secret key, with functions `EXECUTE`-granted to `service_role` only and the module offering only named function calls.
 
-**No private information exposed:**
+**Validation:** allowed fields only; body ≤ 16 KB; length limits; US phone → E.164; email syntax; at least one of phone/email; services and size class must belong to the business, be active and bookable; requested start must be a currently computed slot; consent required; plain-text storage.
 
-- Booking page and slot functions return allow-listed public fields only (never customer data, appointment details, counts of bookings, or reasons a time is unavailable).
-- Status/quote functions return only that record, with contact details masked.
-- Error messages are generic and don't reveal whether a phone/email has other requests, or whether a token ever existed.
-- No sequential IDs in URLs; tokens are 128-bit random, stored hashed, revocable by the owner.
-- Response headers: `Cache-Control: no-store` on token pages; `Referrer-Policy: no-referrer` on `/r/` and `/q/` so tokens don't leak to external links; `X-Robots-Tag: noindex`.
+**No private data exposed (D-25):**
+- Booking page and slot functions return only public business fields, bookable services and start times — never customers, appointments, capacity, usage or reasons a time is unavailable.
+- Submit returns only the request number and status link.
+- Status and quote functions return only the one row matching the token hash, with masked contact details (REC-10).
+- Generic errors that never confirm other requests or token existence.
+- Token pages: `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, `X-Robots-Tag: noindex`.
 
-**Abuse protections:**
+**Abuse protections (limits per REC-05):** per-IP-hash and per-business submission limits; token-action and slot-lookup limits; honeypot; signed minimum completion time; idempotency; open-request cap; optional free bot challenge only if abuse appears (requires approval). Client IP taken from the hosting platform's trusted header (V-16); hashed with a server secret; kept 30 days.
 
-| Control | Initial setting (tunable) |
-|---|---|
-| Submissions per IP hash per business | 5 per 10 min, 20 per day |
-| Submissions per business | 60 per hour (excess queued as rejected with generic message; owner notified of unusual volume) |
-| Open requests per contact per business | 3 |
-| Token actions per IP hash | 30 per 10 min |
-| Slot lookups per IP hash | 120 per 10 min |
-| Honeypot field | Required empty |
-| Minimum completion time | ≥ 3 seconds from form render (signed timestamp) |
-| Idempotency | Per form session |
-| Bot challenge | Free challenge (e.g., Cloudflare Turnstile) **only if** abuse appears — requires account registration and approval |
-
-IP addresses are hashed with a server-side secret salt and kept 30 days in `rate_limit_events`.
-
-### 9.5 Secrets and privileged credentials
+### 9.5 Secrets and credentials
 
 | Credential | Where it may exist |
 |---|---|
-| Supabase URL, anon (publishable) key | Browser allowed (used only for Supabase Auth); `anon` has no data privileges |
-| `service_role` (secret) key | **Never** in browser code, `NEXT_PUBLIC_*` variables, logs, or the repository. **Not configured in the deployed web app in the MVP.** Operator local scripts only. Phase 7 may add it to a server-only module for billing if required. |
-| `booking_api` database connection string | Server-only environment variable; modules marked `import "server-only"` |
-| IP hash salt, token pepper (if used) | Server-only |
+| Supabase URL and anon/publishable key | Browser allowed (Auth only); `anon` has no data privileges |
+| `booking_api` connection string | Server-only environment variable, marked sensitive; only in modules guarded by `server-only` |
+| Service-role/secret key | **Never** in browser code or `NEXT_PUBLIC_*`; not configured in the deployed app unless the REC-13 fallback is approved |
+| IP-hash salt | Server-only |
 
-Controls: CI scans the production client bundle and fails on secret patterns or known variable names; `.env*` git-ignored; `.env.example` contains names only; documented rotation procedure for every credential.
+CI scans the production client bundle for secret values and variable names; `.env*` git-ignored; rotation runbook for each credential. Vercel environment variable handling to confirm (V-14, V-15).
 
 ### 9.6 Authentication
 
-Supabase Auth email + password; email confirmation required for activation; server-side sessions via Supabase SSR helpers (HTTP-only cookies); minimum password length ≥ 10 and leaked-password protection if available on the plan (A-5); Supabase rate limits plus ours on auth forms; re-authentication for closure/deletion and email change; operator MFA. Owner MFA later.
+Supabase Auth email + password; email verification required for activation; server-side sessions (Supabase SSR helpers; cookie attributes to confirm, V-13); password policy and leaked-password protection if available (V-12); invite-only sign-up mechanism to confirm (V-12); re-authentication for closure and email change; operator MFA.
 
 ### 9.7 Web security baseline
 
-HTTPS + HSTS; strict Content Security Policy; CSRF protection (server actions' origin checks, SameSite cookies); output escaping; no HTML rendering of user input; Dependabot; lockfile; `npm audit` in CI; security headers on all routes.
+HTTPS/HSTS; Content Security Policy; Server Actions origin checks (V-17); output escaping; Dependabot; lockfile; security headers.
 
 ### 9.8 Privacy
 
-- **Roles:** the detailer controls their customers' data; DetailerHQ processes it on their behalf (to confirm in legal review).
-- **Collected about end customers:** name, phone and/or email, preferred contact method, service address (mobile jobs only), vehicle year/make/model/color/size, optional plate, notes. **Not collected:** VIN, date of birth, license numbers, payment data, location tracking, marketing consent.
-- **No customer accounts**, no third-party trackers on public pages or dashboard, no PII in logs, hashed IPs only.
-- **Consent** recorded only for being contacted about the request.
-- **US law:** CAN-SPAM for our outreach; TCPA/10DLC before any future SMS; state privacy laws assessed in legal review. *Not legal advice.*
+Data collected about end customers: name, phone and/or email, preferred contact, service address (mobile jobs), vehicle year/make/model/color/size, optional plate, notes. Not collected: VIN, date of birth, license numbers, payment data, location tracking, marketing consent. No customer accounts, no third-party trackers, no PII in logs. US law considerations (CAN-SPAM, future TCPA, state privacy laws) for legal review.
 
 ### 9.9 Auditing and operations
 
-Audit events for sign-in, password/email change, request decisions, holds placed/released, cancellations, reschedules, exports, customer deletion/anonymization, settings changes, account status changes, closure/deletion, operator access. Provider backups with a tested restore before pilots use real data. Uptime check on the booking page.
+Audit events for sign-in, request decisions, holds, capacity changes, cancellations, reschedules, exports, deletions, account state changes, operator access. Tested backup restore before pilots use real data.
 
 ---
 
 ## 10. Notifications
 
-**In-app only in the MVP.** No email, SMS or push to owners or customers; core functionality never depends on a messaging service.
-
-Events: new request; possible duplicate / related request; new inquiry; customer accepted/declined proposal; customer withdrew/cancelled; customer asked to reschedule; hold expired; proposal/request expired; quote expired; unusual submission volume; pilot/trial ending (banner).
-
-Delivery: notification list, bell count, badges, Today screen; refreshed on navigation and by polling every 60 s while visible. Owner email notifications are the first post-MVP candidate once an email provider is selected.
+In-app only (D-7): new request; possible duplicate/related; new inquiry; proposal accepted/declined; withdrawn/cancelled; reschedule asked (if REC-04); **hold expired**; proposal/request expired; quote expired; unusual submission volume; pilot/trial banner. Polling every 60 s while visible. No email/SMS/push.
 
 ---
 
 ## 11. Analytics definitions
 
-Rules: recorded data only; business timezone; definition visible for every metric; rates need ≥ 5 items in the denominator ("Not enough data yet" otherwise); no benchmarks or projections; **no causal claims** (sequence wording only); no sample data in real accounts.
+Rules: recorded data only; business timezone; visible definitions; rates need a minimum sample (REC-11: ≥ 5); no causal claims; no sample data in real accounts.
 
 | Term | Definition |
 |---|---|
-| **Quoted value** | Sum of `total_cents` of quotes sent in the period (by `sent_at`) |
-| **Booked job value** | Sum of `estimated_total_cents` of appointments with start in the period and status Scheduled, In progress or Completed |
-| **Recorded revenue** | Sum of `recorded_total_cents` of Completed appointments with start in the period — amounts the owner entered; not verified payments; tax not separated |
+| Quoted value | Σ `total_cents` of quotes sent in period |
+| Booked job value | Σ `estimated_total_cents` of appointments starting in period with status Scheduled, In progress or Completed |
+| Recorded revenue | Σ `recorded_total_cents` of Completed appointments starting in period (owner-entered; not verified payments; tax not separated) |
 
-| Metric | Definition |
-|---|---|
-| Requests received | Requests created in period (duplicates shown separately) |
-| Median first response time | Creation → first owner action (approve, hold, propose, decline) |
-| Request outcomes | Requests created in period by current status |
-| Request-to-booking rate | Requests created in period that became appointments ÷ requests created in period, excluding duplicates and still-open requests |
-| Holds placed / converted | Holds placed in period; share whose request was approved (sequence only) |
-| Appointments completed | Completed with start in period |
-| Average recorded job value | Recorded revenue ÷ appointments completed |
-| Cancellations & no-shows | By who cancelled; rate ÷ appointments with start in period (excluding future scheduled) |
-| Quote acceptance rate | Accepted ÷ (Accepted + Declined + Expired) for quotes sent in period |
-| Leads by source and status | Leads created in period |
-| Lead-to-booked rate | Leads created in period now Booked ÷ leads created in period (note on immature cohorts) |
-| Follow-up activity | Outbound communications logged and follow-up tasks completed, with outcomes |
-| Leads booked after a logged follow-up | Count; note: "Shows timing only — it doesn't mean the follow-up caused the booking." |
-| Top services | Count and recorded line amounts from completed appointment items |
-| New vs. returning customers | First completed appointment in period vs. earlier |
-
-Each metric has a reference SQL query in the test suite.
+Metrics: requests received; median first response time; request outcomes; request-to-booking rate; holds placed and holds whose request was approved (sequence only); appointments completed; average recorded job value; cancellations and no-shows; quote acceptance rate; leads by source/status; lead-to-booked rate; follow-up activity; leads booked after a logged follow-up (with non-causation note); top services; new vs returning customers; **peak concurrent jobs per day** (from recorded appointments, informational). Each has a reference SQL query in tests.
 
 ---
 
@@ -792,80 +751,45 @@ Each metric has a reference SQL query in the test suite.
 
 ### 12.1 Pricing
 
-| Stage | Offer | Collection |
+| Stage | Offer | Status |
 |---|---|---|
-| **Pilot (early access)** | **$25 for the first month**, described as an early-access offer for pilot businesses | Manual, outside the product (method requires approval; no billing integration in MVP) |
-| After the pilot's first month | **Open decision** (§17.3) — e.g., continue at the public price, or a stated early-access rate | — |
-| **Public paid launch** | **$49/month target, subject to validation** with pilots before publishing | Integrated subscription billing with tax handling (§3.2) |
+| Pilot | $25 for the first month, early-access offer, collected manually | D-11 |
+| After pilot's first month | **Open** (Q-1) | — |
+| Public | $49/month target, subject to validation; not published until validated | D-12 |
 
-The public price is not advertised until validated. Marketing never shows a struck-through "regular price" or fake urgency.
+### 12.2 Pilot terms
 
-### 12.2 Pilot / early-access terms (draft before inviting pilots)
+Duration, $25 first-month price and collection method, what happens after the first month, features may change, no SLA, data ownership, export, retention position, end-of-pilot options, not a free trial.
 
-Duration and dates; $25 first-month price and how it's paid; what happens after the first month; features included and that they may change; no service-level guarantee; data ownership; export at any time; what happens at pilot end (continue, export, or close and delete); support and feedback; that it is **not** a free trial.
+### 12.3 Activation and 7-day free trial (D-14)
 
-### 12.3 Activation and 7-day free trial (paid launch)
-
-- **Activation** = owner's email verified **and** business created (onboarding step 1). Recorded as `activated_at`.
-- Trial starts at activation: `trial_started_at = activated_at`, `trial_ends_at = activated_at + 7 days` (exact instant, shown in business timezone).
-- Before activation: `pending_activation` — onboarding allowed, publishing and requests not allowed, no trial clock.
-- **No credit card required** (current preference).
-- Disclosed at sign-up, pricing page and in-app: length, exact end time, what's included, what happens at the end, **no data deleted at trial end**, how to subscribe.
-- In-app reminders throughout, prominent from 3 days before and on the last day; email reminders once email exists.
-- One trial per business; operator may extend.
-- Pilot accounts never enter `trialing`.
+Activation = email verified AND business created. Trial = `activated_at` + 7 days exactly. No card required (preference). Disclosed everywhere it's offered. Pilot accounts never enter `trialing`. Built and tested in Phase 8 before the public paid launch.
 
 ### 12.4 Account states and access
 
 | State | Dashboard | Booking page | Status links | Export |
 |---|---|---|---|---|
 | `pending_activation` | Onboarding only | Not published | — | — |
-| `pilot`, `trialing`, `active` | Full | Accepting (if on) | Full | ✅ |
-| `past_due` (grace, proposed 7 days) | Full + banner | Accepting | Full | ✅ |
+| `pilot`, `trialing`, `active` | Full | Accepting | Full | ✅ |
+| `past_due` (grace per REC-09) | Full + banner | Accepting | Full | ✅ |
 | `cancelled` (until period end) | Full + banner | Accepting | Full | ✅ |
-| `trial_expired`, `inactive` | **Read-only**; export; subscribe; account; closure | Not accepting; shows business contact | Show status; withdraw/cancel allowed; accept-proposal disabled | ✅ |
-| `closing` (closure requested, in grace period) | Read-only; can cancel closure | Offline | Generic "no longer available" | ✅ |
+| `trial_expired`, `inactive` | Read-only | Not accepting; contact shown | Status shown; withdraw/cancel allowed; accept-proposal disabled | ✅ |
+| `closing` | Read-only; can cancel closure | Offline | Generic | ✅ |
 | `suspended` | Blocked except export & support | Offline | Generic | On request |
 
-Read-only is enforced by the server **and** RLS (`can_write`). **No business or customer data is deleted because a trial ends.** Subscribing restores full access immediately.
+**No business or customer data is deleted because a trial ends (D-18).** Read-only enforced by server, RLS `can_write`, and every workflow function.
 
-### 12.5 Retention schedule (proposal — must be approved, legally reviewed and disclosed before public launch)
+### 12.5 Retention schedule (REC-06, REC-08 — not approved)
 
-| Data | Retention |
-|---|---|
-| Active / restricted account data | Kept while the account exists; restricted accounts kept **180 days** after access ends, with notices at 30 and 7 days (in-app; email once available) |
-| Closed requests not linked to a customer | 12 months after closing |
-| Customer deleted by owner | Immediately hard-deleted (customer, vehicles, communications, notes, request contact snapshots); appointments anonymized |
-| Notifications | 90 days |
-| Activity events | Lifetime of the record they describe |
-| Audit events | 12 months |
-| Rate-limit events (hashed IPs) | 30 days |
-| Contact/pilot applications | 12 months after last contact |
-| Backups | Provider retention (e.g., 7 days — verify); deleted data persists until rotated; disclosed |
-
-**Automated deletion jobs stay disabled** until this schedule is approved, disclosed, and pre-deletion notices can be delivered.
+Restricted accounts kept 180 days after access ends with 30/7-day notices; closed unlinked requests 12 months; notifications 90 days; audit 12 months; hashed IPs 30 days; contact applications 12 months; backups per provider. **Automated deletion stays disabled** until the policy is approved, legally reviewed, disclosed, and notices can be delivered (D-18).
 
 ### 12.6 Account closure and deletion
 
-| Flow | Steps |
-|---|---|
-| **Export** | Always available (except suspended without request): CSV zip of customers, vehicles, requests, appointments + items, leads, quotes + items, tasks, communications |
-| **Close account** | Owner re-authenticates, types business name → status `closing`, booking page offline immediately, status links show generic message, subscription (later) cancelled → **30-day grace** during which the owner can cancel closure → hard deletion of all business data (all business-owned tables, memberships) → owner's auth user deleted if no other memberships → audit record without PII ("business deleted", date) |
-| **Inactive account expiry** | 180 days after access ends (after notices) → same deletion as closure |
-| **Delete one customer** | Owner action with typed confirmation → hard delete PII, anonymize appointments |
-| **End-customer request to DetailerHQ** | Forwarded to the business (controller); we assist; we act directly only as legally required |
-| **Operator deletion** | Scripted, reviewed, audited; same order as automated deletion |
-
-Deletion runs in a single transaction per business where possible; a verification query confirms zero remaining rows for that `business_id`.
+Export always available. Close account → `closing`, booking page offline, grace period (REC-07: 30 days) with cancel option → hard deletion of all business-owned rows (including schedule resources and blocks) → auth user deleted if no other memberships → PII-free audit record. Customer deletion by owner: PII removed, appointments anonymized. Verification query confirms zero rows remain for that business.
 
 ### 12.7 Documentation required before public launch
 
-- [ ] Privacy Policy: data collected (owners and end customers), purposes, processors (hosting, database, email), retention schedule (§12.5), backups, deletion and closure, contact.
-- [ ] Terms of Service: trial terms, subscription, cancellation, account states, restricted access, data export, closure and deletion, acceptable use, controller/processor roles.
-- [ ] Data processing / service-provider terms for businesses (if counsel advises).
-- [ ] Internal runbooks: deletion procedure, backup restore, credential rotation, incident response and breach notification assessment.
-- [ ] Subscription tax handling decision (accountant) and billing provider configuration.
-- [ ] Pilot/early-access terms (needed earlier, before pilots).
+Privacy Policy; Terms (trial, subscription, account states, closure, deletion); service-provider terms if advised; runbooks (deletion, restore, credential rotation, incidents); subscription tax decision; pilot terms (earlier, before pilots).
 
 ---
 
@@ -875,310 +799,332 @@ Deletion runs in a single transaction per business where possible; a verificatio
 
 | Level | Tooling | Scope |
 |---|---|---|
-| Unit | Vitest | Slots, DST, pricing, totals, transitions, cutoffs, hold/proposal expiry math, duplicate rules, template rendering, metrics; ≥ 90% of `/src/domain` |
-| Database | pgTAP (Supabase CLI) | RLS matrix (§13.2), constraints, triggers, exclusion constraint, composite FKs, definer function outputs, scheduled jobs |
-| API-level isolation | Vitest using `supabase-js` against a local Supabase stack | Same RLS matrix through the **Data API** with real JWTs and the anon key |
-| App-level isolation | Playwright | Every route/server action with another business's IDs → 404 |
-| Concurrency | Integration | Parallel approvals/holds/accepts for overlapping times → exactly one succeeds |
-| End-to-end | Playwright (375 / 768 / 1280 px projects) | All booking flows and edge cases E1–E20 where UI-reachable |
-| Accessibility | axe-core + manual keyboard and screen reader passes | Zero serious/critical |
-| Performance | Lighthouse CI | Booking page, home |
+| Unit | Vitest | Slots, DST, pricing, transitions, cutoffs, expiry math, duplicate rules, peak-usage algorithm (pure version), templates, metrics |
+| Database | pgTAP (Supabase CLI) | Grants, RLS, invariants I-1–I-13, triggers, function outputs, capacity checks (single-session), scheduled jobs |
+| Data API isolation | Vitest + `supabase-js` against local Supabase | RLS/grant matrix through the Data API with real JWTs and the publishable key |
+| **Concurrency** | Vitest with multiple direct Postgres connections to the local database | Parallel capacity competition, lock order, hold expiry races |
+| App isolation | Playwright | Cross-business IDs → 404 on every route/action |
+| End-to-end | Playwright at 375/768/1280 px | Booking flows, holds, capacity, edge cases E1–E22 where UI-reachable |
+| Accessibility | axe-core + manual keyboard and screen reader passes | Zero serious/critical issues |
+| Performance | Lighthouse CI | Booking page LCP < 2.5 s (mobile, simulated 4G); home ≥ 90 |
 | Security | Dependabot, `npm audit`, bundle secret scan, catalog checks, Supabase advisor, OWASP ASVS L1 subset review | Every PR / release |
 | Copy | String lint for banned claims ("sent" for messages, "charged", "free trial" during pilot, "AI", tax claims) | Every PR |
-| Usability | Sessions with pilot detailers | Each phase |
 
-### 13.2 RLS and cross-business test matrix
+### 13.2 Permission and RLS test matrix (D-21, D-22, D-24)
 
-**Fixtures:** Business A (owner A), Business B (owner B), a signed-in user with **no** business (U), and anonymous (anon). Each business seeded with at least one row in every business-owned table.
+**Identities:** owner A, owner B, signed-in user with no business (U), `anon`, restricted public role (`booking_api`).
 
-**For every business-owned table**, both in pgTAP (`set role authenticated` + JWT claims / `set role anon`) **and** through the Data API (`supabase-js` with anon key and each user's JWT):
+**For every table** (pgTAP with `set role` + JWT claims, **and** through the Data API):
 
-| Attempt | Owner A | Owner B | User U | anon |
-|---|---|---|---|---|
-| `SELECT` A's rows | ✅ rows returned | 0 rows | 0 rows | permission denied / 0 rows |
-| `INSERT` row with `business_id = A` | ✅ (if granted & writable) | ❌ RLS violation | ❌ | ❌ |
-| `INSERT` row for own business referencing A's customer/vehicle/service/request | n/a | ❌ FK / RLS violation | ❌ | ❌ |
-| `UPDATE` A's row | ✅ (if granted) | 0 rows affected | 0 rows | ❌ |
-| `UPDATE` own row setting `business_id = A` | ❌ immutable trigger | ❌ | — | — |
-| `UPDATE` own row's FK to point at A's record | — | ❌ FK violation | — | — |
-| `DELETE` A's row | ✅ only where allowed | 0 rows affected | 0 rows | ❌ |
-| Call `public_api` functions | ❌ no privilege | ❌ | ❌ | ❌ (only `booking_api`) |
+| Attempt | Owner A | Owner B | U | anon | booking_api |
+|---|---|---|---|---|---|
+| `SELECT` A's rows | ✅ | 0 rows | 0 rows | denied | denied |
+| `INSERT` with `business_id = A` | ✅ only on owner-writable tables | ❌ | ❌ | denied | denied |
+| `INSERT` own row referencing A's customer/vehicle/service/request | — | ❌ (FK/RLS) | ❌ | denied | denied |
+| `UPDATE` A's row | ✅ only owner-writable tables | 0 rows | 0 rows | denied | denied |
+| `UPDATE` setting `business_id` or snapshot columns | ❌ trigger | ❌ | — | denied | denied |
+| `DELETE` A's row | ✅ only where allowed | 0 rows | 0 rows | denied | denied |
+| Any write to `schedule_blocks`, `schedule_resources`, `appointments`, `booking_requests` | **denied** (D-24) | denied | denied | denied | denied |
+| `EXECUTE` owner workflow function on A's records | ✅ | ❌ (membership check → not found) | ❌ | denied | denied |
+| `EXECUTE` `public_api` functions | denied | denied | denied | denied | ✅ |
 
-Additional required tests:
+**Catalog tests (CI, every push):**
+- Every table in `public` has RLS enabled; every grant to `authenticated` has a matching policy.
+- `anon` and `PUBLIC` hold **no** privileges on any table, sequence or function in `public`, `app`, `public_api` (via `has_table_privilege` / `has_function_privilege` over the catalog).
+- A test migration creates a new table and function and asserts no privileges were granted by default (D-22).
+- Every `SECURITY DEFINER` function has `search_path` set.
+- The list of tables equals the list covered by the matrix (new tables without tests fail CI).
+- `booking_api` has no table privileges and cannot execute owner workflow functions.
 
-- Generated **coverage test**: the list of tables in the catalog equals the list covered by the matrix; a new table without tests fails CI.
-- Catalog test: RLS enabled + forced on all tables; `anon` has zero privileges on application objects.
-- Restricted account (`trial_expired`): owner can `SELECT`, all writes fail at the database.
-- `booking_api` can execute public functions but cannot `SELECT` any table directly.
-- Definer functions: return only allow-listed columns; a token for Business A's request cannot act on Business B's; slug of B can't create rows for A.
-- Exclusion constraint: overlapping appointment/hold/proposal inserts fail; adjacent (`end = start`) succeed; different businesses may overlap.
-- Status triggers: invalid transitions via direct `UPDATE` fail.
+### 13.3 Capacity and concurrency tests (D-26, D-27)
 
-### 13.3 Acceptance criteria
+- Capacity 1, 2 and 3; overlapping intervals of different durations; E2, E3 examples; adjacent intervals allowed.
+- Holds and proposals count toward capacity; a hold exceeding capacity is rejected.
+- **Expired holds/proposals are ignored** immediately at expiry, before any sweep runs.
+- **Concurrent competition:** N parallel transactions (N ≥ 5) each try to take the last unit → exactly one commits; others get `capacity_exceeded`; final peak ≤ C.
+- Parallel approve + withdraw on the same request, and parallel approve on two requests → no deadlock (lock order), consistent final state.
+- Hold expiring between two competing transactions → result consistent with transaction-time evaluation.
+- Reschedule excludes the appointment's own block; cancel/complete/no-show free capacity; reopen re-checks.
+- Capacity decrease rejected when future peak > new C; increase always accepted.
+- DST-spanning intervals counted by real duration.
+- Invariants I-4, I-6, I-7 verified after every concurrency test.
 
-All criteria must pass at 375, 768 and 1280 px and meet `DESIGN_SYSTEM.md` §12. 🧪 = automated test required.
+### 13.4 Acceptance criteria
 
-**Accounts, activation, onboarding**
-- [ ] Invite-only sign-up during pilot; invalid/used invites rejected. 🧪
-- [ ] Supabase Auth handles sign-up, confirmation, sign-in, reset; no password data in our schema. 🧪
-- [ ] Activation occurs only when email is verified **and** the business exists; `activated_at` set once. 🧪
-- [ ] Unactivated accounts cannot publish or receive requests. 🧪
-- [ ] Policies step pre-fills 24 h as a **suggestion** that can be changed to any allowed value. 🧪
-- [ ] No service has a price the owner didn't enter. 🧪
+All criteria pass at 375, 768 and 1280 px and meet `DESIGN_SYSTEM.md` §12. 🧪 = automated.
 
-**Services and availability**
-- [ ] Price types behave as specified; only bookable services appear publicly. 🧪
-- [ ] Size-class overrides apply; menu edits never alter snapshots. 🧪
-- [ ] Slot tests cover windows, notice, horizon, buffer, cap, time off, active/expired holds and proposals, DST. 🧪
+**Accounts and onboarding**
+- [ ] Invite-only sign-up; Supabase Auth flows; no password data in our schema. 🧪
+- [ ] Activation only when email verified **and** business created. 🧪
+- [ ] Mobile-only businesses get capacity 1 by default; shops must set capacity during onboarding. 🧪
+- [ ] Policies step pre-fills 24 h as a suggestion. 🧪
+- [ ] No service price the owner didn't enter. 🧪
 
-**Public booking**
-- [ ] No customer account or login is required at any step. 🧪
-- [ ] Each request requires exactly one vehicle description (make, model, size class at minimum). 🧪
-- [ ] Only allow-listed data appears in responses; no other customer or appointment data. 🧪
-- [ ] Invalid input (unknown fields, oversize payload, foreign service IDs, non-slot times, missing consent) is rejected server-side and in the database. 🧪
-- [ ] Rate limits, honeypot, timing check and open-request cap behave as in §9.4 with generic messages. 🧪
-- [ ] Public functions are not callable through the Supabase Data API with the anon key. 🧪
-- [ ] Confirmation states "not confirmed yet" and shows the status link. 
-- [ ] Booking page LCP < 2.5 s (mobile, simulated 4G).
+**Public booking (D-13, D-21, D-25)**
+- [ ] No customer account required at any step. 🧪
+- [ ] One vehicle per request, required. 🧪
+- [ ] Browser never calls the database for public booking; public functions not callable via the Data API with the publishable key. 🧪
+- [ ] Responses contain only allow-listed fields; no capacity, usage or other-customer data. 🧪
+- [ ] Validation, rate limits, honeypot, timing and open-request cap enforced with generic messages. 🧪
+- [ ] Confirmation says "not confirmed yet" with status link.
 
-**Booking workflow**
-- [ ] Approve links customer and vehicle within the same business (cross-business IDs fail at DB), creates one appointment, and is idempotent. 🧪
-- [ ] A vehicle not belonging to the chosen customer cannot be linked. 🧪
-- [ ] Propose: block created, expiry set, status page Accept/Decline; accept creates appointment; expired proposal rejected. 🧪
-- [ ] Decline stores optional customer message and internal reason. 🧪
-- [ ] Every status page state matches §6.4 with masked contact details. 🧪
-
-**Holds**
-- [ ] Pending requests without a hold don't affect public slots. 🧪
-- [ ] Owner can place a hold of 2–72 h, never past the requested start; default from settings. 🧪
-- [ ] Hold placement fails on overlap with appointment/hold/proposal (DB). 🧪
-- [ ] Held time disappears from public slots and reappears immediately after expiry or release. 🧪
-- [ ] Approving the held request converts the hold atomically. 🧪
-- [ ] Decline/withdraw/expire/duplicate release the hold. 🧪
-- [ ] Expired holds are purged and the owner notified once. 🧪
-- [ ] Approving or manually booking over another request's hold requires explicit release, recorded in activity. 🧪
-
-**Conflicts**
-- [ ] Overlapping confirmed appointments are impossible via UI, server actions, direct Data API calls and concurrent requests. 🧪
-- [ ] Soft warnings require explicit confirmation. 🧪
+**Workflow and scheduling (D-23, D-24, D-26, D-27)**
+- [ ] Owners cannot write schedule or appointment data directly; all changes via workflow functions. 🧪
+- [ ] Approve links customer and that customer's vehicle within the business; idempotent. 🧪
+- [ ] Capacity never exceeded under sequential and concurrent operations (§13.3). 🧪
+- [ ] Holds: owner-only, within limits, respect capacity, expire automatically, never block after expiry, released on decision/withdrawal. 🧪
+- [ ] Proposals: same capacity and expiry rules; accept converts atomically. 🧪
+- [ ] Calendar shows concurrent jobs and capacity usage correctly.
+- [ ] Capacity changes enforce §6.6.4. 🧪
 
 **Duplicates, expiry, cancellation, rescheduling**
-- [ ] Idempotent resubmission; possible-duplicate vs related-request flags; open-request cap. 🧪
-- [ ] Pending requests expire at requested start; proposals at their expiry. 🧪
-- [ ] Customer cancel respects the owner's setting and cutoff (exactly-at-cutoff is after). 🧪
-- [ ] "Ask to reschedule" respects the rescheduling cutoff, notifies the owner, and does not change the appointment. 🧪
-- [ ] Owner reschedule enforces hard rules, records previous time, updates status page. 🧪
+- [ ] Idempotent resubmission; possible-duplicate vs related-request flags; open-request cap with generic message. 🧪
+- [ ] Pending requests expire at requested start; proposals at their expiry; holds become inactive at `expires_at`. 🧪
+- [ ] Customer cancel respects the owner's setting and cutoff (exactly at cutoff is after) and frees capacity. 🧪
+- [ ] Owner reschedule enforces capacity and hard rules, records the previous time, updates the status page. 🧪
+- [ ] *(If REC-04 approved)* "Ask to reschedule" respects the cutoff, notifies the owner, and doesn't change the appointment. 🧪
 
 **Time zones**
-- [ ] Correct display and slots in Eastern, Central, Mountain, Arizona, Pacific, Alaska, Hawaii. 🧪
-- [ ] Spring-forward gap never offered; fall-back instants distinct and labelled. 🧪
+- [ ] Correct display and slots in Eastern, Central, Mountain, Arizona, Pacific, Alaska and Hawaii. 🧪
+- [ ] Spring-forward gap never offered; fall-back instants distinct and labelled; capacity counts real duration across transitions. 🧪
 - [ ] Timezone change preserves instants and warns. 🧪
 
 **Customers and vehicles**
 - [ ] A customer can have multiple vehicles; appointments and quotes reference exactly one. 🧪
+- [ ] A vehicle not belonging to the chosen customer cannot be linked (DB). 🧪
 - [ ] Search within 300 ms for 5,000 customers; duplicate suggestions within the business only. 🧪
 - [ ] Delete anonymizes appointments and removes PII. 🧪
 
 **Leads, quotes, follow-ups, communications**
 - [ ] Inquiries create leads, never requests. 🧪
-- [ ] Lead status automation and manual override recorded. 🧪
+- [ ] Lead status automation with recorded manual override. 🧪
 - [ ] Quotes: per-business numbering, totals in cents, no tax computation, auto-expiry. 🧪
 - [ ] Quoted, booked and recorded values stored separately. 🧪
-- [ ] Templates render; missing placeholders block copying; communications logged only after confirmation; no automatic sending anywhere. 🧪
+- [ ] Templates render; missing placeholders block copying; communications logged only after confirmation; nothing sent automatically. 🧪
 
 **Notifications and analytics**
-- [ ] Each §10 event produces one notification for the right business only. 🧪
-- [ ] Each metric matches its reference SQL; thresholds; non-causation note. 🧪
+- [ ] Each §10 event produces one notification for the right business only (including hold expiry). 🧪
+- [ ] Each metric matches its reference SQL; thresholds; non-causation note; no sample data in real accounts. 🧪
 
 **Security**
-- [ ] §13.2 matrix passes for every business-owned table via SQL and Data API. 🧪
-- [ ] Bundle scan finds no service-role key or server-only variables. 🧪
+- [ ] §13.2 matrix and catalog tests pass for every table. 🧪
+- [ ] Bundle scan finds no service-role key, `booking_api` credential or server-only variable. 🧪
 - [ ] Token pages send `no-store`, `no-referrer`, `noindex`. 🧪
 
-**Pilot, trial, retention, closure**
-- [ ] Pilot accounts show early-access wording, never "free trial". 🧪
-- [ ] *(Phase 7)* Trial ends exactly 7 days after activation; restricted state is read-only at the DB; no rows deleted; subscribing restores access. 🧪
-- [ ] Closure: booking page offline immediately; cancel within 30 days restores; deletion leaves zero rows for that business. 🧪
-- [ ] No automated deletion job runs while the retention flag is off. 🧪
-- [ ] Export works in every non-suspended state. 🧪
-
-**Marketing**
-- [ ] Every claim maps to shipped features; no testimonials, statistics or claims without evidence; early-access pricing shown accurately. 
-- [ ] Lighthouse mobile: Performance ≥ 90, Accessibility 100, Best Practices ≥ 95.
+**Pilot, trial, retention, closure (D-14, D-18)**
+- [ ] Pilot accounts never show "free trial". 🧪
+- [ ] *(Phase 8)* Trial ends exactly 7 days after activation; restricted state read-only at the DB; **no rows deleted**; subscribing restores access. 🧪
+- [ ] Closure grace and deletion leave zero rows for that business; deletion jobs disabled until policy approved. 🧪
 
 ---
 
-## 14. Architecture, budget and assumptions to verify
+## 14. Architecture, budget and verification requirements
 
-### 14.1 Stack
+### 14.1 Recommended architecture (REC — confirms nothing new beyond D-decisions)
 
 | Layer | Choice |
 |---|---|
-| Language | TypeScript (strict) |
-| Web | Next.js App Router; server components and server actions |
-| Database | Supabase Postgres (`btree_gist`, `pg_cron`, `citext`, `pg_trgm`) |
-| Auth | Supabase Auth with `@supabase/ssr` |
-| Owner data access | `supabase-js` with the user's session (Data API + RLS); generated types |
-| Public data access | Server-only pooled Postgres connection as `booking_api` → `public_api` functions |
-| Migrations | Supabase CLI SQL migrations |
-| Jobs | `pg_cron` |
-| Validation | Zod (server) + database constraints |
-| UI | Accessible headless primitives, our tokens only; Lucide icons |
-| Time | Timezone-aware date library (e.g., `date-fns-tz` or Temporal polyfill) |
-| Tests | Vitest, pgTAP, Playwright, axe-core, Lighthouse CI |
-| CI | GitHub Actions |
+| App | Next.js App Router, TypeScript, on Vercel (D-20) |
+| Database & Auth | Supabase Postgres + Supabase Auth (D-2, D-20); `pg_cron` |
+| Owner reads | `supabase-js` with the owner's session (Data API, RLS) |
+| Owner non-scheduling writes | `supabase-js` with the owner's session (grants + RLS + triggers) |
+| Owner scheduling/workflow changes | Server actions → owner workflow functions (D-24) |
+| Public booking | Server actions → `public_api` functions via restricted role (D-21; mechanism REC-13) |
+| Capacity | `schedule_resources` + `schedule_blocks` + locked capacity trigger (D-26, D-27) |
+| Migrations / tests | Supabase CLI SQL migrations; pgTAP; Vitest; Playwright |
+| No | Storage, Realtime for business tables, GraphQL (unless verified safe), customer messaging, payments |
 
-### 14.2 Estimated monthly cost (unverified planning estimates)
+### 14.2 Estimated monthly cost (unverified)
 
-| Item | Development | Pilot (real data) | Public launch |
-|---|---|---|---|
-| Vercel | $0 Hobby | ~$20 Pro (Hobby is non-commercial) | ~$20 |
-| Supabase | $0 Free | ~$25 Pro (backups, no pausing) | ~$25 |
-| Auth email | $0 default sender | $0 (verify limits for 3–5 pilots) | $0 free tier (provider TBD) |
-| Domain | — | Decision needed | ~$1–2 |
-| Billing + tax features | — | — | % fees; tax feature fees to evaluate |
-| **Total** | **$0** | **≈ $45** | **≈ $45–47 + % fees** |
+Development $0; pilot ≈ $45 (Vercel Pro ~$20 + Supabase Pro ~$25); public launch ≈ $45–47 plus billing percentage fees. A custom email provider may be needed before the pilot (V-12) — free tiers are expected but require registration and approval.
 
-Pilot revenue at 3–5 × $25 = $75–125 for the first month, covering infrastructure for that period.
+### 14.3 Documentation to check before implementation (none verified yet)
 
-### 14.3 Assumptions to verify before relying on them
-
-| # | Assumption |
-|---|---|
-| A-1 | Vercel Hobby is non-commercial; Pro ~$20/user/month |
-| A-2 | Supabase Free pauses inactive projects and lacks needed backups; Pro ~$25 with daily backups |
-| A-3 | `pg_cron` and `btree_gist` available on our plan |
-| A-4 | Supabase default auth email sender limits are adequate for 3–5 pilots, not for public launch |
-| A-5 | Leaked-password protection, invites and MFA availability on our plan |
-| A-6 | No file storage needed in MVP |
-| A-7 | Usage quotas suffice for ~100 businesses; spend alerts available |
-| A-8 | Billing provider fees and tax-feature pricing acceptable |
-| A-9 | Booking links on a platform subdomain will change when a domain is bought |
-| A-10 | A free bot challenge remains free (only if needed) |
-| A-11 | A custom least-privilege Postgres login role can connect from Vercel through Supabase's pooler |
-| A-12 | Pilot payment method (manual) acceptable to pilots and compliant (tax treatment of $25 pilot fee to confirm with accountant) |
+| # | Topic | What must be confirmed | Where to look | Blocks |
+|---|---|---|---|---|
+| **V-1** | Database roles | Roles present in a Supabase project (`anon`, `authenticated`, `service_role`, `authenticator`, `postgres`, others); attributes (`BYPASSRLS`, `LOGIN`); which role runs migrations and owns objects | Supabase docs: Postgres roles; database configuration; CLI migrations | Phase 1 |
+| **V-2** | Default privileges | Which default grants Supabase applies on new tables/functions/sequences in `public` (to `anon`, `authenticated`, `service_role`); how to revoke safely without breaking Supabase internals; PostgreSQL default `EXECUTE` to `PUBLIC` | Supabase docs: securing the Data API / hardening; PostgreSQL docs: `ALTER DEFAULT PRIVILEGES`, `GRANT`, function privileges | Phase 1 |
+| **V-3** | Exposed surfaces | How to set exposed schemas; whether GraphQL is enabled by default and obeys grants/RLS; Realtime publication defaults | Supabase docs: API settings, GraphQL, Realtime | Phase 1 |
+| **V-4** | RLS & function security | RLS semantics for table owners and `FORCE`; current Supabase guidance on `SECURITY DEFINER` functions, `search_path`, placing definer functions outside exposed schemas; `auth.uid()` performance pattern; database linter rules | Supabase docs: Row Level Security, database functions, database advisors; PostgreSQL docs: `CREATE POLICY`, `ALTER TABLE … FORCE ROW LEVEL SECURITY`, `CREATE FUNCTION` | Phase 1 |
+| **V-5** | API keys | Current key types (legacy anon/service_role vs publishable/secret), scopes, rotation | Supabase docs: API keys | Phase 1 |
+| **V-6** | Data API transactions | Each RPC call runs in one transaction; error propagation of `RAISE` with custom codes; request limits | Supabase docs: Data API / PostgREST functions; PostgREST docs | Phase 1 |
+| **V-7** | Server-side Auth | `@supabase/ssr` usage with Next.js App Router; how the user's JWT reaches the database from server actions | Supabase docs: server-side auth for Next.js | Phase 2 |
+| **V-8** | Custom login role | Creating a `LOGIN` role with a password on Supabase; whether it can connect through the pooler; username format; connection limits | Supabase docs: Postgres roles, connecting to your database | Phase 1 (REC-13 decision) |
+| **V-9** | Connection pooling | Supavisor transaction vs session mode; prepared statements; connection reuse from Vercel serverless/fluid functions; recommended driver settings | Supabase docs: connection pooler; Vercel docs: functions and database connections | Phase 3 |
+| **V-10** | `pg_cron` | Availability, minimum schedule interval, permissions, monitoring | Supabase docs: Cron / `pg_cron` extension | Phase 1 |
+| **V-11** | Extensions | `btree_gist`, `citext`, `pg_trgm` availability and schema placement | Supabase docs: extensions | Phase 1 |
+| **V-12** | Email verification & auth email | Default email sender restrictions and rate limits (whether it can reach non-team addresses); custom SMTP requirements; confirmation and recovery flows; disabling public sign-ups and invite flow; password strength and leaked-password protection availability by plan | Supabase docs: Auth email, SMTP, rate limits, password security, user management | **Before pilot** |
+| **V-13** | Session cookies | Cookie attributes set by Supabase SSR helpers (HttpOnly, SameSite, lifetime) and implications for XSS exposure of tokens | Supabase docs: SSR cookies | Phase 2 |
+| **V-14** | Vercel environment variables | Sensitive variable handling, per-environment scoping, which variables are exposed to the client build | Vercel docs: environment variables; Next.js docs: environment variables | Phase 2 |
+| **V-15** | `server-only` boundaries | Preventing server modules from client bundles | Next.js docs: server and client components | Phase 2 |
+| **V-16** | Client IP | Which request header Vercel guarantees for the client IP and whether it can be spoofed | Vercel docs: request headers | Phase 3 |
+| **V-17** | Server Actions security | Origin/CSRF checks and configuration for our Next.js version | Next.js docs: Server Actions security | Phase 2 |
+| **V-18** | Concurrency semantics | `SELECT … FOR UPDATE` behavior under READ COMMITTED (re-check after lock wait), deadlock detection, triggers firing order with constraints | PostgreSQL docs: explicit locking, transaction isolation, triggers | Phase 1 |
+| **V-19** | Testing toolchain | `supabase test db` with pgTAP; running the local stack in GitHub Actions; minutes for the repo's visibility | Supabase CLI docs; GitHub Actions billing docs | Phase 1 |
+| **V-20** | Plans and pricing | Vercel Hobby commercial-use terms and Pro price; Supabase Free limits (pausing, backups) and Pro price/backup retention; spend caps | Vercel and Supabase pricing/terms pages | Before pilot |
+| **V-21** | Date/time library | DST correctness for US zones in the chosen library | Library docs | Phase 3 |
 
 ### 14.4 Repository structure (proposed)
 
 ```
-/app            routes: (marketing), (auth), onboarding, app/*, b/[slug], r/[token], q/[token], api/*
-/src/domain     pure logic (slots, DST, pricing, transitions, metrics)
-/src/data       server-only data access (owner: user session; public: booking_api)
+/app            routes
+/src/domain     pure logic (slots, DST, pricing, transitions, peak usage)
+/src/data       server-only data access (owner session; public restricted role)
 /src/ui         design-system components and tokens
-/src/config     brand and product configuration
-/supabase       migrations, policies, functions, pgTAP tests, dev seed
-/tests          unit, api-isolation, e2e
-/docs           plans, decisions, legal drafts, runbooks
+/src/config     brand configuration
+/supabase       migrations, grants, policies, functions, pgTAP tests, dev seed
+/tests          unit, api-isolation, concurrency, e2e
+/docs           plans, decisions, verification notes, legal drafts, runbooks
 ```
 
 ---
 
 ## 15. Customer acquisition plan
 
-1. **Target:** independent mobile detailers and small shops in 1–3 US metro areas; aim for **3–5 pilots** with at least one or two mobile detailers.
-2. **Prospecting:** Google Business Profiles, Instagram/Facebook business pages, local car communities — manually, following platform rules. No scraping, automated DMs or bought lists.
-3. **Outreach:** individually written emails and social messages referencing the business specifically; ask for a 20-minute conversation; no claims about unbuilt features. Email follows CAN-SPAM (accurate sender, physical address, working opt-out). One follow-up maximum without a reply.
-4. **Discovery call:** current booking process, missed requests, quoting, follow-up habits, tools and spend, mobile vs. shop needs.
-5. **Pilot offer:** early access at **$25 for the first month** under written terms; onboard together; observe week one; weekly 15-minute check-ins.
-6. **Price validation:** before the paid launch, ask each pilot about continuing at **$49/month** and record answers and objections verbatim.
-7. **Funnel tracking (manual):** contacted → replied → call → pilot → active at 4 weeks → paid → willing at $49.
-8. **Expansion gate:** ≥ 3 paying pilots, ≥ 2 willing at the proposed price (or a revised price), no unscheduled blocking issues.
+1. **Target:** independent mobile detailers and small shops in 1–3 US metro areas; 3–5 pilots including mobile detailers (D-11).
+2. **Prospecting:** Google Business Profiles, Instagram/Facebook business pages, local car communities — manually. No scraping, automated DMs or bought lists.
+3. **Outreach:** individually written emails and social messages; ask for a 20-minute conversation; no claims about unbuilt features; CAN-SPAM compliant email (accurate sender, physical address, opt-out); one follow-up maximum.
+4. **Discovery call:** booking process, missed requests, quoting, follow-up habits, tools and spend, mobile vs shop needs.
+5. **Pilot offer:** $25 for the first month under written early-access terms; onboard together; weekly 15-minute check-ins.
+6. **Price validation:** ask each pilot about continuing at $49/month (D-12); record answers verbatim.
+7. **Funnel tracking (manual):** contacted → replied → call → pilot → active at 4 weeks → paid → willing at validated price.
+8. **Expansion gate:** ≥ 3 paying pilots and ≥ 2 willing at the validated price. Add one discovery question: **"How many vehicles can you work on at the same time, and does that change by day?"** to validate the capacity model.
 
 ---
 
 ## 16. Phased implementation roadmap
 
-Each phase ends with a demo on a real phone and approval before the next.
-
 | Phase | Scope | Exit criteria |
 |---|---|---|
-| **0. Foundations** | Repo, CI, lint/types, design tokens and core components; local Supabase; full schema v1 (§8) with RLS, triggers, composite FKs, exclusion constraint; roles (`booking_api`, no `anon` grants); Supabase Auth; activation; RLS test matrix generator; catalog and bundle-secret checks | Sign-in → empty dashboard at 3 widths; **§13.2 matrix green for all tables** |
-| **1. Setup & public booking** | Onboarding (incl. policies), services, size classes, availability, slot engine with DST, booking page, request flow (one vehicle), inquiry flow, status page (pending), public endpoint validation and abuse controls | A detailer configures their menu; a request is submitted from a phone; abuse tests pass |
-| **2. Booking workflow & calendar** | Inbox; approve with customer/vehicle linking; decline; propose; **holds**; duplicates; conflicts; appointments; calendar; cancel; reschedule; ask-to-reschedule; full status page; Today; notifications | Edge cases E1–E20 demonstrated/tested |
-| **3. Customers & vehicles** | Customer/vehicle CRUD, multiple vehicles, search, history, archive, delete/anonymize | Owner enters 20 customers with vehicles on a phone |
-| **4. Leads, quotes, follow-ups** | Leads, quotes (no tax), share/print, communication log, templates, tasks and rules, scheduled jobs | Inquiry → lead → quote → follow-up → booked |
-| **5. Analytics, settings, data** | Metric catalog, settings, export, account closure request flow (deletion job disabled) | Metrics match reference queries |
-| **6. Hardening & pilot launch** | Security review, CSP, restore drill, accessibility audit, performance, marketing site (early-access stage), Terms/Privacy/pilot terms drafts, monitoring; operator invite flow | 3–5 pilots onboarded at $25 first month (manual collection) |
-| **7. Paid-launch readiness** | Billing integration at validated price; subscription **tax handling**; activation-based 7-day trial; account states and `can_write`; retention schedule finalized and disclosed; deletion jobs with notices; custom SMTP; legal review; public sign-up; name clearance and domain (approved spend) | All Phase 7 criteria in §13.3 pass; legal and accountant sign-off |
-| **Later** | §3.3 by evidence | — |
+| **0. Verification (documentation only, no code)** | Work through V-1–V-21; record findings with dates and links in `docs/verification/`; resolve REC-13 mechanism, REC-21, email provider need (V-12); user decisions on open questions | Every V-item marked confirmed / changed / blocked; plan updated (revision 5 if anything changes) |
+| **1. Database foundation (recommended first implementation phase)** | Supabase CLI project; schemas; default-privilege revocations and explicit grants; all tables with composite FKs; invariants and triggers; `schedule_resources`/`schedule_blocks` with capacity trigger and lock order; owner workflow functions; `public_api` functions; restricted role; `pg_cron` jobs; pgTAP + Data API matrix; catalog checks; concurrency tests | §13.2 and §13.3 green; no application UI yet |
+| **2. Auth, activation & app shell** | Supabase Auth, invite-only sign-up, activation, server-side sessions, design tokens, core components, dashboard shell | Sign-in → shell at 3 widths; bundle secret scan green |
+| **3. Setup & public booking** | Onboarding (capacity, hours, policies, services), slot engine, public booking/inquiry through restricted server path, status page, abuse controls | Real request submitted from a phone; public isolation tests green |
+| **4. Booking workflow & calendar** | Inbox, approve/link, holds, proposals, decline, duplicates, appointments, capacity-aware calendar, cancel, reschedule | E1–E22 demonstrated/tested |
+| **5. Customers & vehicles** | CRUD, multiple vehicles, search, history, archive, anonymize | — |
+| **6. Leads, quotes, follow-ups** | Leads, quotes, communications, templates, tasks | — |
+| **7. Analytics, settings, data; hardening; pilot** | Metrics, export, closure request (deletion disabled), security review, accessibility, marketing (early access), legal drafts, pilot terms | 3–5 pilots onboarded |
+| **8. Paid-launch readiness** | Billing, subscription tax, 7-day trial, account states, retention policy and notices, email provider, legal review, public sign-up, name and domain | Phase 8 acceptance criteria pass; legal and accountant sign-off |
 
 ---
 
-## 17. Decisions, open questions and risks
+## 17. Decisions, recommendations, open questions and risks
 
-### 17.1 Confirmed decisions
+### 17.1 Approved decisions
 
-| # | Decision |
+| # | Decision | Source |
+|---|---|---|
+| D-1 | United States only | Rev 2 |
+| D-2 | Supabase Auth; RLS on business-owned tables | Rev 2 |
+| D-3 | Requests require owner approval or customer acceptance of an owner proposal | Rev 2 |
+| D-4 | Business-defined services, prices, durations, bookability; no universal prices | Rev 2 |
+| D-5 | Leads and quotes separate from booking requests | Rev 2 |
+| D-6 | No automated customer messaging in MVP; templates + owner's own apps | Rev 2 |
+| D-7 | In-app notifications only in MVP | Rev 2 |
+| D-8 | CSV import later unless pilots prove essential | Rev 2 |
+| D-9 | No customer payments, deposits or tax calculation in MVP | Rev 2–3 |
+| D-10 | Subscription billing and tax handling before public paid launch | Rev 3 |
+| D-11 | Pilot: 3–5 businesses incl. mobile detailers; $25 first month, early-access offer | Rev 3 |
+| D-12 | Public subscription target $49/month, subject to validation | Rev 3 |
+| D-13 | Booking requests without customer accounts | Rev 3 |
+| D-14 | 7-day free trial starts after email verification and activation; no card (preference) | Rev 3 |
+| D-15 | Multiple vehicles per customer; one specific vehicle per request | Rev 3 |
+| D-16 | Pending requests don't block availability; optional owner-placed temporary holds | Rev 3 |
+| D-17 | Owner-configurable cancellation/rescheduling policies; 24 h suggested default | Rev 3 |
+| D-18 | No automatic deletion when a trial ends; retention/closure/deletion documented before public launch | Rev 3 |
+| D-19 | Provisional, configurable branding; no spending | Rev 2 |
+| D-20 | Next.js + Supabase on Vercel; ≈ $45/month target | Rev 2 |
+| **D-21** | Replace direct public booking database access with a restricted server-side public booking endpoint using the minimum required privileges *(user's label "P-1")* | Rev 4 |
+| **D-22** | Explicit database permissions; disable unnecessary default privileges and grant only what each role requires *(user's "P-2")* | Rev 4 |
+| **D-23** | Database safeguards against invalid business, customer, vehicle, appointment and status relationships *(user's "P-3")* | Rev 4 |
+| **D-24** | Owners can only read their own schedule; appointment and scheduling changes use authorized server-side operations and database protections *(user's "P-4")* | Rev 4 |
+| **D-25** | Public booking must not expose private business or customer information *(user's "R-1")* | Rev 4 |
+| **D-26** | Capacity-aware scheduling: mobile defaults to 1 simultaneous job; shops configure capacity; confirmed appointments and active holds never exceed capacity; duration-aware overlap; enforced in the database under concurrency; extensible to employees/bays/resources without building employee management | Rev 4 |
+| **D-27** | Holds expire automatically by timestamp; expired holds don't block; holds cannot bypass capacity; safe handling of expiry and concurrent bookings | Rev 4 |
+
+### 17.2 Recommendations (not approved)
+
+| # | Recommendation | Essential before pilot? |
+|---|---|---|
+| REC-01 | Hold duration 2–72 h, default 24 h, ending by requested start | Needed in some form (D-27 requires expiry); values tunable |
+| REC-02 | Proposal expiry default 48 h (2–72 h) | Same |
+| REC-03 | Owner must explicitly release another request's hold when it blocks capacity | Recommended |
+| REC-04 | Customer "Ask to reschedule" (request only) | No — can wait for pilot feedback |
+| REC-05 | Max 3 open requests per contact per business; rate-limit values in §9.4 | Some limits essential; values tunable |
+| REC-06 | Restricted accounts retained 180 days with 30/7-day notices | Before public launch |
+| REC-07 | Closure grace period 30 days | Before public launch |
+| REC-08 | Retention periods (§12.5) | Before public launch; pilot terms need a stated position |
+| REC-09 | `past_due` grace 7 days | Phase 8 |
+| REC-10 | Masked contact details on status pages (implements D-25) | Strongly recommended |
+| REC-11 | Rates shown only with ≥ 5 items | No |
+| REC-12 | All request workflow changes (not only scheduling) through functions; no direct owner writes to requests | Recommended |
+| REC-13 | Mechanism for D-21: dedicated `booking_api` login role via pooler; fallback service-role module only with approval | Mechanism must be chosen in Phase 0 |
+| REC-14 | Buffers are soft warnings, not part of the capacity rule | Recommended |
+| REC-15 | Capacity decreases rejected when future usage exceeds the new capacity | Recommended (protects D-26) |
+| REC-16 | Shops' capacity prefilled with 1 and explicitly confirmed in onboarding | Recommended |
+| REC-17 | Mobile-only businesses may raise capacity (e.g., two vans) in settings | Open (Q-5) |
+| REC-18 | Completed appointments release capacity | Recommended |
+| REC-19 | Maximum capacity 20 | Tunable |
+| REC-20 | Accept that owner workflow functions are callable with the owner's own session outside our UI, since they enforce identical checks | Decision needed (Q-6) |
+| REC-21 | RLS enabled but not forced, with definer functions doing explicit checks | Needed; confirm after V-4 |
+| REC-22 | Row lock on the resource (not SERIALIZABLE) for capacity enforcement | Recommended |
+| REC-23 | Peak-usage algorithm in §6.6.3 | Recommended |
+| REC-24 | Remove the revision-3 exclusion constraint | Follows from D-26 |
+
+### 17.3 Label history (traceability)
+
+| Revision 3 / review label | Revision 4 |
 |---|---|
-| D-1 | US only |
-| D-2 | Supabase Auth; RLS on every business-owned table |
-| D-3 | Requests require owner approval or customer acceptance of an owner proposal; never auto-confirmed |
-| D-4 | Business-defined services, prices, durations, bookability; no universal prices |
-| D-5 | Leads and quotes separate from booking requests |
-| D-6 | No automated customer messaging; templates + owner's own apps |
-| D-7 | In-app notifications only in MVP |
-| D-8 | CSV import later unless pilots prove essential |
-| D-9 | No customer payments, deposits or **tax calculation** in MVP |
-| D-10 | Subscription billing and tax handling before public paid launch |
-| D-11 | Pilot: 3–5 businesses incl. mobile detailers; **$25 first month**, early-access offer |
-| D-12 | Public subscription target **$49/month**, subject to validation |
-| D-13 | No customer accounts on public booking pages |
-| D-14 | 7-day free trial starts at activation (email verified + business created); no card (preference) |
-| D-15 | Multiple vehicles per customer; one specific vehicle per request/appointment |
-| D-16 | Pending requests don't block availability; optional owner-placed temporary holds |
-| D-17 | Owner-configurable cancellation/rescheduling policies; 24 h suggested default |
-| D-18 | No automatic deletion when a trial ends; retention, closure and deletion documented before public launch |
-| D-19 | Provisional, configurable branding; no spending |
-| D-20 | Next.js + Supabase on Vercel; ≈ $45/month target |
+| Old P-1 (hold durations) | REC-01 |
+| Old P-2 (proposal expiry) | REC-02 |
+| Old P-3 (explicit release) | REC-03 |
+| Old P-4 (ask to reschedule) | REC-04 |
+| Old P-5 (caps, rate limits) | REC-05 |
+| Old P-6, P-7, P-8 (retention, closure, periods) | REC-06, REC-07, REC-08 |
+| Old P-9 (past_due grace) | REC-09 |
+| Old P-10 (`booking_api` role) | Goal approved as **D-21**; mechanism remains REC-13 |
+| Old P-11 (masking) | REC-10 (implements D-25) |
+| Old P-12 (analytics threshold) | REC-11 |
+| Review R-1 (service-role Option B) | Not recommended as default (conflicts with D-21 minimum privileges); fallback inside REC-13 |
+| Review R-2 (revoke defaults) | Approved as **D-22** |
+| Review R-3 (workflow via functions) | Scheduling part approved as **D-24**; remainder REC-12 |
+| Review R-4 (read-only schedule; purge trigger) | Read-only approved as **D-24**; purge trigger superseded by timestamp-based expiry (D-27) |
+| Review R-5 (single-session appointments) | **Withdrawn** — superseded by D-26 |
+| User's revision-4 labels "P-1", "P-2", "P-3", "P-4", "R-1" | D-21, D-22, D-23, D-24, D-25 (interpreted by their wording, not by the old numbers) |
 
-### 17.2 Proposals awaiting approval
+### 17.4 Open questions
 
-| # | Proposal |
-|---|---|
-| P-1 | Hold durations 2–72 h, default 24 h, ending no later than the requested start |
-| P-2 | Proposal expiry default 48 h (2–72 h) |
-| P-3 | Owners must explicitly release another request's hold before booking over it |
-| P-4 | Customer "Ask to reschedule" (request only) included in MVP |
-| P-5 | Max 3 open requests per contact per business; rate limits in §9.4 |
-| P-6 | Restricted accounts retained 180 days with 30/7-day notices |
-| P-7 | Account closure grace period 30 days |
-| P-8 | Retention periods in §12.5 |
-| P-9 | `past_due` grace 7 days |
-| P-10 | Public operations via `booking_api` role, not the Data API |
-| P-11 | Masked contact details on status pages |
-| P-12 | Rates shown only with ≥ 5 items |
-
-### 17.3 Open questions
-
-1. **After the $25 first month**, what do pilots pay — the public price, an early-access rate, or another free/discounted period?
-2. **How is the $25 collected** (manual invoice/payment link — which provider; requires account registration and approval)? Tax treatment of pilot fees (accountant)?
-3. **Domain timing** for stable booking links (after name clearance and approval to spend).
-4. Retention periods and closure grace acceptable before legal review?
-5. Which metro areas and first 10–20 prospects?
-6. Should "Ask to reschedule" ship in the MVP (P-4) or wait for pilot feedback?
-7. Bot challenge from day one, or only if abuse appears?
-
-### 17.4 Branding
-
-Name, short name, wordmark text and support email live only in `/src/config`; the booking page features the detailer's brand with a small "Powered by" link; no logo, domain, handles or trademark filings until cleared and approved.
+1. **Q-1:** What do pilots pay after the $25 first month?
+2. **Q-2:** How is the $25 collected (requires registering a payment provider — approval) and how is it taxed (accountant)?
+3. **Q-3:** Domain timing for stable booking links.
+4. **Q-4:** Approve or modify REC-01–REC-24.
+5. **Q-5:** May mobile-only businesses set capacity above 1 (REC-17)?
+6. **Q-6:** Is REC-20 acceptable, or must scheduling functions be callable only from our server (which would move some authorization out of the database)?
+7. **Q-7:** If V-12 shows the default auth email sender cannot reach pilot owners, approve registering an email provider (free tier) before the pilot?
+8. **Q-8:** If V-8/V-9 show the `booking_api` role is not workable, approve the service-role fallback in REC-13 or choose another mechanism?
+9. **Q-9:** Which metro areas and first prospects?
+10. **Q-10:** Create a `main` branch and open a pull request for the planning documents?
 
 ### 17.5 Risks
 
-| Risk | Impact | Mitigation |
-|---|---|---|
-| Cross-business data exposure via Data API | Fatal | Forced RLS everywhere, minimal grants, triggers, composite FKs, §13.2 matrix in CI, catalog checks, Supabase advisor |
-| Custom `booking_api` role not feasible on plan (A-11) | Public endpoint design changes | Fallback: server-only module using the service-role key **only** to call `public_api` functions (never table access), with the same rate limits; requires explicit approval |
-| Service-role / DB credential leak | Full compromise | Not deployed in MVP; server-only modules; bundle scan; rotation runbook |
-| Hold/conflict logic bugs | Double-booking or lost slots | Single exclusion constraint for all blocks; concurrency tests; lazy + scheduled expiry |
-| Customers miss status changes (no messaging) | Missed proposals | Status link everywhere; holds and proposal expiry visible; owner prompted to contact |
-| Owners miss requests (in-app only) | Lost jobs | Today screen, badges, polling, home-screen install, response task rule; owner email first post-MVP |
-| Timezone/DST errors | Wrong-time jobs | UTC storage, allow-listed zones, DST test suite |
-| $49 price not validated | Revenue risk | Explicit validation with pilots before publishing |
-| Pilot payments handled informally | Accounting/tax gaps | Accountant check; written pilot terms |
-| Unexpected deletion | Trust loss | No deletion at trial end; deletion jobs disabled until policy, disclosure and notices |
-| Free-tier/pricing changes | Budget | Verify A-1…A-12; spend alerts |
-| Brand not cleared | Rebrand | Config-only branding |
-| Spam on public forms | Noise | Rate limits, honeypot, timing, cap, optional challenge |
-| Feature creep | Delay | Intake rule (§3.4) |
-| Legal/privacy gaps | Compliance | §12.7 documentation; legal review before paid launch |
-| Single developer | Stalls | Simple architecture, tests, docs |
+| Risk | Mitigation |
+|---|---|
+| Default privileges or exposed surfaces leak data | D-22 revocations; catalog tests; V-1–V-3 |
+| Definer functions bypass RLS incorrectly | Explicit checks, `search_path = ''`, per-function tests, linter |
+| Capacity check bug → overbooking | Single locked trigger path; concurrency suite; invariant checks |
+| Lock contention or deadlocks | Fixed lock order; short single-call transactions; deadlock tests |
+| `booking_api` role not feasible (V-8) | Q-8 fallback decision |
+| Pooler/transaction mismatch (V-9) | One call = one transaction design |
+| Auth email blocked for pilots (V-12) | Q-7 |
+| Customers miss status changes | Status link everywhere; owner prompted to contact |
+| Owners miss requests (in-app only) | Today screen, badges, tasks; owner email post-MVP |
+| Multi-resource needs (technician + bay) arrive early | Allocation table extension path (§8.6.3) |
+| Timezone/DST errors | UTC storage, allow-listed zones, tests |
+| $49 not validated | Pilot validation before publishing |
+| Unexpected deletion | No deletion at trial end; deletion jobs disabled until approved |
+| Legal/privacy gaps | §12.7; legal review |
+| Single developer | Database-first, tests, docs |
+
+### 17.6 Branding
+
+Name, wordmark text and support email live only in `/src/config`; public booking pages feature the detailer's brand with a small "Powered by" link; no logo, domain, handles or trademark filings until cleared and approved (D-19).

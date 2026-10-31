@@ -6,6 +6,8 @@ import styles from './settings.module.css';
 
 const TABS = [
   { href: '/app/settings', label: 'Business' },
+  { href: '/app/settings/branding', label: 'Branding' },
+  { href: '/app/settings/appearance', label: 'Appearance' },
   { href: '/app/settings/account', label: 'Account' },
 ];
 

@@ -39,7 +39,12 @@ export const track = (id: string) => created.add(id);
 export async function cleanup() {
   for (const id of created) {
     const { rows } = await db.query('select business_id from public.memberships where user_id = $1', [id]);
-    for (const row of rows) await db.query('select app.delete_business_data($1)', [row.business_id]);
+    for (const row of rows) {
+      // Phase 6: remove the business's image files first (SQL can't delete Storage files).
+      const { rows: files } = await db.query('select storage_path from public.media_assets where business_id = $1', [row.business_id]);
+      if (files.length) await admin.storage.from('business-media').remove(files.map((f) => f.storage_path as string));
+      await db.query('select app.delete_business_data($1)', [row.business_id]);
+    }
     await admin.auth.admin.deleteUser(id).catch(() => {});
   }
   created.clear();

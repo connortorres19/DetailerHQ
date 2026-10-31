@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   bookingErrorMessage,
-  bookingPageTextSchema,
+  onlineCancellationSchema,
   contactSchema,
   cutoffPhrase,
   estimate,
@@ -123,10 +123,7 @@ test('status copy never calls a pending request confirmed', () => {
   assert.equal(statusCopy(cancelled).next, 'You cancelled this appointment.');
 });
 
-test('owner booking-page text: limits match the database, blanks become null', () => {
-  const ok = bookingPageTextSchema.parse({ intro: '  Hand-washed, never rushed. ', cancellation: '', rescheduling: '', prep: '', onlineCancellation: 'on' });
-  assert.deepEqual(ok, { intro: 'Hand-washed, never rushed.', cancellation: null, rescheduling: null, prep: null, onlineCancellation: true });
-  assert.equal(bookingPageTextSchema.parse({ intro: '', cancellation: '', rescheduling: '', prep: '' }).onlineCancellation, false);
-  assert.ok(!bookingPageTextSchema.safeParse({ intro: 'x'.repeat(301), cancellation: '', rescheduling: '', prep: '' }).success);
-  assert.ok(!bookingPageTextSchema.safeParse({ intro: '', cancellation: 'x'.repeat(1001), rescheduling: '', prep: '' }).success);
+test('booking page: the online-cancellation switch (wording moved to branding: leads/branding tests)', () => {
+  assert.equal(onlineCancellationSchema.parse({ onlineCancellation: 'on' }).onlineCancellation, true);
+  assert.equal(onlineCancellationSchema.parse({}).onlineCancellation, false);
 });

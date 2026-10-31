@@ -31,7 +31,7 @@
 
 .primary {
   background: var(--graphite-900);
-  color: #fff;
+  color: var(--color-action-primary-text);
 }
 
 .primary:hover {

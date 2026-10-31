@@ -224,7 +224,7 @@ Gridlines `graphite-100`, axis text `graphite-500`, no chart backgrounds, no 3D,
 
 ### 3.7 Dark mode
 
-The dashboard ships light-only in the MVP (high contrast in sunlight). All colors are defined as semantic tokens (§15) so a dark theme can be added later without touching components. The **marketing site** uses dark graphite sections intentionally.
+The dashboard ships light-only in the MVP (high contrast in sunlight). All colors are defined as semantic tokens (§15) so a dark theme can be added later without touching components. **Phase 6:** owners can choose Light, Dark or Match my device (Settings → Appearance); dark reverses the graphite scale with the same token names (docs/PHASE6_BRANDING.md). Public pages stay light in the business's own colours. The **marketing site** uses dark graphite sections intentionally.
 
 ---
 

@@ -1,0 +1,125 @@
+.form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.options {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+@media (min-width: 768px) {
+  .options {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.option {
+  position: relative;
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  cursor: pointer;
+}
+
+.option:has(input:checked) {
+  border-color: var(--color-text-primary);
+  box-shadow: inset 0 0 0 1px var(--color-text-primary);
+}
+
+.option:has(input:focus-visible) {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.option input {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--color-text-primary);
+}
+
+/* A small, literal sample of each theme (fixed colours: it shows the theme, not the current one). */
+.sample {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid #dadad6;
+  border-radius: var(--radius-sm);
+  background: #fafaf9;
+}
+
+.sampleBar,
+.sampleLine,
+.sampleLineShort {
+  display: block;
+  height: 6px;
+  border-radius: 2px;
+  background: #171716;
+}
+
+.sampleBar {
+  width: 40%;
+}
+
+.sampleLine {
+  background: #bdbdb8;
+}
+
+.sampleLineShort {
+  width: 60%;
+  background: #bdbdb8;
+}
+
+[data-theme-option='dark'] .sample {
+  border-color: #383835;
+  background: #131312;
+}
+
+[data-theme-option='dark'] .sampleBar {
+  background: #f0efeb;
+}
+
+[data-theme-option='dark'] .sampleLine,
+[data-theme-option='dark'] .sampleLineShort {
+  background: #4e4e4a;
+}
+
+[data-theme-option='system'] .sample {
+  border-color: #8e8e89;
+  background: linear-gradient(90deg, #fafaf9 50%, #131312 50%);
+}
+
+[data-theme-option='system'] .sampleBar {
+  background: linear-gradient(90deg, #171716 50%, #f0efeb 50%);
+  width: 100%;
+}
+
+.text {
+  display: grid;
+  gap: 2px;
+  padding-right: var(--space-6);
+}
+
+.label {
+  font-weight: 600;
+}
+
+.hint,
+.note {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
+.note {
+  margin-top: var(--space-4);
+}

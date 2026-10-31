@@ -43,13 +43,15 @@ begin
 end
 $$;
 grant execute on function pg_temp.returns_error(text, text, text, text) to booking_api;
+-- Phase 6: a business email exists, so the check below proves it isn't published by default.
+update public.businesses set email = 'alpha-owner@example.com' where slug = 'alpha-detail';
 
 select pg_temp.as_booking_api();
 
 -- Booking page: allow-listed public fields only ----------------------------------
 select is(
   (select array_agg(key order by key) from jsonb_object_keys(public_api.get_booking_page('alpha-detail')) key),
-  array['accepting_requests','booking_mode','categories','intro','name','phone','policies','service_area','service_mode','services',
+  array['accepting_requests','booking_mode','branding','categories','intro','name','phone','policies','service_area','service_mode','services',
         'shop_address','size_classes','slug','timezone'],
   'booking page returns only the allow-listed keys');
 select is(
@@ -57,8 +59,9 @@ select is(
           jsonb_object_keys(s) key where s ->> 'name' = 'Full detail'),
   array['by_size','category_id','description','duration_min','id','is_addon','name','price_cents','price_type'],
   'service entries expose only public service fields');
-select ok(public_api.get_booking_page('alpha-detail')::text !~* 'email|account_status|capacity|customer',
-          'booking page leaks no email, account status, capacity or customer data');
+select ok(public_api.get_booking_page('alpha-detail')::text !~* 'account_status|capacity|customer'
+          and public_api.get_booking_page('alpha-detail')::text not like '%alpha-owner@example.com%',
+          'booking page leaks no email (unless the owner publishes it: 16_branding_media), account status, capacity or customer data');
 select is(public_api.get_booking_page('no-such-business'), null, 'unknown slug returns nothing');
 
 -- Submission ---------------------------------------------------------------------------

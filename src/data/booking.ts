@@ -13,10 +13,11 @@ export const getPublicBookingPage = cache(async (slug: string): Promise<BookingP
   return bookingPageSchema.parse(result.data);
 });
 
-// The owner's own page in any state (signed in, RLS + membership checked in the database).
-export async function getPreviewBookingPage(): Promise<BookingPage> {
+// The owner's own page in any state (signed in, RLS + membership checked in the database);
+// with `draft`, the saved but unpublished branding (Phase 6).
+export async function getPreviewBookingPage(draft = false): Promise<BookingPage> {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc('preview_booking_page');
+  const { data, error } = draft ? await supabase.rpc('preview_branding_draft') : await supabase.rpc('preview_booking_page');
   if (error) throw new Error(`Could not load the booking page preview: ${error.message}`);
   return bookingPageSchema.parse(data);
 }

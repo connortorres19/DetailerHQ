@@ -70,7 +70,7 @@
 
 .views a[aria-current='page'] {
   background: var(--graphite-900);
-  color: #fff;
+  color: var(--graphite-0); /* white in light, deep graphite in dark (on --graphite-900) */
 }
 
 .legend {
@@ -259,7 +259,7 @@ a.entry:focus-visible {
   border-radius: 999px;
   background: var(--graphite-900);
   font-size: 11px;
-  color: #fff;
+  color: var(--graphite-0); /* white in light, deep graphite in dark (on --graphite-900) */
 }
 
 .agendaList {

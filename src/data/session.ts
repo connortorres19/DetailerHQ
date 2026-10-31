@@ -3,6 +3,7 @@ import { cache } from 'react';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import type { Database } from '@/types/database';
+import { asTheme, type Theme } from '@/domain/theme';
 
 export type Business = Database['public']['Tables']['businesses']['Row'];
 export type SessionUser = { id: string; email: string };
@@ -43,3 +44,12 @@ export async function requireBusiness(next = '/app'): Promise<{ user: SessionUse
   if (!business) redirect('/onboarding');
   return { user, business };
 }
+
+// The signed-in user's dashboard theme (Phase 6). Defaults to following the device.
+export const getThemePreference = cache(async (): Promise<Theme> => {
+  const user = await getUser();
+  if (!user) return 'system';
+  const supabase = await createClient();
+  const { data } = await supabase.from('user_preferences').select('theme').eq('user_id', user.id).maybeSingle();
+  return asTheme(data?.theme);
+});

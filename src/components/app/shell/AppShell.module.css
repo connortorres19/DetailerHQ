@@ -11,7 +11,7 @@
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
   background: var(--graphite-900);
-  color: #fff;
+  color: var(--graphite-0); /* white in light, deep graphite in dark (on --graphite-900) */
 }
 
 .skip:focus {

@@ -115,16 +115,17 @@ port = 54324
 # sender_name = "Admin"
 
 [storage]
-enabled = false
+# Phase 6: business images (logos, covers, gallery, service photos). One private bucket; the
+# server re-encodes every upload to WebP, and Row Level Security on storage.objects decides who
+# may read, add or delete each object (migration 20261102120000_branding_media.sql).
+enabled = true
 # The maximum file size allowed (e.g. "5MB", "500KB").
-file_size_limit = "50MiB"
+file_size_limit = "4MiB"
 
-# Uncomment to configure local storage buckets
-# [storage.buckets.images]
-# public = false
-# file_size_limit = "50MiB"
-# allowed_mime_types = ["image/png", "image/jpeg"]
-# objects_path = "./images"
+[storage.buckets.business-media]
+public = false
+file_size_limit = "4MiB"
+allowed_mime_types = ["image/webp"]
 
 # Allow connections via S3 compatible clients
 [storage.s3_protocol]

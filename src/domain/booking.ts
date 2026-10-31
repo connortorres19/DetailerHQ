@@ -8,6 +8,30 @@ import { formatCents, formatDuration } from './service.ts';
 
 const priceType = z.enum(['fixed', 'starting_at', 'quote_required']);
 
+// Phase 6: the published look (app.branding_payload). Images are referenced by id and served from
+// /media/<id>.webp; links were validated by the database (https, the network's own domain).
+const pageAsset = z.object({ id: z.uuid(), width: z.number(), height: z.number() });
+const pageBrandingSchema = z.object({
+  colors: z.object({ primary: z.string().nullable(), secondary: z.string().nullable(), accent: z.string().nullable() }),
+  logo: pageAsset.nullable(),
+  cover: pageAsset.nullable(),
+  gallery: z.array(pageAsset),
+  service_photos: z.record(z.string(), pageAsset),
+  website_url: z.string().nullable(),
+  social: z.record(z.string(), z.string()),
+  email: z.string().nullable(),
+});
+export const NO_BRANDING: z.infer<typeof pageBrandingSchema> = {
+  colors: { primary: null, secondary: null, accent: null },
+  logo: null,
+  cover: null,
+  gallery: [],
+  service_photos: {},
+  website_url: null,
+  social: {},
+  email: null,
+};
+
 export const bookingPageSchema = z.object({
   name: z.string(),
   slug: z.string(),
@@ -46,9 +70,11 @@ export const bookingPageSchema = z.object({
     }),
   ),
   published: z.boolean().optional(), // owner preview only
+  branding: pageBrandingSchema.default(NO_BRANDING),
 });
 
 export type BookingPage = z.infer<typeof bookingPageSchema>;
+export type PageBranding = BookingPage['branding'];
 export type PublicService = BookingPage['services'][number];
 
 export const slotsSchema = z.object({
@@ -291,17 +317,9 @@ export { formatDuration };
 
 // --- Owner: what the booking page says (booking_settings text columns) ----------------------
 
-const ownerText = (max: number) =>
-  z
-    .string()
-    .trim()
-    .max(max, `Use ${max.toLocaleString('en-US')} characters or fewer.`)
-    .transform((v) => v || null);
 
-export const bookingPageTextSchema = z.object({
-  intro: ownerText(300),
-  cancellation: ownerText(1000),
-  rescheduling: ownerText(1000),
-  prep: ownerText(1000),
+// Booking page → whether customers may cancel online. (The wording customers read moved to
+// Settings → Branding in Phase 6: domain/branding brandingFormSchema.)
+export const onlineCancellationSchema = z.object({
   onlineCancellation: z.string().optional().transform((v) => v === 'on'),
 });

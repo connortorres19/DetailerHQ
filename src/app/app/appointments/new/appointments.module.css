@@ -96,7 +96,7 @@
 
 .segmented button[aria-selected='true'] {
   background: var(--graphite-900);
-  color: #fff;
+  color: var(--graphite-0); /* white in light, deep graphite in dark (on --graphite-900) */
 }
 
 .search {

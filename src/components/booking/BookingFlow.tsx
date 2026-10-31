@@ -16,6 +16,7 @@ import {
   type BookingPage,
   type Slots,
 } from '@/domain/booking';
+import { mediaUrl } from '@/domain/branding';
 import { formatPhone } from '@/domain/business';
 import { idle, type FormState } from '@/domain/forms';
 import { US_TIMEZONES } from '@/domain/business';
@@ -559,8 +560,14 @@ function Menu({
               const quote = s.price_type === 'quote_required';
               const l = priceFor(s, sizeId);
               const price = quote ? 'Quote required' : sizeId ? linePrice(l) : priceRange(s, sizeIds);
+              const photo = page.branding.service_photos[s.id];
               const content = (
                 <>
+                  {photo ? (
+                    // Decorative: the service name sits right beside it.
+                    // eslint-disable-next-line @next/next/no-img-element -- same-origin, already sized WebP
+                    <img className={styles.rowPhoto} src={mediaUrl(photo.id)} alt="" width={photo.width} height={photo.height} loading="lazy" decoding="async" />
+                  ) : null}
                   <span className={styles.rowText}>
                     <span className={styles.rowName}>{s.name}</span>
                     {s.description ? <span className={styles.rowDesc}>{s.description}</span> : null}

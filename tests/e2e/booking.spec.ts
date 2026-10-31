@@ -54,17 +54,21 @@ test('publishing: offline pages are unavailable, the owner previews and puts the
   await expect(visitor.getByRole('heading', { name: 'Northside Detail Co.' })).toBeVisible();
   await expect(visitor.getByText('Hand-washed, never rushed.')).toBeVisible();
 
-  // The owner's wording and the online-cancellation switch reach the public page.
-  await page.getByLabel('About your business').fill('Family-run since 2015. We bring water and power.');
+  // The online-cancellation switch (Booking page) and the owner's wording (Settings → Branding,
+  // published — Phase 6) reach the public page.
   await page.getByLabel('Customers can cancel online with their booking link').uncheck();
-  await page.getByLabel('About your business').press('Tab');
-  await page.getByRole('button', { name: 'Save booking page details' }).click();
-  await expect(page.getByText('Booking page details saved.')).toBeVisible();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByText('Customers contact you to cancel.')).toBeVisible();
+  await page.getByRole('link', { name: 'Edit branding' }).click();
+  await page.getByLabel('About your business').fill('Family-run since 2015. We bring water and power.');
+  await page.getByRole('button', { name: 'Publish', exact: true }).click();
+  await expect(page.getByText(/Published\./)).toBeVisible();
   await visitor.reload();
   await expect(visitor.getByText('Family-run since 2015. We bring water and power.')).toBeVisible();
   await expect(visitor.getByText('To cancel, contact Northside Detail Co. directly.')).toBeVisible();
   await page.getByLabel('About your business').fill('x'.repeat(301));
   expect(await page.getByLabel('About your business').inputValue()).toHaveLength(300); // browser limit; server limit in unit tests
+  await page.goto('/app/booking-page');
 
   await page.getByRole('button', { name: 'Take offline' }).click();
   await expect(page.getByText('Your booking page is offline.')).toBeVisible();

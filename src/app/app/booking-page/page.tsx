@@ -7,7 +7,7 @@ import { Panel } from '@/components/app/ui/Panel';
 import { requireBusiness } from '@/data/session';
 import { env } from '@/lib/env';
 import { createClient } from '@/lib/supabase/server';
-import { CopyBookingLink, LiveForm, TextForm } from './forms';
+import { CancellationForm, CopyBookingLink, LiveForm } from './forms';
 import styles from './booking-page.module.css';
 
 export const metadata: Metadata = { title: 'Booking page' };
@@ -18,7 +18,7 @@ export default async function BookingPageSettings() {
   const [settings, hours, services] = await Promise.all([
     supabase
       .from('booking_settings')
-      .select('intro_text, cancellation_policy_text, reschedule_policy_text, prep_instructions, customer_can_cancel, booking_mode')
+      .select('customer_can_cancel, booking_mode')
       .single(),
     supabase.from('availability_rules').select('id', { count: 'exact', head: true }),
     supabase.from('services').select('id', { count: 'exact', head: true }).is('archived_at', null).eq('is_bookable', true).eq('is_addon', false),
@@ -74,16 +74,17 @@ export default async function BookingPageSettings() {
             </p>
           </div>
         </Panel>
-        <Panel title="What customers read" id="text">
-          <TextForm
-            initial={{
-              intro: s.intro_text ?? '',
-              cancellation: s.cancellation_policy_text ?? '',
-              rescheduling: s.reschedule_policy_text ?? '',
-              prep: s.prep_instructions ?? '',
-              onlineCancellation: s.customer_can_cancel ? 'on' : '',
-            }}
-          />
+        <Panel title="Look and wording" id="text">
+          <p className={styles.hint}>
+            Your logo, colours, cover photo, gallery, description and policies are set in <Link href="/app/settings/branding">Settings → Branding</Link>,
+            with a live preview before you publish.
+          </p>
+          <div className={styles.buttons}>
+            <ButtonLink href="/app/settings/branding">Edit branding</ButtonLink>
+          </div>
+        </Panel>
+        <Panel title="Cancelling online" id="cancelling">
+          <CancellationForm online={s.customer_can_cancel} />
         </Panel>
       </div>
     </>

@@ -87,7 +87,7 @@ Migration 10 (`20261031130000_availability.sql`) reuses `availability_rules`, `t
 Migration 11 (`20261031140000_public_booking.sql`) builds on the Phase 1 restricted public API (migration 6) — no new tables.
 
 **Routes**
-- `/book/[slug]` — the business's public page: name, initials mark (no logo uploads yet), service area or shop address, phone/text, description (`booking_settings.intro_text`), services grouped by category, booking policies. Unknown, unpublished, suspended or closing businesses all get the same 404 "This booking page isn't available".
+- `/book/[slug]` — the business's public page: name, initials mark or the published logo (Phase 6), service area or shop address, phone/text, description (`booking_settings.intro_text`), services grouped by category, booking policies. Unknown, unpublished, suspended or closing businesses all get the same 404 "This booking page isn't available".
 - `/book/[slug]/preview` — the signed-in owner's own page in any state (live or offline), with real times; booking disabled. Anyone else: 404.
 - `/r/[token]` — the customer's status link (DESIGN_SYSTEM §13.11): status headline (PRODUCT_PLAN §6.4), time, price breakdown, vehicle, masked contact, withdraw / cancel / accept or decline a suggested time. `Referrer-Policy: no-referrer`, `noindex`, `no-store`.
 - `/app/booking-page` — owner: Live/Offline, link + copy, preview, readiness checklist, description and policy text, online-cancellation switch. Nav item "Booking page"; Today checklist "Put your booking page live".
@@ -128,7 +128,7 @@ The plan and design system name the public route `/b/[slug]`; Phase 4C uses `/bo
 
 - **Fixed during 4C:** the "Review" button became the submit button during the same click (same DOM element), submitting the form once before the customer pressed Send. Buttons now have distinct keys; regression-tested.
 - **Fixed during 4C:** `db reset` left `booking_api` without a login (local booking pages broke after `npm test`); handled by `scripts/booking-role.mjs`.
-- No logo uploads (no storage yet) — the header shows the business's initials. No emails or texts are sent: the customer keeps the status link shown on screen (copy-link button).
+- (Phase 6: logos, cover, gallery and service photos — see docs/PHASE6_BRANDING.md; without a logo the header shows the business's initials.) No emails or texts are sent: the customer keeps the status link shown on screen (copy-link button).
 - Business email is not shown publicly (Phase 1 allow-list); phone is.
 - One vehicle and one main service per booking (plus add-ons); several main services in one booking is possible in the database but not offered in the UI.
 - Approval-mode requests can't yet be approved from the dashboard — that's Phase 4D (owner request management).

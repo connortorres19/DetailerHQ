@@ -7,8 +7,8 @@ select plan(7);
 select is(
   (select array_agg(version order by version) from supabase_migrations.schema_migrations),
   array['20261030120000','20261030120100','20261030120200','20261030120300','20261030120400',
-        '20261030120500','20261030120600','20261030120700','20261031120000','20261031130000','20261031140000','20261031150000','20261031160000','20261101120000','20261101130000'],
-  'all fifteen migrations are recorded, in order');
+        '20261030120500','20261030120600','20261030120700','20261031120000','20261031130000','20261031140000','20261031150000','20261031160000','20261101120000','20261101130000','20261102120000'],
+  'all sixteen migrations are recorded, in order');
 
 create temp table ctx as
 select pg_temp.make_business('a@example.com', 'alpha-detail', 'shop', 2) as biz_a,
@@ -64,7 +64,8 @@ select is(
                case when c.relname = 'businesses' then 'id' else 'business_id' end, (select biz_a from ctx)),
              false, true, '')))[1]::text::int as cnt
        from pg_class c join pg_namespace n on n.oid = c.relnamespace
-      where n.nspname = 'public' and c.relkind = 'r') t),
+      where n.nspname = 'public' and c.relkind = 'r'
+        and (c.relname = 'businesses' or exists (select 1 from pg_attribute a where a.attrelid = c.oid and a.attname = 'business_id' and not a.attisdropped))) t),
   0, 'no row with business A''s id remains in any public table');
 
 select is((select count(*)::int from public.memberships where business_id = (select biz_a from ctx)), 0, 'membership removed');

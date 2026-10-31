@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { BookingFlow } from '@/components/booking/BookingFlow';
+import { BrandScope, Gallery } from '@/components/booking/Branding';
 import { BusinessHeader } from '@/components/booking/BusinessHeader';
 import { Policies } from '@/components/booking/Policies';
 import { getPublicBookingPage } from '@/data/booking';
@@ -22,10 +23,11 @@ export default async function BookingPage({ params }: Props) {
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: page.timezone }).format(new Date());
 
   return (
-    <>
+    <BrandScope branding={page.branding}>
       <BusinessHeader page={page} />
       <BookingFlow page={page} today={today} loadSlots={loadSlots} submit={submitBooking.bind(null, page.slug)} />
+      <Gallery branding={page.branding} name={page.name} />
       <Policies page={page} />
-    </>
+    </BrandScope>
   );
 }

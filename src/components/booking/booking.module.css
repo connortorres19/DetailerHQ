@@ -60,8 +60,8 @@
   width: 56px;
   height: 56px;
   border-radius: var(--radius-md);
-  background: var(--graphite-900);
-  color: #fff;
+  background: var(--brand-solid, var(--graphite-900));
+  color: var(--brand-on-solid, #fff);
   font-size: 20px;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -115,6 +115,145 @@
   color: var(--color-text-label);
 }
 
+/* --- Phase 6: the owner's branding ------------------------------------------------------ */
+
+.brandScope {
+  display: contents;
+}
+
+.businessWrap {
+  border-bottom: 1px solid var(--color-border-default);
+}
+
+.businessWrap .business {
+  border-bottom: 0;
+}
+
+.cover {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  margin-bottom: var(--space-5);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-subtle);
+}
+
+@media (min-width: 640px) {
+  .cover {
+    aspect-ratio: 5 / 2;
+  }
+}
+
+/* No cover photo: the secondary colour frames the header (text colour chosen for contrast). */
+.banded {
+  margin-bottom: var(--space-2);
+  padding: var(--space-5) var(--space-5) 0;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--brand-band);
+  color: var(--brand-on-band);
+}
+
+.banded .businessLine,
+.banded .intro,
+.banded .contactList li {
+  color: var(--brand-on-band-muted);
+}
+
+.banded .contactList a,
+.banded .social a {
+  color: var(--brand-on-band);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.banded .logo {
+  border-color: transparent;
+}
+
+.logo {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 64px;
+  height: 64px;
+  padding: 6px;
+  overflow: hidden;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: #ffffff;
+}
+
+.logo img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+.social {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+}
+
+.social a {
+  color: var(--color-text-link);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.social a:hover {
+  text-decoration: underline;
+}
+
+.gallerySection {
+  margin-top: var(--space-10);
+}
+
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 640px) {
+  .gallery {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.gallery a {
+  display: block;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.gallery a:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.gallery img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: var(--color-bg-subtle);
+}
+
 /* --- Flow ------------------------------------------------------------------------------- */
 
 .flow {
@@ -160,7 +299,7 @@
 }
 
 .progressBar li.progressDone {
-  background: var(--graphite-900);
+  background: var(--brand-accent, var(--graphite-900));
 }
 
 .noAccount {
@@ -254,12 +393,12 @@
   width: 16px;
   height: 16px;
   margin: 0;
-  accent-color: var(--graphite-900);
+  accent-color: var(--brand-accent, var(--graphite-900));
 }
 
 .sizeOption:has(input:checked) {
-  border-color: var(--graphite-900);
-  box-shadow: inset 0 0 0 1px var(--graphite-900);
+  border-color: var(--brand-accent, var(--graphite-900));
+  box-shadow: inset 0 0 0 1px var(--brand-accent, var(--graphite-900));
 }
 
 .sizeOption:has(input:focus-visible) {
@@ -324,15 +463,39 @@ div.row {
   cursor: default;
 }
 
+/* Phase 6: a service photo takes its own column. */
+.row:has(> .rowPhoto) {
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+}
+
+div.row:has(> .rowPhoto) {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.rowPhoto {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  background: var(--color-bg-subtle);
+}
+
+@media (min-width: 640px) {
+  .rowPhoto {
+    width: 72px;
+    height: 72px;
+  }
+}
+
 .row input {
   width: 18px;
   height: 18px;
   margin: 2px 0 0;
-  accent-color: var(--graphite-900);
+  accent-color: var(--brand-accent, var(--graphite-900));
 }
 
 .row:has(input:checked) {
-  background: var(--color-bg-selected);
+  background: var(--brand-tint, var(--color-bg-selected));
 }
 
 .row:has(input:focus-visible) {
@@ -417,9 +580,9 @@ div.row {
 }
 
 .date[aria-selected='true'] {
-  border-color: var(--graphite-900);
-  background: var(--graphite-900);
-  color: #fff;
+  border-color: var(--brand-solid, var(--graphite-900));
+  background: var(--brand-solid, var(--graphite-900));
+  color: var(--brand-on-solid, #fff);
 }
 
 .dateDay,
@@ -458,9 +621,9 @@ div.row {
 }
 
 .time[aria-checked='true'] {
-  border-color: var(--graphite-900);
-  background: var(--graphite-900);
-  color: #fff;
+  border-color: var(--brand-solid, var(--graphite-900));
+  background: var(--brand-solid, var(--graphite-900));
+  color: var(--brand-on-solid, #fff);
 }
 
 .date:focus-visible,
@@ -558,7 +721,7 @@ div.row {
   width: 18px;
   height: 18px;
   margin: 2px 0 0;
-  accent-color: var(--graphite-900);
+  accent-color: var(--brand-accent, var(--graphite-900));
 }
 
 .consentError {

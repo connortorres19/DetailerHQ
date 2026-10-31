@@ -24,9 +24,9 @@ export function Button({
   );
 }
 
-export function ButtonLink({ variant = 'secondary', size = 'md', icon, children, className, href }: Common & { href: string }) {
+export function ButtonLink({ variant = 'secondary', size = 'md', icon, children, className, href, target }: Common & { href: string; target?: '_blank' }) {
   return (
-    <Link href={href} className={classes(variant, size, className)}>
+    <Link href={href} className={classes(variant, size, className)} target={target} rel={target ? 'noopener' : undefined}>
       {icon}
       <span>{children}</span>
     </Link>

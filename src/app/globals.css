@@ -1,7 +1,12 @@
 /* DetailerHQ design tokens — docs/DESIGN_SYSTEM.md §3–§8, §15.
    Components consume semantic tokens only; raw palette values live here. */
 
-:root {
+/* Light is the default everywhere. [data-theme='light'] re-applies it inside a dark dashboard
+   (e.g. the branding preview, which shows the public page). */
+:root,
+[data-theme='light'] {
+  color-scheme: light;
+
   /* Palette: graphite (warm neutral) */
   --graphite-0: #ffffff;
   --graphite-25: #fafaf9;
@@ -138,6 +143,115 @@
   --leading-body-sm: 20px;
   --text-overline: 12px;
   --leading-overline: 16px;
+}
+
+/* ------------------------------------------------------------- dashboard dark theme (Phase 6)
+   Only the signed-in dashboard is themed: app/app/layout.tsx renders <div class="app-theme"
+   data-theme="light|dark|system"> from the user's saved preference, so the right theme is in the
+   first HTML (no flash, no script). Public pages never carry it and stay light, in the business's
+   own colours. The two blocks below must stay identical (tests/unit/theme.test.ts checks). */
+:root:has(.app-theme[data-theme='dark']) {
+  color-scheme: dark;
+
+  /* Graphite reversed: surfaces deep and warm, text light — the same names, so components keep
+     their roles (graphite-900 is still "strongest ink", graphite-0 still "surface"). */
+  --graphite-0: #1c1c1b;
+  --graphite-25: #131312;
+  --graphite-50: #222220;
+  --graphite-100: #2b2b29;
+  --graphite-200: #383835;
+  --graphite-300: #4e4e4a;
+  --graphite-400: #7a7a74;
+  --graphite-500: #a3a29b;
+  --graphite-600: #bcbbb4;
+  --graphite-700: #d2d1cb;
+  --graphite-800: #e2e1dc;
+  --graphite-900: #f0efeb;
+  --graphite-950: #fafaf8;
+  --steel-50: #1a2531;
+  --steel-100: #213040;
+  --steel-500: #6f9cc9;
+  --steel-600: #8fb4dc;
+  --steel-700: #b2cbe6;
+
+  --color-text-inverse: #171716;
+  --color-text-inverse-muted: #52524e;
+  --color-action-primary-text: #171716;
+
+  --color-attention-text: #e8b964;
+  --color-attention-bg: #2a2213;
+  --color-attention-border: #4a3c1e;
+  --color-info-text: #8fb4dc;
+  --color-info-bg: #16212c;
+  --color-info-border: #2a3d52;
+  --color-positive-text: #86c79a;
+  --color-positive-bg: #14231a;
+  --color-positive-border: #2a4634;
+  --color-critical-text: #f0948a;
+  --color-critical-bg: #2d1613;
+  --color-critical-border: #57302a;
+  --color-neutral-text: #bcbbb4;
+  --color-neutral-bg: #232321;
+  --color-neutral-border: #3a3a37;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:has(.app-theme[data-theme='system']) {
+    color-scheme: dark;
+
+    /* Graphite reversed: surfaces deep and warm, text light — the same names, so components keep
+       their roles (graphite-900 is still "strongest ink", graphite-0 still "surface"). */
+    --graphite-0: #1c1c1b;
+    --graphite-25: #131312;
+    --graphite-50: #222220;
+    --graphite-100: #2b2b29;
+    --graphite-200: #383835;
+    --graphite-300: #4e4e4a;
+    --graphite-400: #7a7a74;
+    --graphite-500: #a3a29b;
+    --graphite-600: #bcbbb4;
+    --graphite-700: #d2d1cb;
+    --graphite-800: #e2e1dc;
+    --graphite-900: #f0efeb;
+    --graphite-950: #fafaf8;
+    --steel-50: #1a2531;
+    --steel-100: #213040;
+    --steel-500: #6f9cc9;
+    --steel-600: #8fb4dc;
+    --steel-700: #b2cbe6;
+
+    --color-text-inverse: #171716;
+    --color-text-inverse-muted: #52524e;
+    --color-action-primary-text: #171716;
+
+    --color-attention-text: #e8b964;
+    --color-attention-bg: #2a2213;
+    --color-attention-border: #4a3c1e;
+    --color-info-text: #8fb4dc;
+    --color-info-bg: #16212c;
+    --color-info-border: #2a3d52;
+    --color-positive-text: #86c79a;
+    --color-positive-bg: #14231a;
+    --color-positive-border: #2a4634;
+    --color-critical-text: #f0948a;
+    --color-critical-bg: #2d1613;
+    --color-critical-border: #57302a;
+    --color-neutral-text: #bcbbb4;
+    --color-neutral-bg: #232321;
+    --color-neutral-border: #3a3a37;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.35);
+  }
+}
+
+.app-theme {
+  display: contents;
 }
 
 @media (min-width: 768px) {

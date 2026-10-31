@@ -29,6 +29,9 @@ begin
   values (a, 'instagram', 'Elena', '+15125550111');
   insert into public.quotes (business_id, number) values (a, 0) returning id into v_quote;
   insert into public.quote_items (business_id, quote_id, name, price_cents) values (a, v_quote, 'Ceramic coating', 120000);
+  -- Phase 6: an image and the branding row (both read-only for owners; writes go through functions).
+  insert into public.media_assets (business_id, kind, status, width, height, bytes, ready_at) values (a, 'logo', 'ready', 64, 64, 100, now());
+  insert into public.business_branding (business_id, primary_color) values (a, '#1f4e79');
 end
 $$;
 
@@ -57,7 +60,9 @@ select c.relname::text as t,
                      'services','service_prices','customers','vehicles','leads') as owner_writable
        -- quotes and quote_items: read-only for owners since migration 14 (writes go through functions)
   from pg_class c join pg_namespace n on n.oid = c.relnamespace
- where n.nspname = 'public' and c.relkind = 'r';
+ where n.nspname = 'public' and c.relkind = 'r'
+   -- user_preferences is per user, not per business: 16_branding_media checks its own-row policies.
+   and c.relname <> 'user_preferences';
 
 create temp table a_rows (t text, n bigint);
 do $$
@@ -133,6 +138,9 @@ begin
         pg_temp.attempt(case when r.t = 'rate_limit_events'
                              -- identity column: copy every column except id
                              then format('insert into public.rate_limit_events (action, key_hash, business_id) values (''x'', ''\x00'', %L)', a)
+                             -- generated storage_path: name the writable columns
+                             when r.t = 'media_assets'
+                             then format('insert into public.media_assets (business_id, kind, status, width, height, bytes, ready_at) values (%L, ''logo'', ''ready'', 64, 64, 1, now())', a)
                              else format('insert into public.%I select * from jsonb_populate_record(null::public.%I, %L::jsonb)',
                                          r.t, r.t, v_json) end, 'dml'));
     end loop;

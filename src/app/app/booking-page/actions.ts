@@ -1,8 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { bookingPageTextSchema } from '@/domain/booking';
-import { failed, invalid, type FormState } from '@/domain/forms';
+import { onlineCancellationSchema } from '@/domain/booking';
+import { failed, type FormState } from '@/domain/forms';
 import { callWorkflow } from '@/data/workflow';
 import { requireBusiness } from '@/data/session';
 import { createClient } from '@/lib/supabase/server';
@@ -22,28 +22,20 @@ export async function setLive(live: boolean): Promise<FormState> {
   return { status: 'success', message: live ? 'Your booking page is live.' : 'Your booking page is offline.' };
 }
 
-export async function saveBookingPageText(_: FormState, formData: FormData): Promise<FormState> {
+export async function saveOnlineCancellation(_: FormState, formData: FormData): Promise<FormState> {
   const { business } = await requireBusiness('/app/booking-page');
-  const parsed = bookingPageTextSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return invalid(parsed.error, formData);
-  const v = parsed.data;
+  const v = onlineCancellationSchema.parse(Object.fromEntries(formData));
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('booking_settings')
-    .update({
-      intro_text: v.intro,
-      cancellation_policy_text: v.cancellation,
-      reschedule_policy_text: v.rescheduling,
-      prep_instructions: v.prep,
-      customer_can_cancel: v.onlineCancellation,
-    })
+    .update({ customer_can_cancel: v.onlineCancellation })
     .eq('business_id', business.id)
     .select('business_id')
     .maybeSingle();
   if (error || !data) {
-    if (error) console.error('[booking-page] save text', error);
+    if (error) console.error('[booking-page] save online cancellation', error);
     return failed('That didn’t save. Please try again.', formData);
   }
   revalidatePath('/app', 'layout');
-  return { status: 'success', message: 'Booking page details saved.' };
+  return { status: 'success', message: v.onlineCancellation ? 'Customers can cancel online.' : 'Customers contact you to cancel.' };
 }

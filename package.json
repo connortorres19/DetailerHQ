@@ -2,7 +2,7 @@
   "name": "detailerhq",
   "version": "0.0.0",
   "private": true,
-  "description": "DetailerHQ (working name) \u2014 marketing website and database foundation",
+  "description": "DetailerHQ (working name) — marketing website and database foundation",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -47,6 +47,7 @@
     "pg": "8.23.1",
     "react": "19.3.1",
     "react-dom": "19.3.1",
+    "sharp": "0.35.5",
     "zod": "4.6.7"
   }
 }

@@ -33,7 +33,9 @@ function Duration({
 }) {
   return (
     <div className={styles.duration} role="group" aria-label={label}>
-      <select key={values[hoursName] ?? ''} name={hoursName} defaultValue={values[hoursName] ?? ''} aria-label={`${label} hours`} aria-invalid={error ? true : undefined}>
+      {/* Keyed by field + value: remounts when the echoed value changes (React 19 resets forms after
+          an action), and the field name keeps the hours and minutes siblings' keys distinct. */}
+      <select key={`${hoursName}:${values[hoursName] ?? ''}`} name={hoursName} defaultValue={values[hoursName] ?? ''} aria-label={`${label} hours`} aria-invalid={error ? true : undefined}>
         {optional ? <option value="">—</option> : null}
         {HOURS.map((h) => (
           <option key={h} value={h}>
@@ -41,7 +43,7 @@ function Duration({
           </option>
         ))}
       </select>
-      <select key={values[minutesName] ?? ''} name={minutesName} defaultValue={values[minutesName] ?? ''} aria-label={`${label} minutes`} aria-invalid={error ? true : undefined}>
+      <select key={`${minutesName}:${values[minutesName] ?? ''}`} name={minutesName} defaultValue={values[minutesName] ?? ''} aria-label={`${label} minutes`} aria-invalid={error ? true : undefined}>
         {optional ? <option value="">—</option> : null}
         {MINUTES.map((m) => (
           <option key={m} value={m}>

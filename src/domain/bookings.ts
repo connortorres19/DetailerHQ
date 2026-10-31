@@ -90,6 +90,8 @@ export function historyLine(e: { kind: string; to_status: string | null; actor_t
   switch (e.kind) {
     case 'request_submitted':
       return 'Request received from the booking page';
+    case 'appointment_created':
+      return e.metadata.from_hold ? 'You booked it from a calendar hold' : 'You created the appointment';
     case 'hold_placed':
       return `${who} held the requested time`;
     case 'hold_released':

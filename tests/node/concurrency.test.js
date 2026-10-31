@@ -414,3 +414,84 @@ test('cancel and approve racing for the same time never overbook (15 rounds)', a
     assert.ok((await peakUsage(biz.businessId, start, 120)) <= 1, 'never more than capacity');
   }
 });
+
+// ---------------------------------------------------------------------------
+// Phase 4E: owner-created appointments under concurrency.
+// ---------------------------------------------------------------------------
+
+async function ownerCustomer(businessId, n) {
+  const { rows: [c] } = await pool.query(
+    `insert into public.customers (business_id, first_name, phone_e164) values ($1, $2, $3) returning id`,
+    [businessId, `Walk-in ${n}`, `+1512555${String(2000 + n)}`],
+  );
+  const { rows: [v] } = await pool.query(
+    `insert into public.vehicles (business_id, customer_id, make, model) values ($1, $2, 'Ford', 'F-150') returning id`,
+    [businessId, c.id],
+  );
+  return { customer: c.id, vehicle: v.id };
+}
+
+const CREATE = `select public.create_owner_appointment($1, null, $2, null, $3, $4, $5, 'shop', null, 'phone', null, $6) as id`;
+
+test('10 simultaneous owner bookings for one slot (capacity 1): exactly one appointment', async () => {
+  const biz = await freshBusiness('shop', 1);
+  const { size, service } = await slotIds(biz.businessId);
+  const start = await atLocal(pool, 4, '10:00');
+  const people = [];
+  for (let i = 0; i < 10; i += 1) people.push(await ownerCustomer(biz.businessId, i));
+  const { ok, errors } = await settle(
+    people.map((p) => asOwner(pool, biz.userId, CREATE, [p.customer, p.vehicle, size, [service], start, null])),
+  );
+  assert.equal(ok.length, 1);
+  for (const e of errors) {
+    // Either the engine saw the job (time_unavailable) or the trigger did (capacity_exceeded).
+    assert.ok(['invalid_input', 'capacity_exceeded', 'retryable'].includes(classifyDbError(e).kind), `${e.code} ${e.message}`);
+  }
+  assert.equal(await peakUsage(biz.businessId, start, 120), 1);
+  const { rows: [{ n }] } = await pool.query('select count(*)::int as n from public.appointments where business_id = $1', [biz.businessId]);
+  assert.equal(n, 1);
+});
+
+test('converting the same hold twice at once: one appointment, the other attempt finds no hold (10 rounds)', async () => {
+  const biz = await freshBusiness('shop', 1);
+  const { size, service } = await slotIds(biz.businessId);
+  const a = await ownerCustomer(biz.businessId, 50);
+  const b = await ownerCustomer(biz.businessId, 51);
+  for (let round = 0; round < 10; round += 1) {
+    const start = await atLocal(pool, 5 + round, '09:00');
+    const { rows: [{ id: hold }] } = await asOwner(pool, biz.userId,
+      "select public.place_calendar_hold($1, $1::timestamptz + interval '2 hours', 24) as id", [start]);
+    const { ok, errors } = await settle([
+      asOwner(pool, biz.userId, CREATE, [a.customer, a.vehicle, size, [service], null, hold]),
+      asOwner(pool, biz.userId, CREATE, [b.customer, b.vehicle, size, [service], null, hold]),
+    ]);
+    assert.equal(ok.length, 1, `round ${round}`);
+    assert.equal(classifyDbError(errors[0]).kind, 'not_found');
+    assert.equal(await peakUsage(biz.businessId, start, 120), 1);
+  }
+});
+
+test('a hold being converted is never taken by the booking page in between (10 rounds)', async () => {
+  const biz = await freshBusiness('shop', 1);
+  await asOwner(pool, biz.userId, "update public.booking_settings set booking_mode = 'instant' where business_id = $1", [biz.businessId]);
+  const { size, service } = await slotIds(biz.businessId);
+  const a = await ownerCustomer(biz.businessId, 60);
+  for (let round = 0; round < 10; round += 1) {
+    const start = await atLocal(pool, 5 + round, '13:00');
+    const { rows: [{ id: hold }] } = await asOwner(pool, biz.userId,
+      "select public.place_calendar_hold($1, $1::timestamptz + interval '2 hours', 24) as id", [start]);
+    const payload = {
+      service_ids: [service], vehicle_size_class_id: size, requested_start: start, location_type: 'shop',
+      contact_first_name: 'Sam', contact_phone_e164: `+15125551${String(100 + round)}`, contact_email: `race${round}@example.com`,
+      vehicle_make: 'Kia', vehicle_model: 'Soul', consent: true,
+    };
+    const [convert, submit] = await Promise.allSettled([
+      asOwner(pool, biz.userId, CREATE, [a.customer, a.vehicle, size, [service], null, hold]),
+      pool.query('select public_api.submit_booking_request($1, $2, gen_random_uuid(), $3, $4) as r',
+        [biz.slug, JSON.stringify(payload), sha256(`hold-race-${round}`), sha256(`hold-race-ip-${round}`)]),
+    ]);
+    assert.equal(convert.status, 'fulfilled', `round ${round}: the conversion always succeeds`);
+    assert.ok(submit.value.rows[0].r.error, `round ${round}: the public booking is refused`);
+    assert.equal(await peakUsage(biz.businessId, start, 120), 1);
+  }
+});

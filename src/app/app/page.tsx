@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { CalendarDays, Check, Circle, Inbox, UserPlus } from 'lucide-react';
+import { CalendarDays, Check, Circle, Inbox, Plus, UserPlus } from 'lucide-react';
 import { PageHeader } from '@/components/app/shell/PageHeader';
 import { ButtonLink } from '@/components/app/ui/Button';
 import { EmptyState, Panel } from '@/components/app/ui/Panel';
@@ -32,6 +32,11 @@ export default async function TodayPage() {
       <PageHeader
         title="Today"
         description={`${formatDate(tz, new Date(), { weekday: 'long', month: 'long', day: 'numeric' })} · ${formatDate(tz, new Date(), { timeZoneName: 'short' }).split(' ').pop()}`}
+        actions={
+          <ButtonLink href="/app/appointments/new" variant="primary" icon={<Plus size={16} strokeWidth={1.5} aria-hidden="true" />}>
+            New appointment
+          </ButtonLink>
+        }
       />
       <div className={styles.grid}>
         <div className={styles.column}>

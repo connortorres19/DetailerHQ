@@ -369,3 +369,7 @@
   color: var(--color-text-link);
   cursor: pointer;
 }
+
+.preline {
+  white-space: pre-line;
+}

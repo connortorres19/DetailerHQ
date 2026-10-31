@@ -244,8 +244,20 @@ test('capacity conflict: a time taken while another customer is choosing is refu
   await expect(second.getByText('That time was just taken. Please choose another.')).toBeVisible();
   const times = second.getByRole('radiogroup', { name: 'Start times' }).getByRole('radio');
   await expect(times.first()).toBeVisible();
-  // Capacity 1 + 3 h job + 30 min buffer: the taken time (and the next hours) are gone.
-  await expect(times.filter({ hasText: new RegExp(`^${t1}$`) })).toHaveCount(0);
+  // Capacity 1 + 3 h job + 30 min buffer: on the booked day the taken time is gone — or, late in the
+  // day, the whole day is (the list then opens on another day, which may offer the same clock time).
+  const { rows: [{ starts_at }] } = await db.query(
+    `select a.starts_at from public.appointments a join public.booking_requests r on r.id = a.booking_request_id where r.business_id = $1`,
+    [biz.businessId],
+  );
+  const bookedDay = new Date(starts_at).toLocaleDateString('en-US', { timeZone: 'America/Chicago', weekday: 'long', month: 'long', day: 'numeric' });
+  const sameDay = second.getByRole('listbox', { name: 'Dates' }).getByRole('option', { name: new RegExp(`^${bookedDay}`) });
+  if (await sameDay.isEnabled()) {
+    await sameDay.click();
+    await expect(times.filter({ hasText: new RegExp(`^${t1}$`) })).toHaveCount(0);
+  } else {
+    await expect(sameDay).toHaveAttribute('aria-label', `${bookedDay} — no open times`);
+  }
 
   const rows = await requests(biz.businessId);
   expect(rows.map((x) => x.status)).toEqual(['approved']); // the refused attempt left nothing

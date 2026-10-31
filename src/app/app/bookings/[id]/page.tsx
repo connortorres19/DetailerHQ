@@ -9,6 +9,7 @@ import { StatusBadge } from '@/components/ui/StatusBadge';
 import { getBooking } from '@/data/bookings';
 import { requireBusiness } from '@/data/session';
 import { linePrice, estimateLabel } from '@/domain/booking';
+import { SOURCE_LABEL } from '@/domain/appointments';
 import { historyLine, STATUS_LABEL } from '@/domain/bookings';
 import { formatPhone, US_TIMEZONES } from '@/domain/business';
 import { idSchema } from '@/domain/customer';
@@ -19,8 +20,9 @@ import styles from '../bookings.module.css';
 
 export const metadata: Metadata = { title: 'Booking' };
 
-export default async function BookingPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function BookingPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ created?: string }> }) {
   const { id } = await params;
+  const { created } = await searchParams;
   const { business } = await requireBusiness(`/app/bookings/${id}`);
   if (!idSchema.safeParse(id).success) notFound();
   const booking = await getBooking(id);
@@ -62,6 +64,7 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
       />
 
       <div className={styles.notices}>
+        {created === '1' ? <Notice tone="positive">Appointment created. It’s on your calendar now.</Notice> : null}
         {matches.length ? (
           <Notice tone="attention">
             Possible existing customer:{' '}
@@ -120,6 +123,16 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
               </dd>
               <dt>Where</dt>
               <dd>{location}</dd>
+              <dt>Source</dt>
+              <dd>{SOURCE_LABEL[row.source] ?? row.source}</dd>
+              {appointment?.internal_notes ? (
+                <>
+                  <dt>Internal notes</dt>
+                  <dd className={styles.preline}>
+                    {String(appointment.internal_notes)} <span className={styles.meta}>(private)</span>
+                  </dd>
+                </>
+              ) : null}
               {appointment?.cancel_reason ? (
                 <>
                   <dt>Cancel reason</dt>
@@ -202,6 +215,11 @@ export default async function BookingPage({ params }: { params: Promise<{ id: st
             ) : (
               <p className={styles.meta}>A customer record is created when you confirm.</p>
             )}
+            {customerHref ? (
+              <p>
+                <Link href={`/app/appointments/new?customer=${customerHref}`}>Book again</Link>
+              </p>
+            ) : null}
           </Panel>
 
           <Panel title="Vehicle" id="vehicle">

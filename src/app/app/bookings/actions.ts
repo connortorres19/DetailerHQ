@@ -90,7 +90,7 @@ export async function bookingSlots(bookingId: string, date: string): Promise<{ o
   const sizeId = (booking.request?.vehicle_size_class_id as string | undefined) ?? booking.appointment?.vehicle?.size_class_id ?? null;
   if (!serviceIds.length || !sizeId) return { ok: false, message: 'Open times can’t be listed for this booking. Enter a time instead.' };
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc('preview_available_slots', { p_service_ids: serviceIds, p_size_class_id: sizeId, p_from: date, p_days: 1 });
+  const { data, error } = await supabase.rpc('owner_available_slots', { p_service_ids: serviceIds, p_size_class_id: sizeId, p_from: date, p_days: 1 });
   if (error) return { ok: false, message: 'Open times can’t be listed for these services any more. Enter a time instead.' };
   const parsed = slotsSchema.parse(data);
   return { ok: true, slots: parsed.days.find((d) => d.date === date)?.slots ?? [] };

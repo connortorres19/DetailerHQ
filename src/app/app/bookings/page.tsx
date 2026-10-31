@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { CalendarDays } from 'lucide-react';
+import { CalendarDays, Plus } from 'lucide-react';
 import { PageHeader } from '@/components/app/shell/PageHeader';
 import { ButtonLink } from '@/components/app/ui/Button';
 import { EmptyState } from '@/components/app/ui/Panel';
@@ -9,6 +9,7 @@ import { listBookings } from '@/data/bookings';
 import { requireBusiness } from '@/data/session';
 import { linePrice } from '@/domain/booking';
 import { formatPhone } from '@/domain/business';
+import { SOURCE_LABEL } from '@/domain/appointments';
 import { FILTERS, parseFilter, STATUS_LABEL } from '@/domain/bookings';
 import { formatCents, formatDuration } from '@/domain/service';
 import { formatDate } from '@/domain/time';
@@ -39,9 +40,14 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
         title="Bookings"
         description="Requests waiting for you first, then upcoming appointments, then past ones."
         actions={
-          <ButtonLink href="/app/calendar" icon={<CalendarDays size={16} strokeWidth={1.5} aria-hidden="true" />}>
-            Calendar
-          </ButtonLink>
+          <>
+            <ButtonLink href="/app/calendar" icon={<CalendarDays size={16} strokeWidth={1.5} aria-hidden="true" />}>
+              Calendar
+            </ButtonLink>
+            <ButtonLink href="/app/appointments/new" variant="primary" icon={<Plus size={16} strokeWidth={1.5} aria-hidden="true" />}>
+              New appointment
+            </ButtonLink>
+          </>
         }
       />
       <nav className={styles.tabs} aria-label="Filter bookings">
@@ -88,6 +94,7 @@ export default async function BookingsPage({ searchParams }: { searchParams: Pro
                   <span className={styles.status}>
                     <StatusBadge tone={tone}>{label}</StatusBadge>
                     {r.proposal ? <span className={styles.meta}>was {day(r.start)} {time(r.start)}</span> : null}
+                    {r.source !== 'booking_page' ? <span className={styles.meta}>{SOURCE_LABEL[r.source]}</span> : null}
                   </span>
                 </Link>
               </li>

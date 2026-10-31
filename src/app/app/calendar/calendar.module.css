@@ -382,3 +382,9 @@ a.entry:focus-visible {
     grid-column: 1 / -1;
   }
 }
+
+.holdActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

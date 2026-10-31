@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { ButtonLink } from '@/components/app/ui/Button';
 import { PageHeader } from '@/components/app/shell/PageHeader';
 import { EmptyState, Panel } from '@/components/app/ui/Panel';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -109,7 +110,15 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      <PageHeader title="Calendar" description={`Confirmed jobs, holds and pending requests. Times in ${zone}.`} />
+      <PageHeader
+        title="Calendar"
+        description={`Confirmed jobs, holds and pending requests. Times in ${zone}.`}
+        actions={
+          <ButtonLink href={`/app/appointments/new${date > today ? `?date=${date}` : ''}`} variant="primary" icon={<Plus size={16} strokeWidth={1.5} aria-hidden="true" />}>
+            New appointment
+          </ButtonLink>
+        }
+      />
       <div className={styles.toolbar}>
         <div className={styles.nav}>
           <Link href={href(view, addDays(date, -step))} aria-label={`Previous ${view === 'agenda' ? 'two weeks' : view}`} className={styles.iconLink}>
@@ -267,7 +276,12 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
                         {h.note ? `${h.note} · ` : ''}held until {formatDate(tz, h.expires_at!, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                       </p>
                     </div>
-                    <ReleaseHold holdId={h.id} />
+                    <div className={styles.holdActions}>
+                      <ButtonLink href={`/app/appointments/new?hold=${h.id}`} size="sm" variant="primary">
+                        Book this hold
+                      </ButtonLink>
+                      <ReleaseHold holdId={h.id} />
+                    </div>
                   </li>
                 );
               })}

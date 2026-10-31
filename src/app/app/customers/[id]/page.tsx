@@ -8,7 +8,10 @@ import { ConfirmAction } from '@/components/app/ui/ConfirmAction';
 import { Notice } from '@/components/app/ui/Notice';
 import { EmptyState, Panel } from '@/components/app/ui/Panel';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { listCustomerAppointments } from '@/data/appointments';
 import { findDuplicates, getCustomer } from '@/data/customers';
+import { SOURCE_LABEL } from '@/domain/appointments';
+import { displayStatus, STATUS_LABEL } from '@/domain/bookings';
 import { requireBusiness } from '@/data/session';
 import { formatPhone } from '@/domain/business';
 import { CONTACT_PREFERENCES, LEAD_SOURCES, customerName, idSchema, vehicleName } from '@/domain/customer';
@@ -46,6 +49,7 @@ export default async function CustomerPage({
   const { saved } = await searchParams;
   const flash = saved ? SAVED[saved] : undefined;
   const duplicates = customer.archived_at ? [] : (await findDuplicates(customer.phone_e164, customer.email, id)).filter((d) => !d.archived_at);
+  const appointments = await listCustomerAppointments(id);
   const name = customerName(customer);
   const vehicles = customer.vehicles.filter((v) => !v.archived_at);
   const archivedVehicles = customer.vehicles.filter((v) => v.archived_at);
@@ -69,6 +73,11 @@ export default async function CustomerPage({
         }
         actions={
           <>
+            {customer.archived_at ? null : (
+              <ButtonLink href={`/app/appointments/new?customer=${id}`} variant="primary" icon={<Plus size={16} strokeWidth={1.5} aria-hidden="true" />}>
+                New appointment
+              </ButtonLink>
+            )}
             <ButtonLink href={`/app/customers/${id}/edit`} icon={<Pencil size={16} strokeWidth={1.5} aria-hidden="true" />}>
               Edit
             </ButtonLink>
@@ -207,6 +216,31 @@ export default async function CustomerPage({
               </ul>
             </details>
           ) : null}
+        </Panel>
+
+        <Panel title="Appointments" id="appointments" flush>
+          {appointments.length === 0 ? (
+            <EmptyState title="No appointments yet" body="Bookings for this customer — from your booking page or made by you — appear here." />
+          ) : (
+            <ul className={styles.vehicles} role="list">
+              {appointments.map((a) => {
+                const [label, tone] = STATUS_LABEL[displayStatus(null, a)];
+                return (
+                  <li key={a.id} className={styles.vehicle}>
+                    <div>
+                      <Link href={`/app/bookings/${a.booking_request_id ?? a.id}`}>
+                        {formatDate(business.timezone, a.starts_at, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                      </Link>
+                      <p className={styles.secondary}>
+                        {[a.appointment_items.map((i) => i.name).join(', '), a.vehicle ? vehicleName(a.vehicle) : null, SOURCE_LABEL[a.source]].filter(Boolean).join(' · ')}
+                      </p>
+                    </div>
+                    <StatusBadge tone={tone}>{label}</StatusBadge>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </Panel>
       </div>
     </>

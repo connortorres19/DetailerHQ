@@ -17,7 +17,7 @@ const REQUEST_COLUMNS =
 
 const APPOINTMENT_COLUMNS =
   'id, number, status, starts_at, ends_at, estimated_total_cents, recorded_total_cents, booking_request_id, location_type, service_address_line1, service_city, ' +
-  'service_state, service_postal_code, cancelled_by, cancel_reason, customer_message, created_at, ' +
+  'service_state, service_postal_code, cancelled_by, cancel_reason, customer_message, source, internal_notes, created_at, ' +
   'customer:customers(id, first_name, last_name, phone_e164, email), vehicle:vehicles(id, year, make, model, color, size_class_id), ' +
   'appointment_items(service_id, name, estimated_price_cents, duration_min)';
 
@@ -41,6 +41,7 @@ export type BookingRow = {
   totalCents: number;
   isMinimum: boolean;
   notes: string | null;
+  source: string;
   proposal: { start: string; end: string; expiresAt: string } | null;
 };
 
@@ -54,7 +55,7 @@ type RequestRow = Record<string, unknown> & {
 };
 type AppointmentRow = Record<string, unknown> & {
   id: string; number: number; status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | 'no_show'; starts_at: string; ends_at: string;
-  estimated_total_cents: number; booking_request_id: string | null;
+  estimated_total_cents: number; booking_request_id: string | null; source: string; internal_notes: string | null;
   customer: { id: string; first_name: string; last_name: string | null; phone_e164: string | null; email: string | null } | null;
   vehicle: { id: string; year: number | null; make: string; model: string; color: string | null; size_class_id: string | null } | null;
   appointment_items: { service_id: string | null; name: string; estimated_price_cents: number; duration_min: number }[];
@@ -98,6 +99,7 @@ function toRow(r: RequestRow | null, a: AppointmentRow | null, sizes: Map<string
     totalCents: a?.estimated_total_cents ?? r!.estimated_total_cents,
     isMinimum: r?.estimate_is_minimum ?? false,
     notes: r?.customer_notes ?? null,
+    source: a?.source ?? 'booking_page',
     proposal:
       status === 'proposed' && r?.proposed_start && r.proposed_end && r.proposal_expires_at
         ? { start: r.proposed_start, end: r.proposed_end, expiresAt: r.proposal_expires_at }
@@ -269,7 +271,7 @@ export async function getCalendar(from: Date, to: Date) {
       title: b.kind === 'proposal' ? `Proposed to ${name ?? 'customer'}` : b.booking_request_id ? `Held for ${name ?? 'a request'}` : 'Hold',
       detail: b.note ?? '',
       status: null,
-      href: b.booking_request_id ? `/app/bookings/${b.booking_request_id}` : null,
+      href: b.booking_request_id ? `/app/bookings/${b.booking_request_id}` : `/app/appointments/new?hold=${b.id}`,
       holdId: b.booking_request_id ? null : b.id,
       expiresAt: b.expires_at,
     });

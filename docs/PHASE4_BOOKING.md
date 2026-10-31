@@ -177,3 +177,41 @@ Built on the Phase 1 owner workflow functions (approve, propose, retract, declin
 - The inbox shows the 300 most recent requests and appointments (a note says so); no pagination yet.
 - Calendar holds are on the single schedule resource (as all capacity is in the MVP). Converting a hold into an appointment for a phone customer is not built (owner-created appointments are a later phase).
 - History shows activity events; requests created before an event existed (or inserted directly) show "No history yet".
+
+## 4E — Owner-created appointments
+
+For customers who call, text, walk in or are booked in person. They use the same availability engine, saved prices and capacity rules as the booking page; no booking logic is duplicated.
+
+**Screens**
+- `/app/appointments/new` — source (phone, text, walk-in, in person, other) → customer (search existing by name/phone/email, or add new) → vehicle (theirs, or add one) → vehicle size → service + add-ons (saved prices, live estimate) → date + open start time → where (address prefilled from the customer; required for mobile jobs) → internal notes → save. Confirmed straight away.
+- Entry points: "New appointment" on Today, Bookings, Calendar and each customer page (`?customer=`); "Book this hold" on calendar holds (`?hold=`).
+- Booking detail shows the source and internal notes; the inbox shows the source; customer pages list their appointments (both booking-page and owner-created).
+
+**Migration 13 (`20261031160000_owner_appointments.sql`)**
+| Piece | What it does |
+|---|---|
+| `appointments.source` (`appointment_source` enum) | booking_page · phone · text · walk_in · in_person · other. Existing rows backfilled; a trigger forces `booking_page` for appointments from requests. |
+| `app.time_problem(..., check_alignment)` | The migration-11 engine body, moved; `public_time_problem` now calls it with alignment on. Owners skip start-time alignment only (a 1:15 PM hold stays convertible). |
+| `app.slots_for(business, duration, …)` | The shared slot loop; the public listing and the owner listing both use it. |
+| `public.owner_available_slots` | Open times for any active, priced service (including ones not offered online). Quote-only services are refused (no saved price). |
+| `public.create_owner_appointment` | One transaction under the capacity lock: optional hold conversion (must be this business's active calendar hold; removed while the lock is held, so the time is never free in between) → existing or new customer (never merged) → existing or new vehicle → saved prices for the chosen size (validated first) → full availability check (hours, breaks, blocked time, notice, window, buffer, daily cap, capacity) → insert (capacity trigger re-checks). Any failure rolls back everything, including new records and the hold removal. |
+
+### Tests (2026-10-31)
+
+| Suite | Result |
+|---|---|
+| Unit | 45/45 (4 new: payload has no price/duration/business, new records, all errors at once, rules) |
+| pgTAP | 779/779 — new `12_owner_appointments` (52): new and existing customers/vehicles, all five sources, booking-page source refused, saved prices and durations (incl. size override and phone-only services), quote-only refused, size required, validation, alignment not required for owners, every availability rule refusing (capacity, buffer, hours, blocked time, daily cap, notice, window) with nothing left behind, owner slot listing, hold conversion (start from hold, hold removed, history, fills the time, refused conversion keeps the hold, expired and unknown holds refused), cross-business refusals, JSON-null handling, mobile address required |
+| Node | 31/31 — 3 new races: 10 simultaneous owner bookings for one slot (one wins); one hold converted twice at once (one wins, the other "not found"); hold conversion vs instant public booking (conversion always wins) |
+| E2E `appointments.spec.ts` | 7/7 — phone booking for a new customer/vehicle (saved prices; injected price fields ignored; shows in inbox, day/week/agenda calendar and customer history); existing customer with existing vehicle (text) and new vehicle (walk-in), in person, other, no duplicates; tampered unavailable time refused with choices kept and nothing created; missing details all reported; hold → appointment in one step; expired hold; two tabs booking the same slot (one created); cross-business; phone layout |
+| All E2E (production build) | 73/73 |
+| Build, bundle scan (34 browser files), `db lint`, marketing film, CSP | pass / clean / clean / unchanged / no violations |
+
+### Findings and limits
+
+- **Found during 4E:** the Data API sends a JSON `null` for a jsonb argument as the jsonb value `null`, not SQL NULL; the function now treats both as "not given" (regression-tested).
+- **Found during 4E:** a mobile appointment needs a street address (Phase 1 table rule); the form now requires it (prefilled from the customer).
+- **Test fix (4C):** the capacity-conflict test assumed the taken time's day still had open times; late in the day the list opens on the next day. It now checks the booked day itself.
+- Minimum notice applies to owner bookings too (as specified): a walk-in starting right now needs a low minimum notice (Availability → Booking rules).
+- One vehicle size per booking; an existing vehicle keeps its stored size (it's only filled in when empty).
+- Quote-only services can't be booked until quoting exists (later phase).

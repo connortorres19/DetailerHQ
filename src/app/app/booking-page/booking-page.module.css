@@ -1,0 +1,125 @@
+.stack {
+  display: grid;
+  gap: var(--space-5);
+  max-width: 820px;
+}
+
+.status {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.live,
+.offline {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 var(--space-2);
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.live {
+  border-color: var(--color-positive-border);
+  background: var(--color-positive-bg);
+  color: var(--color-positive-text);
+}
+
+.offline {
+  border-color: var(--color-border-default);
+  background: var(--color-neutral-bg);
+  color: var(--color-neutral-text);
+}
+
+.url {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.liveForm {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.ready {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-subtle);
+  list-style: none;
+}
+
+.ready li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.ready li[data-done='true'] {
+  color: var(--color-text-secondary);
+}
+
+.hint {
+  display: block;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--color-text-secondary);
+}
+
+.form {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.check {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-3);
+  align-items: start;
+  cursor: pointer;
+}
+
+.check input {
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--graphite-900);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 639px) {
+  .actions > * {
+    width: 100%;
+  }
+}

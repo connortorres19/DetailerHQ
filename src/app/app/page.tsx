@@ -23,6 +23,7 @@ export default async function TodayPage() {
     { done: today.activeCustomers > 0, label: 'Add your first customer', href: '/app/customers/new' },
     { done: today.activeServices > 0, label: 'Add your services', href: '/app/services/new' },
     { done: today.hourWindows > 0, label: 'Set your working hours', href: '/app/availability' },
+    { done: Boolean(business.published_at && business.accepting_requests), label: 'Put your booking page live', href: '/app/booking-page' },
   ];
   const setupDone = checklist.every((i) => i.done);
 
@@ -104,7 +105,6 @@ export default async function TodayPage() {
                   </li>
                 ))}
               </ul>
-              <p className={styles.later}>Your booking page isn’t available yet.</p>
             </Panel>
           )}
         </div>

@@ -8,7 +8,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import pg from 'pg';
 import {
   adminPool, asOwner, ownerSession, createOwnerUser, createBusiness, atLocal, insertRequest,
-  cleanup, settle, local, sha256,
+  cleanup, settle, local, sha256, enableBookingApi,
 } from './support.js';
 import { classifyDbError, withRetry } from '../../src/db/errors.js';
 
@@ -141,8 +141,8 @@ test('a waiting transaction sees capacity freed by the one it waited for', async
 
 test('approve vs customer withdraw race: no deadlocks, always a consistent outcome (25 rounds)', async () => {
   const biz = await freshBusiness('shop', 5);
-  const password = sha256(String(Math.random())).toString('hex');
-  await pool.query(`alter role booking_api with login password '${password}'`);
+  const role = await enableBookingApi(pool);
+  const { password } = role;
   const bookingPool = new pg.Pool({
     connectionString: local.DB_URL.replace('postgres:postgres@', `booking_api:${password}@`),
     max: 5,
@@ -162,7 +162,12 @@ test('approve vs customer withdraw race: no deadlocks, always a consistent outco
           assert.equal(classifyDbError(r.reason).kind, 'invalid_state', `${r.reason.code} ${r.reason.message}`);
         }
       }
-      assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1, 'exactly one side wins');
+      // Public functions return errors as results (migration 11): a losing withdraw is
+      // {"error": {"code": "DH002"}}, not a rejected query.
+      const withdrawError = results[1].status === 'fulfilled' ? results[1].value.rows[0].withdraw_request.error : null;
+      if (withdrawError) assert.equal(withdrawError.code, 'DH002', JSON.stringify(withdrawError));
+      const wins = [results[0].status === 'fulfilled', results[1].status === 'fulfilled' && !withdrawError];
+      assert.equal(wins.filter(Boolean).length, 1, 'exactly one side wins');
       const { rows: [state] } = await pool.query(
         `select r.status::text, (select count(*)::int from public.appointments a where a.booking_request_id = r.id) as appts
            from public.booking_requests r where r.id = $1`,
@@ -175,7 +180,7 @@ test('approve vs customer withdraw race: no deadlocks, always a consistent outco
     }
   } finally {
     await bookingPool.end();
-    await pool.query('alter role booking_api with nologin password null');
+    await role.restore();
   }
 });
 

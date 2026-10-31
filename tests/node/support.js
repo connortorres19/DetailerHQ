@@ -136,3 +136,23 @@ export async function settle(promises) {
     errors: results.filter((r) => r.status === 'rejected').map((r) => r.reason),
   };
 }
+
+// Lets the booking_api role log in with a random password for a test, then puts back whatever
+// login state it had before (a developer's `npm run env:local` password keeps working).
+export async function enableBookingApi(pool) {
+  const { rows: [before] } = await pool.query(
+    "select rolcanlogin, rolpassword from pg_authid where rolname = 'booking_api'");
+  const password = randomBytes(24).toString('hex');
+  await pool.query(`alter role booking_api with login password '${password}'`);
+  return {
+    password,
+    async restore() {
+      if (before.rolpassword) {
+        // A stored SCRAM verifier can be set back as-is; PostgreSQL does not re-hash it.
+        await pool.query(`alter role booking_api with ${before.rolcanlogin ? 'login' : 'nologin'} password '${before.rolpassword.replaceAll("'", "''")}'`);
+      } else {
+        await pool.query(`alter role booking_api with ${before.rolcanlogin ? 'login' : 'nologin'} password null`);
+      }
+    },
+  };
+}

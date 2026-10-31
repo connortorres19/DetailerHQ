@@ -38,7 +38,7 @@ export default async function BusinessSettingsPage() {
         <dl className={styles.dl}>
           <dt>Booking link</dt>
           <dd className={styles.mono}>
-            {new URL(env.NEXT_PUBLIC_SITE_URL).host}/b/{business.slug}
+            {new URL(env.NEXT_PUBLIC_SITE_URL).host}/book/{business.slug} · <Link href="/app/booking-page">Manage</Link>
           </dd>
           <dt>Time zone</dt>
           <dd>

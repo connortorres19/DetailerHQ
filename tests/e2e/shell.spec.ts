@@ -13,7 +13,7 @@ test('Today shows real, empty state for a new business and only working navigati
   await expect(page.getByText('Needs your action')).toHaveCount(0); // hidden when nothing is pending
 
   const nav = page.getByRole('navigation', { name: 'Main navigation' });
-  await expect(nav.getByRole('link')).toHaveText(['Today', 'Customers', 'Services', 'Availability', 'Settings']);
+  await expect(nav.getByRole('link')).toHaveText(['Today', 'Customers', 'Services', 'Availability', 'Booking page', 'Settings']);
   await expect(nav.getByRole('link', { name: 'Today' })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByText('Ridgeway Mobile Detailing').first()).toBeVisible();
 
@@ -25,6 +25,7 @@ test('Today shows real, empty state for a new business and only working navigati
     /Add your first customer\(to do\)/,
     /Add your services\(to do\)/,
     /Set your working hours\(to do\)/,
+    /Put your booking page live\(to do\)/,
   ]);
 });
 

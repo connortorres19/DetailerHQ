@@ -6,18 +6,19 @@ import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import pg from 'pg';
 import {
-  adminPool, createOwnerUser, createBusiness, atLocal, cleanup, sha256, local,
+  adminPool, createOwnerUser, createBusiness, atLocal, cleanup, sha256, local, enableBookingApi,
 } from './support.js';
 
 const POOLER_PORT = 54329; // supabase/config.toml [db.pooler]
 const POOLER_TENANT = 'pooler-dev'; // local Supavisor tenant; hosted projects use the project ref
 const admin = adminPool(5);
 const businesses = [];
-const password = randomBytes(24).toString('hex');
+let password, role;
 let viaPooler, direct, biz, sizeClassId, serviceId;
 
 before(async () => {
-  await admin.query(`alter role booking_api with login password '${password}'`);
+  role = await enableBookingApi(admin);
+  ({ password } = role);
   viaPooler = new pg.Pool({
     host: '127.0.0.1', port: POOLER_PORT, database: 'postgres',
     user: `booking_api.${POOLER_TENANT}`, password, max: 2,
@@ -45,7 +46,7 @@ before(async () => {
 after(async () => {
   await viaPooler?.end();
   await direct?.end();
-  await admin.query('alter role booking_api with nologin password null');
+  await role.restore();
   await cleanup(admin, businesses);
   await admin.end();
 });

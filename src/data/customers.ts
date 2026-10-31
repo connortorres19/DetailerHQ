@@ -78,3 +78,24 @@ export async function findDuplicates(phone: string | null, email: string | null,
   if (error) throw new Error(`Could not check duplicates: ${error.message}`);
   return data ?? [];
 }
+
+// Ids (among `customers`) sharing a phone or email with another active customer of this business.
+// Public bookings always create new records (D-28); this is how the owner spots possible duplicates.
+export async function duplicateIds(customers: { id: string; phone_e164: string | null; email: string | null }[]) {
+  const phones = [...new Set(customers.map((c) => c.phone_e164).filter((v): v is string => Boolean(v)))];
+  const emails = [...new Set(customers.map((c) => c.email).filter((v): v is string => Boolean(v)))];
+  if (!phones.length && !emails.length) return new Set<string>();
+  const supabase = await createClient();
+  const filters = [
+    phones.length ? `phone_e164.in.(${phones.map((p) => `"${p}"`).join(',')})` : null,
+    emails.length ? `email.in.(${emails.map((e) => `"${e.replaceAll('"', '')}"`).join(',')})` : null,
+  ].filter(Boolean);
+  const { data, error } = await supabase.from('customers').select('id, phone_e164, email').is('archived_at', null).or(filters.join(','));
+  if (error) throw new Error(`Could not check duplicates: ${error.message}`);
+  const all = data ?? [];
+  return new Set(
+    customers
+      .filter((c) => all.some((o) => o.id !== c.id && ((c.phone_e164 && o.phone_e164 === c.phone_e164) || (c.email && o.email === c.email))))
+      .map((c) => c.id),
+  );
+}

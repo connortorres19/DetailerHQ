@@ -105,7 +105,7 @@ test.describe('sign in and sign out', () => {
     await page.getByLabel('Email').fill(email);
     await page.getByLabel('Password').fill(PASSWORD);
     await page.getByRole('button', { name: 'Sign in' }).click();
-    await expect(page.locator('[role="alert"]')).toBeVisible();
+    await expect(page.locator('[role="alert"]:not(#__next-route-announcer__)')).toBeVisible(); // not Next's route announcer
     await expect(page).toHaveURL(/\/sign-in/);
   });
 });

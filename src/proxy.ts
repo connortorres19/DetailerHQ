@@ -5,10 +5,13 @@ export async function proxy(request: NextRequest) {
   return updateSession(request);
 }
 
-// Only the app and auth routes. The marketing site stays static and session-free.
+// The app, auth and public booking routes (CSP nonce + no-store; the booking preview needs the
+// owner's session). The marketing site stays static and session-free.
 export const config = {
   matcher: [
     '/app/:path*',
+    '/book/:path*',
+    '/r/:path*',
     '/onboarding/:path*',
     '/sign-in',
     '/sign-up',

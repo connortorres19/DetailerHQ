@@ -6,7 +6,7 @@ import { ButtonLink } from '@/components/app/ui/Button';
 import { Notice } from '@/components/app/ui/Notice';
 import { EmptyState, Panel } from '@/components/app/ui/Panel';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { PAGE_SIZE, listCustomers } from '@/data/customers';
+import { PAGE_SIZE, duplicateIds, listCustomers } from '@/data/customers';
 import { requireBusiness } from '@/data/session';
 import { formatPhone } from '@/domain/business';
 import { customerName, vehicleName } from '@/domain/customer';
@@ -23,6 +23,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   const page = Math.max(1, Number.parseInt(params.page ?? '1', 10) || 1);
   const q = (params.q ?? '').slice(0, 60);
   const { customers, total } = await listCustomers({ q, archived, page });
+  const duplicates = archived ? new Set<string>() : await duplicateIds(customers);
 
   const link = (over: Partial<Search>) => {
     const s = new URLSearchParams();
@@ -109,6 +110,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                         <span className={styles.mobileContact}>{[formatPhone(c.phone_e164), c.email].filter(Boolean).join(' · ')}</span>
                       </span>
                       {c.archived_at ? <StatusBadge tone="neutral">Archived</StatusBadge> : null}
+                      {duplicates.has(c.id) ? <StatusBadge tone="attention">Possible duplicate</StatusBadge> : null}
                     </td>
                     <td className="tabular">{formatPhone(c.phone_e164)}</td>
                     <td>{c.email}</td>

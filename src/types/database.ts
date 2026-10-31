@@ -678,6 +678,12 @@ isOneToOne: false
 "place_hold":
 { Args: { "p_hours"?: number,"p_request_id": string }; Returns: string
                            },
+"preview_available_slots":
+{ Args: { "p_days": number,"p_from": string,"p_service_ids": (string)[],"p_size_class_id": string }; Returns: Json
+                           },
+"preview_booking_page":
+{ Args: Record<PropertyKey, never>; Returns: Json
+                           },
 "propose_time":
 { Args: { "p_customer_id"?: string,"p_expires_hours"?: number,"p_message"?: string,"p_request_id": string,"p_start": string,"p_vehicle_id"?: string }; Returns: string
                            },
@@ -698,6 +704,9 @@ isOneToOne: false
                            },
 "save_weekly_hours":
 { Args: { "p_windows": Json }; Returns: number
+                           },
+"set_booking_page_live":
+{ Args: { "p_live": boolean }; Returns: boolean
                            },
 "set_capacity":
 { Args: { "p_capacity": number }; Returns: undefined

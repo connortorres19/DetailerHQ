@@ -8,7 +8,7 @@ import { ConfirmAction } from '@/components/app/ui/ConfirmAction';
 import { Notice } from '@/components/app/ui/Notice';
 import { EmptyState, Panel } from '@/components/app/ui/Panel';
 import { StatusBadge } from '@/components/ui/StatusBadge';
-import { getCustomer } from '@/data/customers';
+import { findDuplicates, getCustomer } from '@/data/customers';
 import { requireBusiness } from '@/data/session';
 import { formatPhone } from '@/domain/business';
 import { CONTACT_PREFERENCES, LEAD_SOURCES, customerName, idSchema, vehicleName } from '@/domain/customer';
@@ -45,6 +45,7 @@ export default async function CustomerPage({
 
   const { saved } = await searchParams;
   const flash = saved ? SAVED[saved] : undefined;
+  const duplicates = customer.archived_at ? [] : (await findDuplicates(customer.phone_e164, customer.email, id)).filter((d) => !d.archived_at);
   const name = customerName(customer);
   const vehicles = customer.vehicles.filter((v) => !v.archived_at);
   const archivedVehicles = customer.vehicles.filter((v) => v.archived_at);
@@ -92,6 +93,19 @@ export default async function CustomerPage({
       {flash ? (
         <div className={styles.flash}>
           <Notice tone={flash[0]}>{flash[1]}</Notice>
+        </div>
+      ) : null}
+      {duplicates.length ? (
+        <div className={styles.flash}>
+          <Notice tone="attention">
+            Possible duplicate: {duplicates.map((d, i) => (
+              <span key={d.id}>
+                {i ? ', ' : ''}
+                <Link href={`/app/customers/${d.id}`}>{customerName(d)}</Link>
+              </span>
+            ))}{' '}
+            {duplicates.length === 1 ? 'has' : 'have'} the same phone or email. Records are never merged automatically — check before adding vehicles or jobs.
+          </Notice>
         </div>
       ) : null}
 

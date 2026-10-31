@@ -81,3 +81,55 @@ Migration 10 (`20261031130000_availability.sql`) reuses `availability_rules`, `t
 - **F-4B-2 (fixed):** the public hours check was an hour off for jobs crossing a DST change, and refused jobs ending exactly at midnight.
 - **F-4B-3 (fixed):** buffers, start-time alignment and the daily cap were stored but not enforced (finding B3, planned for 4D); they're enforced now.
 - **Limits:** one schedule resource per business (a shop's capacity is shared, not per bay); the daily cap counts jobs by local start day; a single job can't span days in the public check (multi-day jobs remain owner-scheduled).
+
+## 4C — Public booking pages
+
+Migration 11 (`20261031140000_public_booking.sql`) builds on the Phase 1 restricted public API (migration 6) — no new tables.
+
+**Routes**
+- `/book/[slug]` — the business's public page: name, initials mark (no logo uploads yet), service area or shop address, phone/text, description (`booking_settings.intro_text`), services grouped by category, booking policies. Unknown, unpublished, suspended or closing businesses all get the same 404 "This booking page isn't available".
+- `/book/[slug]/preview` — the signed-in owner's own page in any state (live or offline), with real times; booking disabled. Anyone else: 404.
+- `/r/[token]` — the customer's status link (DESIGN_SYSTEM §13.11): status headline (PRODUCT_PLAN §6.4), time, price breakdown, vehicle, masked contact, withdraw / cancel / accept or decline a suggested time. `Referrer-Policy: no-referrer`, `noindex`, `no-store`.
+- `/app/booking-page` — owner: Live/Offline, link + copy, preview, readiness checklist, description and policy text, online-cancellation switch. Nav item "Booking page"; Today checklist "Put your booking page live".
+
+The plan and design system name the public route `/b/[slug]`; Phase 4C uses `/book/[slug]` as instructed. Settings shows the new link.
+
+**Flow** (one screen per step on phones, summary rail on desktop, sticky estimate bar on phones): Service (vehicle size → service → add-ons, price for the chosen size) → Time (14-day date strip, 48px start-time buttons, business time zone, warning when the visitor's device is in another zone) → Details (name, email, mobile phone, vehicle year/make/model + notes, address for mobile jobs, notes) → Review (breakdown, estimate vs. confirmed wording, policies, consent) → status link.
+
+**Database (migration 11)**
+| Piece | What it does |
+|---|---|
+| `app.public_time_problem()` | One availability engine: returns the first rule a time breaks (notice, window, hours/breaks, slot alignment, blocked time, capacity incl. buffer, daily cap) or null. `check_public_time` now wraps it. |
+| `public_api.get_available_slots(slug, services, size, from, days≤14, ip_hash)` | Lists open start times day by day using the same engine, so listed times and accepted times can't disagree. Rate-limited (120 calls / 10 min per hashed IP). |
+| `public_api.get_booking_page` | Payload extended: booking mode, categories, shop address, policy flags (allow-listed; still no email, account status or capacity). |
+| `submit_booking_request` | Unchanged validation (Phase 1 body moved to `app.submit_booking_request_core`). **Instant mode:** takes the capacity lock first, then creates the customer + vehicle (never merged) and the appointment in the same transaction; any failure rolls everything back. Approval mode: pending request only (pending requests take no capacity, D-32). |
+| **R2 / D3 fixed** | Public functions return `{"error": {code, message, detail}}` instead of raising, so the failed attempt's rate-limit row is kept: failed submissions 10 / 10 min per hashed IP; failed status-link lookups 10 / 10 min per hashed IP (on top of the Phase 1 limits for successful calls). |
+| `public.set_booking_page_live(bool)` | Going live needs an activated account, working hours and a bookable main service; offline = unpublished. |
+| `public.preview_booking_page()`, `public.preview_available_slots()` | Owner-only preview (SECURITY INVOKER wrappers over `app.*_impl`). |
+
+**Server (`src/lib/booking/server.ts`, server-only)**: connects as `booking_api` (`BOOKING_DATABASE_URL`) — the role can only execute `public_api` functions. Client IPs are HMAC-SHA256'd with `BOOKING_HASH_SECRET` before reaching the database. Status tokens are a 256-bit HMAC of the form's random idempotency key (only the SHA-256 hash is stored), so a retried submit returns the same link for the one stored request. The browser sends ids and a start time only; prices, durations, business and availability are derived and checked by the database.
+
+**Local setup**: `npm run env:local` now also enables the local `booking_api` login and writes `BOOKING_DATABASE_URL` + `BOOKING_HASH_SECRET` (re-running keeps them). A database reset recreates the role without a login; `npm run db:reset` (and `npm test`) re-applies it from `.env.local`. **Production:** set both variables as server-only secrets; the client IP is read from the first `x-forwarded-for` entry, which must be set by the hosting platform (Vercel overwrites it) — behind another proxy, configure it to overwrite the header.
+
+**Duplicates**: public bookings never merge. Instant bookings create a new customer + vehicle; approval-mode requests get theirs at approval. The owner's customer list shows a "Possible duplicate" badge and the customer page names the matching records (same phone or email).
+
+### Tests (2026-10-31)
+
+| Suite | Result |
+|---|---|
+| Unit | 35/35 (12 new: size pricing, estimates, validation, payload allow-list, error and status copy, policy wording, owner text limits) |
+| pgTAP | 673/673 — new `10_public_booking` (43): slots with hours, breaks, blocked time, buffer, capacity, sizes, horizon, quote-only; listed time accepted / unlisted refused; pending don't remove times; instant booking (appointment + new customer + vehicle, not merged; overlap and buffer refused, nothing left behind; next slot books); price breakdown; cancellation cutoff both ways; rebook after cancel; 10 guessed links counted then refused; publishing prerequisites; preview; privileges. `06_public_api` updated for errors-as-results with two new R2 assertions |
+| Node | 25/25 (race test updated for errors-as-results; booking role state restored after tests) |
+| E2E `booking.spec.ts` | 10/10 — publish/preview/offline 404/owner text; approval flow with size pricing, add-on, invalid input, consent, pending (not confirmed) and withdraw; instant flow on a phone with duplicate flag; capacity conflict between two customers; double-click + replay → one booking, same link; rate limiting; status-link headers, wrong/altered/malformed links, cancellation cutoff; cross-business tampering; layouts at 1280/390 px |
+| All E2E (production build) | 56/56 |
+| Build, bundle scan (33 browser files), `db lint`, marketing film, CSP | pass / clean / unchanged / no violations |
+
+### Findings and limits
+
+- **Fixed during 4C:** the "Review" button became the submit button during the same click (same DOM element), submitting the form once before the customer pressed Send. Buttons now have distinct keys; regression-tested.
+- **Fixed during 4C:** `db reset` left `booking_api` without a login (local booking pages broke after `npm test`); handled by `scripts/booking-role.mjs`.
+- No logo uploads (no storage yet) — the header shows the business's initials. No emails or texts are sent: the customer keeps the status link shown on screen (copy-link button).
+- Business email is not shown publicly (Phase 1 allow-list); phone is.
+- One vehicle and one main service per booking (plus add-ons); several main services in one booking is possible in the database but not offered in the UI.
+- Approval-mode requests can't yet be approved from the dashboard — that's Phase 4D (owner request management).
+- The rate-limit key is the client IP from `x-forwarded-for`; correct behind Vercel, needs proxy configuration elsewhere.

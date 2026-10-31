@@ -183,6 +183,12 @@
   }
 }
 
+/* "More" exists only in the phone tab bar. */
+.phoneOnly,
+.moreSheet {
+  display: none;
+}
+
 /* ---- Phone: top bar + bottom tab bar (< 768px) ---- */
 
 @media (max-width: 767px) {
@@ -211,9 +217,57 @@
     border-radius: 0;
   }
 
-  .navLink[aria-current='page'] {
+  .navLink[aria-current='page'],
+  .navLink[data-active] {
     background: transparent;
     box-shadow: inset 0 2px 0 var(--steel-600);
+  }
+
+  .phoneHidden {
+    display: none;
+  }
+
+  .phoneOnly {
+    display: block;
+  }
+
+  .phoneOnly .navLink {
+    width: 100%;
+    border: 0;
+    background: none;
+    font-family: inherit;
+    color: var(--graphite-700);
+    cursor: pointer;
+  }
+
+  .moreSheet {
+    position: absolute;
+    right: var(--space-2);
+    bottom: calc(64px + env(safe-area-inset-bottom) + var(--space-2));
+    display: grid;
+    min-width: 220px;
+    margin: 0;
+    padding: var(--space-2);
+    list-style: none;
+    border: 1px solid var(--graphite-200);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-surface);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .moreLink {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    height: 44px;
+    padding: 0 var(--space-3);
+    border-radius: var(--radius-sm);
+    color: var(--color-text-primary);
+    text-decoration: none;
+  }
+
+  .moreLink[aria-current='page'] {
+    background: var(--color-bg-selected);
   }
 
   .main {

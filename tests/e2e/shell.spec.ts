@@ -13,7 +13,7 @@ test('Today shows real, empty state for a new business and only working navigati
   await expect(page.getByText('Needs your action')).toHaveCount(0); // hidden when nothing is pending
 
   const nav = page.getByRole('navigation', { name: 'Main navigation' });
-  await expect(nav.getByRole('link')).toHaveText(['Today', 'Customers', 'Services', 'Availability', 'Booking page', 'Settings']);
+  await expect(nav.getByRole('link')).toHaveText(['Today', 'Bookings', 'Calendar', 'Customers', 'Services', 'Availability', 'Booking page', 'Settings']);
   await expect(nav.getByRole('link', { name: 'Today' })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByText('Ridgeway Mobile Detailing').first()).toBeVisible();
 
@@ -35,6 +35,14 @@ for (const [width, height] of [[1280, 800], [820, 1180], [390, 844]] as const) {
     await ownerWithBusiness(page, `shell${width}`);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBe(0);
     await expect(page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Customers' })).toBeVisible();
+    if (width < 768) {
+      // Phone tab bar: four destinations + More (DESIGN_SYSTEM §11.3).
+      const nav = page.getByRole('navigation', { name: 'Main navigation' });
+      await expect(nav.getByRole('link', { name: 'Settings' })).toBeHidden();
+      await nav.getByRole('button', { name: 'More' }).click();
+      await page.getByRole('list', { name: 'More' }).getByRole('link', { name: 'Settings' }).click();
+      await expect(page).toHaveURL(/\/app\/settings$/);
+    }
     await page.screenshot({ path: `test-results/shell-${width}.png`, fullPage: true });
   });
 }

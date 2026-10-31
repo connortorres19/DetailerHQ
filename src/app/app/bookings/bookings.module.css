@@ -1,0 +1,371 @@
+/* Booking inbox and detail (Phase 4D). Rows, not cards; dense on desktop, stacked on phones. */
+
+.tabs {
+  display: flex;
+  gap: var(--space-1);
+  margin-bottom: var(--space-5);
+  overflow-x: auto;
+  border-bottom: 1px solid var(--color-border-default);
+}
+
+.tabs a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  height: 40px;
+  padding: 0 var(--space-3);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-label);
+  text-decoration: none;
+}
+
+.tabs a:hover {
+  color: var(--color-text-primary);
+}
+
+.tabs a[aria-current='page'] {
+  border-bottom-color: var(--graphite-900);
+  color: var(--color-text-primary);
+}
+
+.count {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--color-bg-subtle);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  overflow: hidden;
+}
+
+.list li + li {
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 132px minmax(140px, 1fr) minmax(180px, 1.4fr) 88px 160px;
+  gap: var(--space-4);
+  align-items: start;
+  padding: var(--space-3) var(--space-4);
+  color: inherit;
+  text-decoration: none;
+}
+
+.row:hover {
+  background: var(--color-bg-subtle);
+}
+
+.row:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+
+.when,
+.who,
+.what,
+.status {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.day,
+.name {
+  font-weight: 500;
+}
+
+.time,
+.meta {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.note {
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 18px;
+  font-style: italic;
+  color: var(--color-text-label);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.price {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.status {
+  justify-items: start;
+}
+
+.footnote {
+  margin-top: var(--space-3);
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 899px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-2) var(--space-4);
+  }
+
+  .when {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .status {
+    grid-column: 2;
+    grid-row: 1;
+    justify-items: end;
+  }
+
+  .who {
+    grid-column: 1;
+  }
+
+  .price {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .what {
+    grid-column: 1 / -1;
+  }
+}
+
+/* --- Detail --------------------------------------------------------------------------------- */
+
+.titleRow {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.notices {
+  display: grid;
+  gap: var(--space-3);
+  margin: calc(-1 * var(--space-2)) 0 var(--space-5);
+}
+
+.notices:empty {
+  display: none;
+}
+
+.detail {
+  display: grid;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.detailMain,
+.detailSide {
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.dl {
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr);
+  gap: var(--space-3) var(--space-4);
+  margin: 0;
+}
+
+.dl dt {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
+.dl dd {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+}
+
+.breakdown {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.breakdown th,
+.breakdown td {
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+  vertical-align: top;
+  text-align: left;
+  font-weight: 400;
+}
+
+.breakdown th {
+  display: grid;
+  gap: 2px;
+}
+
+.breakdown td {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.breakdown tfoot th,
+.breakdown tfoot td {
+  border-bottom: 0;
+  font-weight: 600;
+}
+
+.contact {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-2) 0;
+  padding: 0;
+  list-style: none;
+}
+
+.contact li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.contact a {
+  color: var(--color-text-link);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.quote {
+  margin-top: var(--space-2);
+  white-space: pre-line;
+  color: var(--color-text-label);
+}
+
+.timeline {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0 0 0 var(--space-4);
+  list-style: none;
+  border-left: 1px solid var(--color-border-default);
+}
+
+.timeline li {
+  position: relative;
+  display: grid;
+  gap: 2px;
+}
+
+.timeline li::before {
+  content: '';
+  position: absolute;
+  left: calc(-1 * var(--space-4) - 6px);
+  top: 6px;
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--color-bg-surface);
+  border-radius: 50%;
+  background: var(--graphite-400);
+}
+
+.actions {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.buttonRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.panelForm {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-subtle);
+}
+
+.fieldset {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.fieldset legend {
+  margin-bottom: var(--space-2);
+  font-weight: 500;
+}
+
+.check {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-3);
+  align-items: start;
+  cursor: pointer;
+}
+
+.check input {
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--graphite-900);
+}
+
+.picker {
+  display: grid;
+  gap: var(--space-4);
+}
+
+@media (min-width: 1100px) {
+  .detail {
+    grid-template-columns: minmax(0, 1fr) 340px;
+  }
+}
+
+@media (max-width: 639px) {
+  .dl {
+    grid-template-columns: 1fr;
+    gap: var(--space-1);
+  }
+
+  .dl dd + dt {
+    margin-top: var(--space-3);
+  }
+}
+
+.linkButton {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  color: var(--color-text-link);
+  cursor: pointer;
+}

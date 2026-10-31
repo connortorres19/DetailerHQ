@@ -7,8 +7,8 @@ select plan(7);
 select is(
   (select array_agg(version order by version) from supabase_migrations.schema_migrations),
   array['20261030120000','20261030120100','20261030120200','20261030120300','20261030120400',
-        '20261030120500','20261030120600','20261030120700','20261031120000','20261031130000','20261031140000'],
-  'all eleven migrations are recorded, in order');
+        '20261030120500','20261030120600','20261030120700','20261031120000','20261031130000','20261031140000','20261031150000'],
+  'all twelve migrations are recorded, in order');
 
 create temp table ctx as
 select pg_temp.make_business('a@example.com', 'alpha-detail', 'shop', 2) as biz_a,

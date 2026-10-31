@@ -1,7 +1,7 @@
 // Calendar math in the business's time zone (PRODUCT_PLAN §6.10). Instants are UTC Dates;
 // "days" and "weeks" are the business's local ones, DST-aware.
 
-function wallClock(tz: string, instant: Date) {
+export function wallClock(tz: string, instant: Date) {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: tz,
     hourCycle: 'h23',

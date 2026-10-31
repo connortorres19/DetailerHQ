@@ -439,14 +439,14 @@ isOneToOne: false
                   ]
                 },"schedule_blocks": {
                   Row: {
-                    "appointment_id": string | null,"booking_request_id": string | null,"business_id": string,"created_at": string,"created_by": string | null,"during": unknown,"expires_at": string | null,"id": string,"kind": Database["public"]['Enums']["block_kind"],"resource_id": string
+                    "appointment_id": string | null,"booking_request_id": string | null,"business_id": string,"created_at": string,"created_by": string | null,"during": unknown,"expires_at": string | null,"id": string,"kind": Database["public"]['Enums']["block_kind"],"note": string | null,"resource_id": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "appointment_id"?: string | null,"booking_request_id"?: string | null,"business_id": string,"created_at"?: string,"created_by"?: string | null,"during": unknown,"expires_at"?: string | null,"id"?: string,"kind": Database["public"]['Enums']["block_kind"],"resource_id": string
+                    "appointment_id"?: string | null,"booking_request_id"?: string | null,"business_id": string,"created_at"?: string,"created_by"?: string | null,"during": unknown,"expires_at"?: string | null,"id"?: string,"kind": Database["public"]['Enums']["block_kind"],"note"?: string | null,"resource_id": string
                   }
                   Update: {
-                    "appointment_id"?: string | null,"booking_request_id"?: string | null,"business_id"?: string,"created_at"?: string,"created_by"?: string | null,"during"?: unknown,"expires_at"?: string | null,"id"?: string,"kind"?: Database["public"]['Enums']["block_kind"],"resource_id"?: string
+                    "appointment_id"?: string | null,"booking_request_id"?: string | null,"business_id"?: string,"created_at"?: string,"created_by"?: string | null,"during"?: unknown,"expires_at"?: string | null,"id"?: string,"kind"?: Database["public"]['Enums']["block_kind"],"note"?: string | null,"resource_id"?: string
                   }
                   Relationships: [
                     {
@@ -675,6 +675,9 @@ isOneToOne: false
 "mark_no_show":
 { Args: { "p_appointment_id": string }; Returns: undefined
                            },
+"place_calendar_hold":
+{ Args: { "p_ends_at": string,"p_hours": number,"p_note"?: string,"p_starts_at": string }; Returns: string
+                           },
 "place_hold":
 { Args: { "p_hours"?: number,"p_request_id": string }; Returns: string
                            },
@@ -686,6 +689,9 @@ isOneToOne: false
                            },
 "propose_time":
 { Args: { "p_customer_id"?: string,"p_expires_hours"?: number,"p_message"?: string,"p_request_id": string,"p_start": string,"p_vehicle_id"?: string }; Returns: string
+                           },
+"release_calendar_hold":
+{ Args: { "p_block_id": string }; Returns: boolean
                            },
 "release_hold":
 { Args: { "p_request_id": string }; Returns: boolean

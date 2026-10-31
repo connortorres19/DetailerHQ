@@ -14,7 +14,7 @@ const LIVE_MESSAGES: Record<string, string> = {
 };
 
 // Live / offline goes through public.set_booking_page_live (prerequisites checked in the database).
-export async function setLive(live: boolean, _: FormState): Promise<FormState> {
+export async function setLive(live: boolean): Promise<FormState> {
   await requireBusiness('/app/booking-page');
   const result = await callWorkflow('set_booking_page_live', { p_live: live });
   revalidatePath('/app', 'layout');

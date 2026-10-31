@@ -38,8 +38,10 @@ export default async function TodayPage() {
           {today.pendingRequests > 0 ? (
             <Panel title="Needs your action" id="needs-action">
               <p className={styles.attention}>
-                <Inbox size={16} strokeWidth={1.5} aria-hidden="true" /> {today.pendingRequests} pending{' '}
-                {today.pendingRequests === 1 ? 'request' : 'requests'}
+                <Inbox size={16} strokeWidth={1.5} aria-hidden="true" />
+                <Link href="/app/bookings?view=pending">
+                  {today.pendingRequests} pending {today.pendingRequests === 1 ? 'request' : 'requests'}
+                </Link>
               </p>
             </Panel>
           ) : null}
@@ -56,9 +58,9 @@ export default async function TodayPage() {
                 {today.schedule.map((a) => (
                   <li key={a.id} className={styles.job}>
                     <span className={`${styles.time} tabular`}>{formatTimeRange(tz, a.starts_at, a.ends_at)}</span>
-                    <span className={styles.who}>
+                    <Link href={`/app/bookings/${a.booking_request_id ?? a.id}`} className={styles.who}>
                       {a.customer?.first_name} {a.customer?.last_name}
-                    </span>
+                    </Link>
                     <span className={styles.meta}>
                       {[a.vehicle?.year, a.vehicle?.make, a.vehicle?.model].filter(Boolean).join(' ')}
                       {a.location_type === 'mobile' && a.service_address_line1 ? ` · ${a.service_address_line1}` : ''}

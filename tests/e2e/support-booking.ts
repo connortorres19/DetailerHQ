@@ -1,4 +1,4 @@
-import { createHmac, randomInt } from 'node:crypto';
+import { createHmac, randomBytes, randomInt } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { expect, type Page } from '@playwright/test';
 import { db } from './support';
@@ -101,4 +101,39 @@ export async function fillDetails(page: Page, overrides: Record<string, string> 
     ...overrides,
   };
   for (const [label, value] of Object.entries(v)) await page.getByLabel(label, { exact: true }).fill(value);
+}
+
+// A booking request as the public page stores it, with a known status-link token (the database
+// keeps only its SHA-256), so a test can act as the customer through /r/<token>.
+export async function seedRequest(
+  biz: { businessId: string; services: { fullDetail: string; petHair: string }; sizes: { car: string } },
+  opts: { daysAhead: number; time: string; first?: string; last?: string; phone?: string; email?: string; addon?: boolean; notes?: string; minutes?: number },
+) {
+  const token = randomBytes(32).toString('base64url');
+  const minutes = opts.minutes ?? (opts.addon ? 210 : 180);
+  const { rows: [r] } = await db.query(
+    `insert into public.booking_requests (business_id, token_hash, idempotency_key, requested_start, requested_end, location_type,
+       service_address_line1, service_city, service_state, service_postal_code, contact_first_name, contact_last_name,
+       contact_phone_e164, contact_email, preferred_contact, vehicle_year, vehicle_make, vehicle_model, vehicle_size_class_id,
+       vehicle_notes, customer_notes, consent_at, estimated_total_cents, estimate_is_minimum, estimated_duration_min)
+     select $1, sha256($2::bytea), gen_random_uuid(), s, s + make_interval(mins => $3), 'mobile', '1234 Oak St', 'Austin', 'TX', '78701',
+            $4, $5, $6, $7, 'text', 2021, 'Tesla', 'Model Y', $8, 'Dog hair in the back', $9, now(), $10, false, $3
+       from (select ((now() at time zone 'America/Chicago')::date + $11::int + $12::time) at time zone 'America/Chicago' as s) t
+     returning id, number, requested_start`,
+    [biz.businessId, token, minutes, opts.first ?? 'Jordan', opts.last ?? 'Reyes', opts.phone ?? '+15125550142', opts.email ?? 'jordan.reyes@example.com',
+     biz.sizes.car, opts.notes ?? null, opts.addon ? 22000 : 18000, opts.daysAhead, opts.time],
+  );
+  await db.query(
+    `insert into public.booking_request_items (business_id, booking_request_id, service_id, name, price_type, price_cents, duration_min, is_addon)
+     values ($1, $2, $3, 'Full detail', 'fixed', 18000, 180, false)`,
+    [biz.businessId, r.id, biz.services.fullDetail],
+  );
+  if (opts.addon) {
+    await db.query(
+      `insert into public.booking_request_items (business_id, booking_request_id, service_id, name, price_type, price_cents, duration_min, is_addon)
+       values ($1, $2, $3, 'Pet hair removal', 'fixed', 4000, 30, true)`,
+      [biz.businessId, r.id, biz.services.petHair],
+    );
+  }
+  return { id: r.id as string, number: r.number as number, token, start: r.requested_start as Date };
 }

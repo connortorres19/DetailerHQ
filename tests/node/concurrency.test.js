@@ -333,3 +333,84 @@ test('housekeeping (expire_stale) running concurrently with approvals, holds and
   assert.equal(rows[0].approved, 2, 'exactly capacity-many approvals succeeded (expired holds did not block)');
   assert.equal(rows[0].stale_pending, 0, 'every past pending request ended expired or declined');
 });
+
+// ---------------------------------------------------------------------------
+// Phase 4D: owner actions racing each other and the public booking page.
+// ---------------------------------------------------------------------------
+
+async function slotIds(businessId) {
+  const { rows: [r] } = await pool.query(
+    `select (select id from public.vehicle_size_classes where business_id = $1 order by sort_order limit 1) as size,
+            (select id from public.services where business_id = $1 and name = 'Full detail') as service`,
+    [businessId],
+  );
+  return r;
+}
+
+test('owner approval, instant public booking and a calendar hold racing for one slot (capacity 1): exactly one wins (15 rounds)', async () => {
+  const biz = await freshBusiness('mobile');
+  await asOwner(pool, biz.userId, "update public.booking_settings set booking_mode = 'instant' where business_id = $1", [biz.businessId]);
+  const { size, service } = await slotIds(biz.businessId);
+  for (let round = 0; round < 15; round += 1) {
+    const start = await atLocal(pool, 2 + round, '10:00');
+    const req = await insertRequest(pool, biz.businessId, start, 120);
+    const payload = {
+      service_ids: [service], vehicle_size_class_id: size, requested_start: start, location_type: 'mobile',
+      service_address_line1: '1234 Oak St', service_city: 'Austin', service_state: 'TX', service_postal_code: '78701',
+      contact_first_name: 'Sam', contact_phone_e164: `+15125550${String(100 + round)}`, contact_email: `sam${round}@example.com`,
+      vehicle_make: 'Ford', vehicle_model: 'F-150', consent: true,
+    };
+    const [approve, submit, hold] = await Promise.allSettled([
+      asOwner(pool, biz.userId, 'select public.approve_request($1)', [req.id]),
+      pool.query('select public_api.submit_booking_request($1, $2, gen_random_uuid(), $3, $4) as r',
+        [biz.slug, JSON.stringify(payload), sha256(`race-token-${round}`), sha256(`race-ip-${round}`)]),
+      asOwner(pool, biz.userId, "select public.place_calendar_hold($1, $1::timestamptz + interval '2 hours', 24)", [start]),
+    ]);
+    for (const r of [approve, hold]) {
+      if (r.status === 'rejected') assert.equal(classifyDbError(r.reason).kind, 'capacity_exceeded', `${r.reason.code} ${r.reason.message}`);
+    }
+    assert.equal(submit.status, 'fulfilled');
+    const submitWon = !submit.value.rows[0].r.error;
+    if (!submitWon) assert.equal(submit.value.rows[0].r.error.detail, 'fully booked');
+    const wins = [approve.status === 'fulfilled', submitWon, hold.status === 'fulfilled'].filter(Boolean).length;
+    assert.equal(wins, 1, `round ${round}: exactly one of approve / instant booking / hold wins`);
+    assert.equal(await peakUsage(biz.businessId, start, 120), 1);
+  }
+});
+
+test('two reschedules into the same free slot at once: one moves, the other stays put (10 rounds)', async () => {
+  const biz = await freshBusiness('mobile');
+  for (let round = 0; round < 10; round += 1) {
+    const a = await insertRequest(pool, biz.businessId, await atLocal(pool, 3 + round, '07:00'), 60);
+    const b = await insertRequest(pool, biz.businessId, await atLocal(pool, 3 + round, '09:00'), 60);
+    const { rows: [{ id: apptA }] } = await asOwner(pool, biz.userId, 'select public.approve_request($1) as id', [a.id]);
+    const { rows: [{ id: apptB }] } = await asOwner(pool, biz.userId, 'select public.approve_request($1) as id', [b.id]);
+    const target = await atLocal(pool, 3 + round, '15:00');
+    const { ok, errors } = await settle([
+      asOwner(pool, biz.userId, 'select public.reschedule_appointment($1, $2)', [apptA, target]),
+      asOwner(pool, biz.userId, 'select public.reschedule_appointment($1, $2)', [apptB, target]),
+    ]);
+    assert.equal(ok.length, 1);
+    assert.equal(classifyDbError(errors[0]).kind, 'capacity_exceeded');
+    assert.equal(await peakUsage(biz.businessId, target, 60), 1);
+    const { rows } = await pool.query('select count(*)::int as n from public.appointments where id = any($1) and starts_at = $2', [[apptA, apptB], target]);
+    assert.equal(rows[0].n, 1, 'exactly one appointment moved; the other kept its time');
+  }
+});
+
+test('cancel and approve racing for the same time never overbook (15 rounds)', async () => {
+  const biz = await freshBusiness('mobile');
+  for (let round = 0; round < 15; round += 1) {
+    const start = await atLocal(pool, 3 + round, '12:00');
+    const first = await insertRequest(pool, biz.businessId, start, 120);
+    const second = await insertRequest(pool, biz.businessId, start, 120);
+    const { rows: [{ id: appt }] } = await asOwner(pool, biz.userId, 'select public.approve_request($1) as id', [first.id]);
+    const [cancel, approve] = await Promise.allSettled([
+      asOwner(pool, biz.userId, 'select public.cancel_appointment($1)', [appt]),
+      asOwner(pool, biz.userId, 'select public.approve_request($1)', [second.id]),
+    ]);
+    assert.equal(cancel.status, 'fulfilled');
+    if (approve.status === 'rejected') assert.equal(classifyDbError(approve.reason).kind, 'capacity_exceeded');
+    assert.ok((await peakUsage(biz.businessId, start, 120)) <= 1, 'never more than capacity');
+  }
+});

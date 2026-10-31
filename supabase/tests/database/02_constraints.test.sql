@@ -178,7 +178,7 @@ select public.create_appointment((select cust_a from rec), (select veh_a from re
        array[pg_temp.service_id((select biz_a from ctx), 'Full detail')], 'mobile', '{"line1":"1 Main"}'::jsonb);
 select throws_ok(
   format($$select public.complete_appointment(%L)$$, (select id from appt2)),
-  'DH002', 'appointment cannot move from scheduled to completed', 'scheduled cannot jump to completed');
+  'DH002', 'a job can only be completed after its start time', 'a future job cannot be marked completed (migration 12)');
 select throws_ok(
   format($$select public.mark_no_show(%L)$$, (select id from appt2)),
   'DH002', 'no-show can only be recorded after the start time', 'no-show only after start');

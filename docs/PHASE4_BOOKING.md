@@ -133,3 +133,47 @@ The plan and design system name the public route `/b/[slug]`; Phase 4C uses `/bo
 - One vehicle and one main service per booking (plus add-ons); several main services in one booking is possible in the database but not offered in the UI.
 - Approval-mode requests can't yet be approved from the dashboard — that's Phase 4D (owner request management).
 - The rate-limit key is the client IP from `x-forwarded-for`; correct behind Vercel, needs proxy configuration elsewhere.
+
+## 4D — Owner booking management
+
+Built on the Phase 1 owner workflow functions (approve, propose, retract, decline, close duplicate, request holds, reschedule, cancel, complete, no-show), which already take the business's capacity lock and are re-checked by the capacity trigger. No booking logic is duplicated in the app.
+
+**Screens**
+- `/app/bookings` — inbox. Filters All · Pending (incl. proposed) · Confirmed (incl. in progress) · Completed · Cancelled (incl. no-show) · Declined (incl. withdrawn, expired, proposal declined, closed duplicate), with counts. Rows: date/time, duration, customer, phone/email, services + add-ons, vehicle + size, price, notes, status. Sorted: waiting requests (soonest first), upcoming jobs (soonest first), then the rest (newest first).
+- `/app/bookings/[id]` — detail: actions, time and place, price breakdown, customer (call/text/email links), vehicle, notes, history (activity events), possible-duplicate warning with links, repeat-request notice, hold and proposal notices.
+- `/app/calendar` — day, week and agenda in the business time zone: confirmed jobs (solid), pending requests (dashed, amber), proposed times (dashed, blue), holds (hatched); completed/no-show muted. Hold form and active-holds list with Release.
+- Navigation: Bookings and Calendar after Today; on phones the tab bar shows Today · Bookings · Calendar · Customers · More (DESIGN_SYSTEM §11.3). Today links pending requests and today's jobs to their bookings.
+
+**Actions by status**
+| Status | Actions |
+|---|---|
+| Pending | Confirm (new customer record by default, or an existing customer/vehicle the owner picks) · Propose another time (open times from the availability engine, re-verified on the server) · Hold / release the requested time · Decline (private reason; optional message shown to the customer) · Close as duplicate (when flagged) |
+| Proposed | Withdraw proposal · Decline (the customer accepts/declines on `/r/[token]`; acceptance re-checks capacity and returns the request to pending if the time is gone) |
+| Confirmed | Reschedule (open times, or any time — capacity always enforced; one statement, so no overbooking window) · Cancel (frees capacity; private reason, optional customer message) · Complete / No-show (after the start time) |
+| In progress | Complete · Cancel |
+
+**Migration 12 (`20261031150000_booking_management.sql`)**
+- **Calendar holds:** `schedule_blocks.note`; a hold may stand alone (no request). Same table, capacity trigger and expiry rule as request holds: one unit of capacity for [start, end) until it expires (2–72 h, never past its start), refused if the time is full (never overrides an appointment). `public.place_calendar_hold` / `release_calendar_hold` (owners only; another business's hold is "not found").
+- **Complete from scheduled:** the transition rule allows scheduled → completed directly, and the guard refuses completing a job before its start time (mirroring the existing no-show rule). `02_constraints` updated accordingly.
+
+**Duplicates**: the detail page lists active customers with the same phone or email. Nothing merges automatically; the owner can choose one when confirming (the request's vehicle is added to them unless an existing vehicle is chosen). Phase 4C's instant bookings keep creating new records.
+
+### Tests (2026-10-31)
+
+| Suite | Result |
+|---|---|
+| Unit | 41/41 (6 new: display status, filters, sort order, history wording, date/time inputs) |
+| pgTAP | 727/727 — new `11_booking_management` (54): approve (new records; owner-chosen existing customer), overlapping approval refused, approve twice refused, decline privacy on the status link, propose → accept / reject / expired / no longer available → pending, proposal into a full time refused, calendar holds (capacity, never over an appointment, validation, B can't see or release A's, release, expiry stops counting, notes only on calendar holds), cancel frees capacity, reschedule refused into a full time / allowed over its own time / block moves with it, complete only after start, no-show, cross-business refusals, privileges |
+| Node | 28/28 — 3 new races: approval vs instant public booking vs calendar hold for one slot (exactly one wins, 15 rounds); two reschedules into one slot (one moves, 10 rounds); cancel vs approve (never over capacity, 15 rounds) |
+| E2E `bookings.spec.ts` | 9/9 — inbox, filters, detail, confirm, overbooking refused, private decline with a customer message; duplicate warning and owner-chosen linking; propose → customer accepts / rejects on the status link; request hold + calendar hold (shown on the calendar, refused over an appointment, released); reschedule refused/allowed, cancel frees time, complete and no-show; calendar day/week/agenda with real data; cross-business 404 + tampered action refused; layouts at 390/1280 px |
+| All E2E (production build) | 66/66 |
+| Build, bundle scan (35 browser files), `db lint`, marketing film, CSP | pass / clean / clean / unchanged / no violations |
+
+### Findings and limits
+
+- **Fixed during 4D:** leaving "Show a message to the customer" unticked made decline/cancel fail (the absent field was rejected). Optional text now accepts being absent; the e2e cancel test covers it.
+- **Fixed during 4D:** a controlled checkbox inside an action form desynced after React's post-action form reset; replaced by a toggle button.
+- No messages are sent: the customer sees decisions on their status link; the owner can call, text or email from the detail page (opens their own apps).
+- The inbox shows the 300 most recent requests and appointments (a note says so); no pagination yet.
+- Calendar holds are on the single schedule resource (as all capacity is in the MVP). Converting a hold into an appointment for a phone customer is not built (owner-created appointments are a later phase).
+- History shows activity events; requests created before an event existed (or inserted directly) show "No history yet".

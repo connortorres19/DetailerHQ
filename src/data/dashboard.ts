@@ -16,7 +16,7 @@ export async function getToday(business: Business) {
     supabase.from('booking_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
     supabase
       .from('appointments')
-      .select('id, starts_at, ends_at, status, location_type, service_address_line1, customer:customers(first_name, last_name), vehicle:vehicles(year, make, model)')
+      .select('id, booking_request_id, starts_at, ends_at, status, location_type, service_address_line1, customer:customers(first_name, last_name), vehicle:vehicles(year, make, model)')
       .gte('starts_at', today.start.toISOString())
       .lt('starts_at', today.end.toISOString())
       .in('status', ACTIVE)

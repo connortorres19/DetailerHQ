@@ -690,6 +690,9 @@ isOneToOne: false
 "retract_proposal":
 { Args: { "p_request_id": string }; Returns: undefined
                            },
+"save_service":
+{ Args: { "p_prices": Json,"p_service": Json,"p_service_id": string }; Returns: string
+                           },
 "set_capacity":
 { Args: { "p_capacity": number }; Returns: undefined
                            },

@@ -294,14 +294,15 @@ test.describe('cross-business isolation for services', () => {
     // A's service with a size A hasn't priced → the composite FK rejects it (service must be B's).
     const otherSize = await db.query('select id from public.vehicle_size_classes where business_id = $1 and id <> $2 limit 1', [a.businessId, a.sizeId]);
     const priceOnA = await client.from('service_prices').insert({ business_id: b.businessId, service_id: a.serviceId, size_class_id: otherSize.rows[0].id, price_cents: 1 });
-    expect(priceOnA.error?.code).toBe('23503');
-    // Known Phase 1 schema finding (F-4A-1): for a (service, size) pair A HAS priced, the primary
-    // key (service_id, size_class_id) is checked before the foreign key, so the error is 23505.
-    // It reveals only that the pair exists, needs both of A's random UUIDs, and writes nothing.
+    expect(priceOnA.error?.code).toBe('DH003');
+    // F-4A-1 fixed (migration 9): even for a pair A HAS priced, the ownership trigger answers first
+    // with a clear DH003 — no duplicate-key error revealing that the pair exists.
     const existingPair = await client.from('service_prices').insert({ business_id: b.businessId, service_id: a.serviceId, size_class_id: a.sizeId, price_cents: 1 });
-    expect(['23505', '23503']).toContain(existingPair.error?.code);
+    expect(existingPair.error?.code).toBe('DH003');
+    expect(existingPair.error?.message).toBe('unknown service');
     const bWithASize = await client.from('service_prices').insert({ business_id: b.businessId, service_id: b.serviceId, size_class_id: a.sizeId, price_cents: 1 });
-    expect(bWithASize.error?.code).toBe('23503');
+    expect(bWithASize.error?.code).toBe('DH003');
+    expect(bWithASize.error?.message).toBe('unknown vehicle size');
 
     // Database rules hold even for direct writes: negative money, bookable quote, bad duration.
     for (const bad of [
@@ -314,4 +315,50 @@ test.describe('cross-business isolation for services', () => {
     }
     await aUnchanged();
   });
+});
+
+test('saves are atomic and duplicate or foreign sizes get clear errors (save_service, real owner session)', async ({ page }) => {
+  const owner = await ownerWithBusiness(page, 'svcatomic');
+  const client = anon();
+  await client.auth.signInWithPassword({ email: owner.email, password: PASSWORD });
+  const sizes = (await db.query('select id from public.vehicle_size_classes where business_id = $1 order by sort_order', [owner.businessId])).rows.map((r) => r.id as string);
+  const svc = { name: 'Atomic wash', price_type: 'fixed', base_price_cents: 5000, base_duration_min: 60, is_bookable: true };
+
+  const dup = await client.rpc('save_service', { p_service_id: null, p_service: svc, p_prices: [{ size_class_id: sizes[0], price_cents: 6000 }, { size_class_id: sizes[0], price_cents: 7000 }] });
+  expect(dup.error?.code).toBe('DH004');
+  expect(dup.error?.details).toBe('duplicate_size');
+
+  // Second row breaks a check constraint → the service row from the same call must not survive.
+  const partial = await client.rpc('save_service', { p_service_id: null, p_service: svc, p_prices: [{ size_class_id: sizes[0], price_cents: 6000 }, { size_class_id: sizes[1], duration_min: 5 }] });
+  expect(partial.error?.code).toBe('23514');
+  const none = await db.query(`select count(*)::int as n from public.services where business_id = $1 and name = 'Atomic wash'`, [owner.businessId]);
+  expect(none.rows[0].n).toBe(0);
+
+  // A good save, then a failing edit: neither the service nor its grid changes.
+  const ok = await client.rpc('save_service', { p_service_id: null, p_service: svc, p_prices: [{ size_class_id: sizes[0], price_cents: 6000 }] });
+  expect(ok.error).toBeNull();
+  const id = ok.data as string;
+  const bad = await client.rpc('save_service', { p_service_id: id, p_service: { ...svc, name: 'Renamed', base_price_cents: 1 }, p_prices: [{ size_class_id: sizes[1], price_cents: -1 }] });
+  expect(bad.error?.code).toBe('23514');
+  const after = await db.query(
+    `select s.name, s.base_price_cents, (select json_agg(json_build_object('size', size_class_id, 'price', price_cents)) from public.service_prices where service_id = s.id) as prices
+       from public.services s where s.id = $1`,
+    [id],
+  );
+  expect(after.rows[0]).toEqual({ name: 'Atomic wash', base_price_cents: 5000, prices: [{ size: sizes[0], price: 6000 }] });
+
+  // The editor surfaces the database's duplicate/foreign-size reasons as a field error, not a generic one.
+  await page.goto(`/app/services/${id}`);
+  let done = false;
+  await page.route('**/app/services/**', async (route) => {
+    const req = route.request();
+    if (done || req.method() !== 'POST' || !req.headers()['next-action']) return route.continue();
+    done = true;
+    const foreign = '00000000-0000-4000-8000-000000000000';
+    const body = (req.postData() ?? '').replaceAll(`size.${sizes[0]}.price`, `size.${foreign}.price`);
+    expect(body).toContain(foreign);
+    return route.continue({ postData: body });
+  });
+  await page.getByRole('button', { name: 'Save changes' }).click();
+  await expect(page.getByText('Unknown vehicle size.')).toBeVisible();
 });

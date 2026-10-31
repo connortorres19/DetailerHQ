@@ -9,6 +9,7 @@ import { requireBusiness } from '@/data/session';
 import { idSchema } from '@/domain/customer';
 import { failed, formValues, type FormState } from '@/domain/forms';
 import { categorySchema, parseServiceForm, type ServiceInput } from '@/domain/service';
+import { callWorkflow } from '@/data/workflow';
 
 const NOT_FOUND = 'We couldn’t find that service. It may belong to another account or have been removed.';
 
@@ -26,15 +27,20 @@ function dbFailure(error: PostgrestError, formData?: FormData): FormState {
   return failed('Something went wrong. Please try again.', formData);
 }
 
-const toServiceRow = (v: ServiceInput) => ({
-  name: v.name,
-  description: v.description,
-  category_id: v.categoryId,
-  price_type: v.priceType,
-  base_price_cents: v.basePriceCents,
-  base_duration_min: v.baseDurationMin,
-  is_addon: v.isAddon,
-  is_bookable: v.isBookable,
+// The service and its whole size grid are saved by ONE database call (public.save_service,
+// migration 9): one transaction, so a failure anywhere leaves nothing partially saved.
+const toPayload = (v: ServiceInput) => ({
+  p_service: {
+    name: v.name,
+    description: v.description,
+    category_id: v.categoryId,
+    price_type: v.priceType,
+    base_price_cents: v.basePriceCents,
+    base_duration_min: v.baseDurationMin,
+    is_addon: v.isAddon,
+    is_bookable: v.isBookable,
+  },
+  p_prices: v.sizes.map((s) => ({ size_class_id: s.sizeClassId, price_cents: s.priceCents, duration_min: s.durationMin })),
 });
 
 // Validates the form server-side against the business's own vehicle sizes (read through RLS).
@@ -45,63 +51,44 @@ async function validate(formData: FormData) {
   return { data: result.data } as const;
 }
 
+// Database reasons → owner-facing messages, on the field they concern.
+function saveFailure(result: { kind: string; code: string | undefined; message: string; detail?: string }, formData: FormData): FormState {
+  switch (result.detail) {
+    case 'duplicate_size':
+      return failed('Each vehicle size can only be priced once. Check the size grid.', formData, { sizes: 'Each vehicle size can only be priced once.' });
+    case 'size_not_in_business':
+      return failed('One of those vehicle sizes isn’t in your account. Refresh and try again.', formData, { sizes: 'Unknown vehicle size.' });
+    case 'service_not_found':
+    case 'service_not_in_business':
+      return failed(NOT_FOUND, formData);
+  }
+  if (result.code === '23503') return failed('That category or vehicle size isn’t in your account. Refresh and try again.', formData);
+  if (result.code === '23514' || result.kind === 'invalid_input') return failed('Some of the details aren’t valid. Check them and try again.', formData);
+  return failed(result.message, formData);
+}
+
 // ---- Services ------------------------------------------------------------------------
 
 export async function createService(_: FormState, formData: FormData): Promise<FormState> {
-  const { business } = await requireBusiness('/app/services/new');
+  await requireBusiness('/app/services/new');
   const v = await validate(formData);
   if (v.error) return v.error;
-
-  const supabase = await createClient();
-  const { data: last } = await supabase.from('services').select('sort_order').order('sort_order', { ascending: false }).limit(1).maybeSingle();
-  const { data: service, error } = await supabase
-    .from('services')
-    .insert({ business_id: business.id, ...toServiceRow(v.data), sort_order: (last?.sort_order ?? 0) + 1 })
-    .select('id')
-    .single();
-  if (error) return dbFailure(error, formData);
-
-  if (v.data.sizes.length) {
-    const { error: priceError } = await supabase.from('service_prices').insert(
-      v.data.sizes.map((s) => ({ business_id: business.id, service_id: service.id, size_class_id: s.sizeClassId, price_cents: s.priceCents, duration_min: s.durationMin })),
-    );
-    if (priceError) {
-      // No partial services: remove the row just created (nothing can reference it yet).
-      await supabase.from('services').delete().eq('id', service.id);
-      return dbFailure(priceError, formData);
-    }
-  }
+  // null = create (the generated type marks the uuid parameter non-null; the function accepts null).
+  const result = await callWorkflow('save_service', { p_service_id: null as unknown as string, ...toPayload(v.data) });
+  if (!result.ok) return saveFailure(result, formData);
   revalidatePath('/app', 'layout');
-  redirect(`/app/services?saved=created`);
+  redirect('/app/services?saved=created');
 }
 
 export async function updateService(serviceId: string, _: FormState, formData: FormData): Promise<FormState> {
   const id = parseId(serviceId);
-  const { business } = await requireBusiness(`/app/services/${id}`);
+  await requireBusiness(`/app/services/${id}`);
   const v = await validate(formData);
   if (v.error) return v.error;
-
-  const supabase = await createClient();
-  const { data, error } = await supabase.from('services').update(toServiceRow(v.data)).eq('id', id).select('id').maybeSingle();
-  if (error) return dbFailure(error, formData);
-  if (!data) return failed(NOT_FOUND, formData);
-
-  // Replace the size grid: drop sizes now blank, upsert the rest. RLS and the composite
-  // foreign key keep both writes inside this business and this service.
-  const keep = v.data.sizes.map((s) => s.sizeClassId);
-  let remove = supabase.from('service_prices').delete().eq('service_id', id);
-  if (keep.length) remove = remove.not('size_class_id', 'in', `(${keep.join(',')})`);
-  const { error: removeError } = await remove;
-  if (removeError) return dbFailure(removeError, formData);
-  if (v.data.sizes.length) {
-    const { error: upsertError } = await supabase.from('service_prices').upsert(
-      v.data.sizes.map((s) => ({ business_id: business.id, service_id: id, size_class_id: s.sizeClassId, price_cents: s.priceCents, duration_min: s.durationMin })),
-      { onConflict: 'service_id,size_class_id' },
-    );
-    if (upsertError) return dbFailure(upsertError, formData);
-  }
+  const result = await callWorkflow('save_service', { p_service_id: id, ...toPayload(v.data) });
+  if (!result.ok) return saveFailure(result, formData);
   revalidatePath('/app', 'layout');
-  redirect(`/app/services?saved=updated`);
+  redirect('/app/services?saved=updated');
 }
 
 async function setArchived(serviceId: string, archived: boolean) {

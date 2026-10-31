@@ -81,7 +81,7 @@ select throws_ok(
 select throws_ok(
   format($$insert into public.service_prices (business_id, service_id, size_class_id, price_cents) values (%L, %L, %L, 100)$$,
          (select biz_a from ctx), pg_temp.service_id((select biz_a from ctx), 'Full detail'), pg_temp.size_class_id((select biz_b from ctx))),
-  '23503', null, 'service price cannot reference another business''s size class');
+  'DH003', 'unknown vehicle size', 'service price cannot reference another business''s size class (ownership trigger, migration 9)');
 
 select throws_ok(
   format($$insert into public.schedule_blocks (business_id, resource_id, kind, during, booking_request_id, expires_at)

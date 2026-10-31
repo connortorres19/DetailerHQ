@@ -45,7 +45,10 @@ type PublicFunction =
   | 'withdraw_request'
   | 'cancel_appointment'
   | 'accept_proposal'
-  | 'decline_proposal';
+  | 'decline_proposal'
+  | 'get_quote'
+  | 'accept_quote'
+  | 'decline_quote';
 
 // Calls one public_api function. Since migration 11 they return {"error": …} instead of raising
 // (so failed attempts are rate-limited); unexpected database errors still throw.
@@ -68,6 +71,23 @@ export function statusTokenFor(idempotencyKey: string) {
 }
 
 export const isWellFormedToken = (token: string) => /^[A-Za-z0-9_-]{43}$/.test(token);
+
+// Quote links. The database makes them (public.send_quote, migration 15): it draws the nonce from
+// its CSPRNG and stores only sha256(token); owners never choose a token. The server passes a 32-byte
+// subkey of its secret (never stored) and derives the same 256-bit token from the stored nonce to
+// show the link again: token = base64url(HMAC-SHA256(key, "quote-link:v2:" + nonce)).
+// Version 1 links (sent before migration 15) used HMAC(secret, "quote-link:" + nonce).
+export function quoteLinkKey() {
+  return createHmac('sha256', bookingConfig().BOOKING_HASH_SECRET).update('quote-link-key:v2').digest();
+}
+
+export function quoteTokenFor(nonce: string, version: number) {
+  const token =
+    version === 1
+      ? createHmac('sha256', bookingConfig().BOOKING_HASH_SECRET).update(`quote-link:${nonce}`).digest('base64url')
+      : createHmac('sha256', quoteLinkKey()).update(`quote-link:v2:${nonce}`).digest('base64url');
+  return { token, hash: sha256(token) };
+}
 
 // Rate limits are keyed on an HMAC of the client IP: the database never sees a raw IP and a
 // leaked table can't be reversed by enumerating addresses. Behind Vercel (or any proxy that

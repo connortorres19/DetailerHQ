@@ -6,9 +6,10 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { setTimeout as sleep } from 'node:timers/promises';
 import pg from 'pg';
+import { createHmac } from 'node:crypto';
 import {
   adminPool, asOwner, ownerSession, createOwnerUser, createBusiness, atLocal, insertRequest,
-  cleanup, settle, local, sha256, enableBookingApi,
+  cleanup, settle, local, sha256, enableBookingApi, runId,
 } from './support.js';
 import { classifyDbError, withRetry } from '../../src/db/errors.js';
 
@@ -494,4 +495,104 @@ test('a hold being converted is never taken by the booking page in between (10 r
     assert.ok(submit.value.rows[0].r.error, `round ${round}: the public booking is refused`);
     assert.equal(await peakUsage(biz.businessId, start, 120), 1);
   }
+});
+
+// --- Phase 5: quotes -------------------------------------------------------------------------------
+
+async function sentQuote(biz, n, minutes = 120) {
+  const c = await ownerCustomer(biz.businessId, 100 + n);
+  const { rows: [{ d }] } = await pool.query(`select ((now() at time zone 'America/Chicago')::date + 14)::text as d`);
+  const { rows: [{ id }] } = await asOwner(pool, biz.userId, `select public.save_quote(null, $1, $2, null, $3, null, $4) as id`, [
+    { valid_until: d }, c.customer, c.vehicle, JSON.stringify([{ name: 'Full detail', quantity: 1, price_cents: 18000, duration_min: minutes }]),
+  ]);
+  // The database makes the token; derive it from the nonce as the server does (and as a cross-check).
+  const key = sha256(`node-link-key-${runId}`);
+  const { rows: [{ nonce }] } = await asOwner(pool, biz.userId, 'select public.send_quote($1, $2) as nonce', [id, key]);
+  const token = createHmac('sha256', key).update(`quote-link:v2:${nonce}`).digest('base64url');
+  return { id, hash: sha256(token) };
+}
+
+async function withBookingPool(fn) {
+  const role = await enableBookingApi(pool);
+  const { password } = role;
+  const bookingPool = new pg.Pool({ connectionString: local.DB_URL.replace('postgres:postgres@', `booking_api:${password}@`), max: 6 });
+  try {
+    return await fn(bookingPool);
+  } finally {
+    await bookingPool.end();
+    await role.restore();
+  }
+}
+
+test('a customer accepting twice at once, and accept racing decline: one decision, recorded once (10 rounds)', async () => {
+  const biz = await freshBusiness('shop', 1);
+  await withBookingPool(async (bp) => {
+    for (let round = 0; round < 10; round += 1) {
+      const q = await sentQuote(biz, round);
+      const ip = sha256(`qip-${runId}-${round}`);
+      const other = round % 2 ? 'decline_quote' : 'accept_quote';
+      const [a, b] = await Promise.all([
+        bp.query('select public_api.accept_quote($1, $2) as r', [q.hash, ip]),
+        bp.query(`select public_api.${other}($1, $2) as r`, [q.hash, ip]),
+      ]);
+      const results = [a.rows[0].r, b.rows[0].r];
+      const { rows: [row] } = await pool.query('select status, decided_at from public.quotes where id = $1', [q.id]);
+      assert.ok(['accepted', 'declined'].includes(row.status), `round ${round}: ${row.status}`);
+      assert.ok(row.decided_at);
+      if (other === 'accept_quote') {
+        assert.equal(row.status, 'accepted');
+        assert.ok(results.every((r) => !r.error), JSON.stringify(results));
+        assert.equal(results.filter((r) => r.already).length, 1, 'the second accept is a no-op');
+      } else {
+        // The loser of accept vs decline is told the quote can no longer be answered.
+        assert.equal(results.filter((r) => r.error).length, 1, JSON.stringify(results));
+        assert.equal(results.find((r) => r.error).error.code, 'DH002');
+      }
+      const { rows: [{ n }] } = await pool.query(
+        `select count(*)::int as n from public.activity_events where business_id = $1 and kind = 'quote_status_changed' and quote_id = $2 and to_status in ('accepted', 'declined')`,
+        [biz.businessId, q.id],
+      );
+      assert.equal(n, 1, `round ${round}: one decision in the history`);
+    }
+  });
+});
+
+test('booking the same accepted quote twice at once: one appointment, the quote converted once (10 rounds)', async () => {
+  const biz = await freshBusiness('shop', 3);
+  await withBookingPool(async (bp) => {
+    for (let round = 0; round < 10; round += 1) {
+      const q = await sentQuote(biz, 20 + round);
+      await bp.query('select public_api.accept_quote($1, $2)', [q.hash, sha256(`twice-${runId}-${round}`)]);
+      const [s1, s2] = [await atLocal(pool, 3 + round, '09:00'), await atLocal(pool, 3 + round, '13:00')];
+      const { ok, errors } = await settle([
+        asOwner(pool, biz.userId, `select public.convert_quote($1, $2, 'shop', null) as id`, [q.id, s1]),
+        asOwner(pool, biz.userId, `select public.convert_quote($1, $2, 'shop', null) as id`, [q.id, s2]),
+      ]);
+      assert.equal(ok.length, 1, `round ${round}`);
+      assert.equal(classifyDbError(errors[0]).kind, 'invalid_state', `${errors[0].code} ${errors[0].message}`);
+      const { rows: [{ n, status }] } = await pool.query(
+        `select (select count(*)::int from public.appointments where quote_id = $1) as n, (select status from public.quotes where id = $1) as status`, [q.id]);
+      assert.deepEqual({ n, status }, { n: 1, status: 'converted' });
+    }
+  });
+});
+
+test('quote conversion and an owner booking racing for the last slot (capacity 1): exactly one wins (10 rounds)', async () => {
+  const biz = await freshBusiness('shop', 1);
+  const { size, service } = await slotIds(biz.businessId);
+  const walkIn = await ownerCustomer(biz.businessId, 90);
+  await withBookingPool(async (bp) => {
+    for (let round = 0; round < 10; round += 1) {
+      const q = await sentQuote(biz, 40 + round);
+      await bp.query('select public_api.accept_quote($1, $2)', [q.hash, sha256(`slot-${runId}-${round}`)]);
+      const start = await atLocal(pool, 3 + round, '10:00');
+      const { ok, errors } = await settle([
+        asOwner(pool, biz.userId, `select public.convert_quote($1, $2, 'shop', null) as id`, [q.id, start]),
+        asOwner(pool, biz.userId, CREATE, [walkIn.customer, walkIn.vehicle, size, [service], start, null]),
+      ]);
+      assert.equal(ok.length, 1, `round ${round}`);
+      assert.ok(['invalid_input', 'capacity_exceeded', 'retryable'].includes(classifyDbError(errors[0]).kind), `${errors[0].code} ${errors[0].message}`);
+      assert.equal(await peakUsage(biz.businessId, start, 120), 1);
+    }
+  });
 });

@@ -17,7 +17,7 @@ const REQUEST_COLUMNS =
 
 const APPOINTMENT_COLUMNS =
   'id, number, status, starts_at, ends_at, estimated_total_cents, recorded_total_cents, booking_request_id, location_type, service_address_line1, service_city, ' +
-  'service_state, service_postal_code, cancelled_by, cancel_reason, customer_message, source, internal_notes, created_at, ' +
+  'service_state, service_postal_code, cancelled_by, cancel_reason, customer_message, source, internal_notes, quote_id, created_at, ' +
   'customer:customers(id, first_name, last_name, phone_e164, email), vehicle:vehicles(id, year, make, model, color, size_class_id), ' +
   'appointment_items(service_id, name, estimated_price_cents, duration_min)';
 

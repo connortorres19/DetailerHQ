@@ -9,7 +9,7 @@ export type WorkflowName = keyof Functions;
 
 export type WorkflowResult<T> =
   | { ok: true; data: T }
-  | { ok: false; kind: DbErrorKind; code: string | undefined; message: string; detail?: string };
+  | { ok: false; kind: DbErrorKind; code: string | undefined; message: string; detail?: string; reason?: string };
 
 // Owner-facing wording for each error class (PRODUCT_PLAN §6.12). Function-specific
 // messages (e.g. which field) are added by the caller where it knows more.
@@ -24,11 +24,12 @@ const MESSAGES: Record<DbErrorKind, string> = {
   unexpected: 'Something went wrong. Please try again.',
 };
 
-// `detail` is the machine-readable reason some functions attach (e.g. 'duplicate_size'), for
-// callers that map it to a field; it is never shown to owners as-is.
+// `detail` is the machine-readable reason some functions attach (e.g. 'duplicate_size') and
+// `reason` the function's own message (e.g. 'discount is more than the subtotal'), for callers that
+// map them to wording; neither is shown to owners as-is.
 export function describeDbError(error: Pick<PostgrestError, 'code' | 'message'> & { details?: string | null }) {
   const { code, kind } = classifyDbError(error);
-  return { kind, code, message: MESSAGES[kind], detail: error.details ?? undefined };
+  return { kind, code, message: MESSAGES[kind], detail: error.details ?? undefined, reason: error.message };
 }
 
 class RetryableError extends Error {

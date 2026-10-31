@@ -297,14 +297,14 @@ isOneToOne: false
                   ]
                 },"leads": {
                   Row: {
-                    "booking_request_id": string | null,"business_id": string,"contact_email": string | null,"contact_first_name": string,"contact_last_name": string | null,"contact_phone_e164": string | null,"created_at": string,"customer_id": string | null,"id": string,"last_inbound_at": string | null,"lost_reason": Database["public"]['Enums']["lost_reason"] | null,"next_follow_up_at": string | null,"request_text": string | null,"source": Database["public"]['Enums']["lead_source"],"status": Database["public"]['Enums']["lead_status"],"updated_at": string,"vehicle_description": string | null,"vehicle_id": string | null
+                    "booking_request_id": string | null,"business_id": string,"contact_email": string | null,"contact_first_name": string,"contact_last_name": string | null,"contact_phone_e164": string | null,"created_at": string,"customer_id": string | null,"follow_up_note": string | null,"id": string,"last_contacted_at": string | null,"last_inbound_at": string | null,"lost_reason": Database["public"]['Enums']["lost_reason"] | null,"next_follow_up_at": string | null,"notes": string | null,"request_text": string | null,"service_id": string | null,"size_class_id": string | null,"source": Database["public"]['Enums']["lead_source"],"status": Database["public"]['Enums']["lead_status"],"updated_at": string,"vehicle_description": string | null,"vehicle_id": string | null,"vehicle_make": string | null,"vehicle_model": string | null,"vehicle_year": number | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "booking_request_id"?: string | null,"business_id": string,"contact_email"?: string | null,"contact_first_name": string,"contact_last_name"?: string | null,"contact_phone_e164"?: string | null,"created_at"?: string,"customer_id"?: string | null,"id"?: string,"last_inbound_at"?: string | null,"lost_reason"?: Database["public"]['Enums']["lost_reason"] | null,"next_follow_up_at"?: string | null,"request_text"?: string | null,"source": Database["public"]['Enums']["lead_source"],"status"?: Database["public"]['Enums']["lead_status"],"updated_at"?: string,"vehicle_description"?: string | null,"vehicle_id"?: string | null
+                    "booking_request_id"?: string | null,"business_id": string,"contact_email"?: string | null,"contact_first_name": string,"contact_last_name"?: string | null,"contact_phone_e164"?: string | null,"created_at"?: string,"customer_id"?: string | null,"follow_up_note"?: string | null,"id"?: string,"last_contacted_at"?: string | null,"last_inbound_at"?: string | null,"lost_reason"?: Database["public"]['Enums']["lost_reason"] | null,"next_follow_up_at"?: string | null,"notes"?: string | null,"request_text"?: string | null,"service_id"?: string | null,"size_class_id"?: string | null,"source": Database["public"]['Enums']["lead_source"],"status"?: Database["public"]['Enums']["lead_status"],"updated_at"?: string,"vehicle_description"?: string | null,"vehicle_id"?: string | null,"vehicle_make"?: string | null,"vehicle_model"?: string | null,"vehicle_year"?: number | null
                   }
                   Update: {
-                    "booking_request_id"?: string | null,"business_id"?: string,"contact_email"?: string | null,"contact_first_name"?: string,"contact_last_name"?: string | null,"contact_phone_e164"?: string | null,"created_at"?: string,"customer_id"?: string | null,"id"?: string,"last_inbound_at"?: string | null,"lost_reason"?: Database["public"]['Enums']["lost_reason"] | null,"next_follow_up_at"?: string | null,"request_text"?: string | null,"source"?: Database["public"]['Enums']["lead_source"],"status"?: Database["public"]['Enums']["lead_status"],"updated_at"?: string,"vehicle_description"?: string | null,"vehicle_id"?: string | null
+                    "booking_request_id"?: string | null,"business_id"?: string,"contact_email"?: string | null,"contact_first_name"?: string,"contact_last_name"?: string | null,"contact_phone_e164"?: string | null,"created_at"?: string,"customer_id"?: string | null,"follow_up_note"?: string | null,"id"?: string,"last_contacted_at"?: string | null,"last_inbound_at"?: string | null,"lost_reason"?: Database["public"]['Enums']["lost_reason"] | null,"next_follow_up_at"?: string | null,"notes"?: string | null,"request_text"?: string | null,"service_id"?: string | null,"size_class_id"?: string | null,"source"?: Database["public"]['Enums']["lead_source"],"status"?: Database["public"]['Enums']["lead_status"],"updated_at"?: string,"vehicle_description"?: string | null,"vehicle_id"?: string | null,"vehicle_make"?: string | null,"vehicle_model"?: string | null,"vehicle_year"?: number | null
                   }
                   Relationships: [
                     {
@@ -331,6 +331,18 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "businesses"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "leads_business_id_service_id_fkey"
+      columns: ["business_id","service_id"]
+isOneToOne: false
+      referencedRelation: "services"
+      referencedColumns: ["business_id","id"]
+    },{
+      foreignKeyName: "leads_business_id_size_class_id_fkey"
+      columns: ["business_id","size_class_id"]
+isOneToOne: false
+      referencedRelation: "vehicle_size_classes"
+      referencedColumns: ["business_id","id"]
     }
                   ]
                 },"memberships": {
@@ -381,14 +393,14 @@ isOneToOne: false
                   ]
                 },"quotes": {
                   Row: {
-                    "business_id": string,"created_at": string,"customer_id": string | null,"decided_at": string | null,"discount_cents": number,"id": string,"lead_id": string | null,"notes": string | null,"number": number,"sent_at": string | null,"status": Database["public"]['Enums']["quote_status"],"subtotal_cents": number,"terms": string | null,"token_hash": string | null,"total_cents": number,"updated_at": string,"valid_until": string | null,"vehicle_id": string | null,"vehicle_text": string | null
+                    "business_id": string,"created_at": string,"customer_id": string | null,"decided_at": string | null,"discount_cents": number,"follow_up_note": string | null,"id": string,"internal_notes": string | null,"lead_id": string | null,"link_version": number | null,"next_follow_up_at": string | null,"notes": string | null,"number": number,"proposed_start": string | null,"sent_at": string | null,"status": Database["public"]['Enums']["quote_status"],"subtotal_cents": number,"terms": string | null,"token_hash": string | null,"token_nonce": string | null,"total_cents": number,"updated_at": string,"valid_until": string | null,"vehicle_id": string | null,"vehicle_text": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "business_id": string,"created_at"?: string,"customer_id"?: string | null,"decided_at"?: string | null,"discount_cents"?: number,"id"?: string,"lead_id"?: string | null,"notes"?: string | null,"number": number,"sent_at"?: string | null,"status"?: Database["public"]['Enums']["quote_status"],"subtotal_cents"?: number,"terms"?: string | null,"token_hash"?: string | null,"total_cents"?: number,"updated_at"?: string,"valid_until"?: string | null,"vehicle_id"?: string | null,"vehicle_text"?: string | null
+                    "business_id": string,"created_at"?: string,"customer_id"?: string | null,"decided_at"?: string | null,"discount_cents"?: number,"follow_up_note"?: string | null,"id"?: string,"internal_notes"?: string | null,"lead_id"?: string | null,"link_version"?: number | null,"next_follow_up_at"?: string | null,"notes"?: string | null,"number": number,"proposed_start"?: string | null,"sent_at"?: string | null,"status"?: Database["public"]['Enums']["quote_status"],"subtotal_cents"?: number,"terms"?: string | null,"token_hash"?: string | null,"token_nonce"?: string | null,"total_cents"?: number,"updated_at"?: string,"valid_until"?: string | null,"vehicle_id"?: string | null,"vehicle_text"?: string | null
                   }
                   Update: {
-                    "business_id"?: string,"created_at"?: string,"customer_id"?: string | null,"decided_at"?: string | null,"discount_cents"?: number,"id"?: string,"lead_id"?: string | null,"notes"?: string | null,"number"?: number,"sent_at"?: string | null,"status"?: Database["public"]['Enums']["quote_status"],"subtotal_cents"?: number,"terms"?: string | null,"token_hash"?: string | null,"total_cents"?: number,"updated_at"?: string,"valid_until"?: string | null,"vehicle_id"?: string | null,"vehicle_text"?: string | null
+                    "business_id"?: string,"created_at"?: string,"customer_id"?: string | null,"decided_at"?: string | null,"discount_cents"?: number,"follow_up_note"?: string | null,"id"?: string,"internal_notes"?: string | null,"lead_id"?: string | null,"link_version"?: number | null,"next_follow_up_at"?: string | null,"notes"?: string | null,"number"?: number,"proposed_start"?: string | null,"sent_at"?: string | null,"status"?: Database["public"]['Enums']["quote_status"],"subtotal_cents"?: number,"terms"?: string | null,"token_hash"?: string | null,"token_nonce"?: string | null,"total_cents"?: number,"updated_at"?: string,"valid_until"?: string | null,"vehicle_id"?: string | null,"vehicle_text"?: string | null
                   }
                   Relationships: [
                     {
@@ -663,6 +675,15 @@ isOneToOne: false
 "complete_appointment":
 { Args: { "p_appointment_id": string,"p_payment_note"?: Database["public"]['Enums']["payment_note"],"p_recorded_total_cents"?: number }; Returns: undefined
                            },
+"complete_follow_up":
+{ Args: { "p_lead_id": string,"p_note"?: string,"p_quote_id": string }; Returns: undefined
+                           },
+"convert_lead_to_customer":
+{ Args: { "p_customer_id"?: string,"p_lead_id": string }; Returns: string
+                           },
+"convert_quote":
+{ Args: { "p_address": Json,"p_duration_min"?: number,"p_location_type": Database["public"]['Enums']["location_type"],"p_quote_id": string,"p_starts_at": string }; Returns: string
+                           },
 "create_appointment":
 { Args: { "p_customer_id": string,"p_duration_min"?: number,"p_location_type": Database["public"]['Enums']["location_type"],"p_service_address"?: Json,"p_service_ids": (string)[],"p_starts_at": string,"p_vehicle_id": string }; Returns: string
                            },
@@ -675,11 +696,20 @@ isOneToOne: false
 "decline_request":
 { Args: { "p_customer_message"?: string,"p_internal_reason"?: string,"p_request_id": string }; Returns: undefined
                            },
+"delete_quote":
+{ Args: { "p_quote_id": string }; Returns: undefined
+                           },
+"log_lead_activity":
+{ Args: { "p_channel"?: string,"p_kind": string,"p_lead_id": string,"p_note"?: string }; Returns: undefined
+                           },
 "mark_no_show":
 { Args: { "p_appointment_id": string }; Returns: undefined
                            },
 "owner_available_slots":
 { Args: { "p_days": number,"p_from": string,"p_service_ids": (string)[],"p_size_class_id": string }; Returns: Json
+                           },
+"owner_slots_for_duration":
+{ Args: { "p_days": number,"p_duration_min": number,"p_from": string }; Returns: Json
                            },
 "place_calendar_hold":
 { Args: { "p_ends_at": string,"p_hours": number,"p_note"?: string,"p_starts_at": string }; Returns: string
@@ -711,11 +741,17 @@ isOneToOne: false
 "retract_proposal":
 { Args: { "p_request_id": string }; Returns: undefined
                            },
+"save_quote":
+{ Args: { "p_customer": Json,"p_customer_id": string,"p_items": Json,"p_quote": Json,"p_quote_id": string,"p_vehicle": Json,"p_vehicle_id": string }; Returns: string
+                           },
 "save_service":
 { Args: { "p_prices": Json,"p_service": Json,"p_service_id": string }; Returns: string
                            },
 "save_weekly_hours":
 { Args: { "p_windows": Json }; Returns: number
+                           },
+"send_quote":
+{ Args: { "p_link_key": string,"p_quote_id": string }; Returns: string
                            },
 "set_booking_page_live":
 { Args: { "p_live": boolean }; Returns: boolean
@@ -725,10 +761,13 @@ isOneToOne: false
                            },
 "start_appointment":
 { Args: { "p_appointment_id": string }; Returns: undefined
+                           },
+"withdraw_quote":
+{ Args: { "p_quote_id": string }; Returns: undefined
                            }
           }
           Enums: {
-            "account_status": "pending_activation"|"pilot"|"trialing"|"active"|"past_due"|"trial_expired"|"inactive"|"cancelled"|"suspended"|"closing","actor_type": "owner"|"customer"|"system"|"operator","appointment_source": "booking_page"|"phone"|"text"|"walk_in"|"in_person"|"other","appointment_status": "scheduled"|"in_progress"|"completed"|"cancelled"|"no_show","block_kind": "appointment"|"hold"|"proposal","booking_mode": "approval"|"instant","cancelled_by": "customer"|"business","contact_preference": "call"|"text"|"email","lead_source": "booking_page"|"phone"|"text"|"instagram"|"facebook"|"google"|"referral"|"walk_in"|"repeat"|"other","lead_status": "new"|"contacted"|"quote_sent"|"follow_up_due"|"booked"|"lost","location_type": "mobile"|"shop","lost_reason": "price"|"timing"|"went_elsewhere"|"no_response"|"not_a_fit"|"other","membership_role": "owner","payment_note": "not_recorded"|"unpaid"|"paid_cash"|"paid_card"|"paid_transfer"|"paid_other","price_type": "fixed"|"starting_at"|"quote_required","quote_status": "draft"|"sent"|"accepted"|"declined"|"expired","request_status": "pending"|"time_proposed"|"approved"|"declined"|"proposal_declined"|"withdrawn"|"expired"|"closed_duplicate","resource_kind": "general"|"bay"|"staff"|"equipment","service_mode": "mobile"|"shop"|"both"
+            "account_status": "pending_activation"|"pilot"|"trialing"|"active"|"past_due"|"trial_expired"|"inactive"|"cancelled"|"suspended"|"closing","actor_type": "owner"|"customer"|"system"|"operator","appointment_source": "booking_page"|"phone"|"text"|"walk_in"|"in_person"|"other"|"quote","appointment_status": "scheduled"|"in_progress"|"completed"|"cancelled"|"no_show","block_kind": "appointment"|"hold"|"proposal","booking_mode": "approval"|"instant","cancelled_by": "customer"|"business","contact_preference": "call"|"text"|"email","lead_source": "booking_page"|"phone"|"text"|"instagram"|"facebook"|"google"|"referral"|"walk_in"|"repeat"|"other"|"website"|"social_media","lead_status": "new"|"contacted"|"quote_sent"|"follow_up_due"|"booked"|"lost","location_type": "mobile"|"shop","lost_reason": "price"|"timing"|"went_elsewhere"|"no_response"|"not_a_fit"|"other","membership_role": "owner","payment_note": "not_recorded"|"unpaid"|"paid_cash"|"paid_card"|"paid_transfer"|"paid_other","price_type": "fixed"|"starting_at"|"quote_required","quote_status": "draft"|"sent"|"accepted"|"declined"|"expired"|"converted","request_status": "pending"|"time_proposed"|"approved"|"declined"|"proposal_declined"|"withdrawn"|"expired"|"closed_duplicate","resource_kind": "general"|"bay"|"staff"|"equipment","service_mode": "mobile"|"shop"|"both"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -844,7 +883,7 @@ export type CompositeTypes<
 export const Constants = {
   "public": {
           Enums: {
-            "account_status": ["pending_activation", "pilot", "trialing", "active", "past_due", "trial_expired", "inactive", "cancelled", "suspended", "closing"],"actor_type": ["owner", "customer", "system", "operator"],"appointment_source": ["booking_page", "phone", "text", "walk_in", "in_person", "other"],"appointment_status": ["scheduled", "in_progress", "completed", "cancelled", "no_show"],"block_kind": ["appointment", "hold", "proposal"],"booking_mode": ["approval", "instant"],"cancelled_by": ["customer", "business"],"contact_preference": ["call", "text", "email"],"lead_source": ["booking_page", "phone", "text", "instagram", "facebook", "google", "referral", "walk_in", "repeat", "other"],"lead_status": ["new", "contacted", "quote_sent", "follow_up_due", "booked", "lost"],"location_type": ["mobile", "shop"],"lost_reason": ["price", "timing", "went_elsewhere", "no_response", "not_a_fit", "other"],"membership_role": ["owner"],"payment_note": ["not_recorded", "unpaid", "paid_cash", "paid_card", "paid_transfer", "paid_other"],"price_type": ["fixed", "starting_at", "quote_required"],"quote_status": ["draft", "sent", "accepted", "declined", "expired"],"request_status": ["pending", "time_proposed", "approved", "declined", "proposal_declined", "withdrawn", "expired", "closed_duplicate"],"resource_kind": ["general", "bay", "staff", "equipment"],"service_mode": ["mobile", "shop", "both"]
+            "account_status": ["pending_activation", "pilot", "trialing", "active", "past_due", "trial_expired", "inactive", "cancelled", "suspended", "closing"],"actor_type": ["owner", "customer", "system", "operator"],"appointment_source": ["booking_page", "phone", "text", "walk_in", "in_person", "other", "quote"],"appointment_status": ["scheduled", "in_progress", "completed", "cancelled", "no_show"],"block_kind": ["appointment", "hold", "proposal"],"booking_mode": ["approval", "instant"],"cancelled_by": ["customer", "business"],"contact_preference": ["call", "text", "email"],"lead_source": ["booking_page", "phone", "text", "instagram", "facebook", "google", "referral", "walk_in", "repeat", "other", "website", "social_media"],"lead_status": ["new", "contacted", "quote_sent", "follow_up_due", "booked", "lost"],"location_type": ["mobile", "shop"],"lost_reason": ["price", "timing", "went_elsewhere", "no_response", "not_a_fit", "other"],"membership_role": ["owner"],"payment_note": ["not_recorded", "unpaid", "paid_cash", "paid_card", "paid_transfer", "paid_other"],"price_type": ["fixed", "starting_at", "quote_required"],"quote_status": ["draft", "sent", "accepted", "declined", "expired", "converted"],"request_status": ["pending", "time_proposed", "approved", "declined", "proposal_declined", "withdrawn", "expired", "closed_duplicate"],"resource_kind": ["general", "bay", "staff", "equipment"],"service_mode": ["mobile", "shop", "both"]
           }
         }
 } as const

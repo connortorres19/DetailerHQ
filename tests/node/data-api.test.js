@@ -2,6 +2,7 @@
 // (PostgREST + Auth), using real user sessions and the local publishable/secret keys.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash, createHmac, randomUUID } from 'node:crypto';
 import {
   adminPool, createOwnerUser, createBusiness, atLocal, insertRequest, cleanup, settle,
   supabaseAnon, supabaseSecret,
@@ -119,6 +120,58 @@ test('a leaked secret key still cannot read application tables through the Data 
   const secret = supabaseSecret();
   const { error } = await secret.from('customers').select('*').limit(1);
   assert.equal(error?.code, '42501', 'service_role holds no table grants (D-22)');
+});
+
+test('Phase 5: quotes are written only through functions; leads and quotes stay inside their business (real Data API)', async () => {
+  const day = (await pool.query(`select ((now() at time zone 'America/Chicago')::date + 14)::text as d`)).rows[0].d;
+  const { data: quoteId, error } = await ownerA.client.rpc('save_quote', {
+    p_quote_id: null, p_quote: { valid_until: day, internal_notes: 'SECRET' }, p_customer_id: null,
+    p_customer: { first_name: 'Api', phone_e164: '+15125550777' }, p_vehicle_id: null, p_vehicle: { make: 'Mazda', model: 'CX-5' },
+    p_items: [{ name: 'Full detail', quantity: 1, price_cents: 20000 }],
+  });
+  assert.equal(error, null, error?.message);
+  // Owners can't choose a link token: the old (nonce, hash) form is gone; the database makes the token.
+  const chosen = await ownerA.client.rpc('send_quote', { p_quote_id: quoteId, p_token_nonce: randomUUID(), p_token_hash: `\\x${'00'.repeat(32)}` });
+  assert.equal(chosen.error?.code, 'PGRST202', 'the caller-chosen-token form does not exist');
+  const key = createHash('sha256').update('api-link-key').digest();
+  const sent = await ownerA.client.rpc('send_quote', { p_quote_id: quoteId, p_link_key: `\\x${key.toString('hex')}` });
+  assert.equal(sent.error, null, sent.error?.message);
+  const token = createHmac('sha256', key).update(`quote-link:v2:${sent.data}`).digest('base64url');
+  const hash = `\\x${createHash('sha256').update(token).digest('hex')}`;
+  const { rows: [stored] } = await pool.query('select encode(token_hash, \'hex\') as h, link_version from public.quotes where id = $1', [quoteId]);
+  assert.deepEqual(stored, { h: hash.slice(2), link_version: 2 }, 'stored hash = sha256 of the derived token');
+  const { data: lead } = await ownerA.client.from('leads')
+    .insert({ business_id: bizA.businessId, source: 'phone', contact_first_name: 'Api', contact_phone_e164: '+15125550777' }).select('id').single();
+
+  // The owner can't fake the customer's answer or rewrite the frozen quote.
+  for (const [what, res] of [
+    ['accept', await ownerA.client.from('quotes').update({ status: 'accepted' }).eq('id', quoteId)],
+    ['reprice', await ownerA.client.from('quotes').update({ subtotal_cents: 1 }).eq('id', quoteId)],
+    ['insert', await ownerA.client.from('quotes').insert({ business_id: bizA.businessId })],
+    ['delete', await ownerA.client.from('quotes').delete().eq('id', quoteId)],
+    ['add item', await ownerA.client.from('quote_items').insert({ business_id: bizA.businessId, quote_id: quoteId, name: 'X', quantity: 1, price_cents: 1 })],
+    ['edit item', await ownerA.client.from('quote_items').update({ price_cents: 1 }).eq('quote_id', quoteId)],
+    ['forge history', await ownerA.client.from('activity_events').insert({ business_id: bizA.businessId, quote_id: quoteId, kind: 'quote_status_changed', to_status: 'accepted', actor_type: 'customer' })],
+  ]) assert.equal(res.error?.code, '42501', `${what}: ${res.error?.message}`);
+  assert.equal((await ownerA.client.rpc('accept_quote', { p_token_hash: hash, p_ip_hash: hash })).error?.code, 'PGRST202', 'the customer API is not in the exposed schema');
+  assert.ok((await ownerA.client.schema('app').rpc('quote_action_core', { p_action: 'accept', p_token_hash: hash, p_ip_hash: hash })).error, 'app schema not exposed');
+  const notes = await ownerA.client.from('quotes').update({ internal_notes: 'still private' }).eq('id', quoteId);
+  assert.equal(notes.error, null, 'private notes stay editable');
+  const { rows: [q] } = await pool.query('select status, total_cents from public.quotes where id = $1', [quoteId]);
+  assert.deepEqual(q, { status: 'sent', total_cents: 20000 });
+
+  // B: nothing of A's is visible or changeable.
+  for (const table of ['leads', 'quotes', 'quote_items']) {
+    const { data, error: e } = await ownerB.client.from(table).select('*').eq('business_id', bizA.businessId);
+    assert.equal(e, null);
+    assert.deepEqual(data, [], `${table} leaks nothing`);
+  }
+  const bUpdate = await ownerB.client.from('leads').update({ notes: 'B' }).eq('id', lead.id).select();
+  assert.deepEqual(bUpdate.data, [], 'B updates nothing');
+  assert.equal((await ownerB.client.rpc('withdraw_quote', { p_quote_id: quoteId })).error?.code, 'DH003');
+  assert.equal((await ownerB.client.rpc('log_lead_activity', { p_lead_id: lead.id, p_kind: 'note', p_note: 'x', p_channel: null })).error?.code, 'DH003');
+  // Anonymous callers get nothing.
+  for (const table of ['leads', 'quotes', 'quote_items']) assert.equal((await supabaseAnon().from(table).select('*').limit(1)).error?.code, '42501', table);
 });
 
 test('parallel Data API approvals respect capacity (real PostgREST path)', async () => {

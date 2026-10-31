@@ -20,14 +20,14 @@ const nextConfig: NextConfig = {
           { key: 'X-Frame-Options', value: 'DENY' },
         ],
       },
-      // Status links are secrets: never leak them in a Referer header or to search engines.
-      {
-        source: '/r/:path*',
+      // Status and quote links are secrets: never leak them in a Referer header or to search engines.
+      ...['/r/:path*', '/q/:path*'].map((source) => ({
+        source,
         headers: [
           { key: 'Referrer-Policy', value: 'no-referrer' },
           { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
         ],
-      },
+      })),
     ];
   },
 };

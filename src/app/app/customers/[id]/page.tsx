@@ -9,6 +9,9 @@ import { Notice } from '@/components/app/ui/Notice';
 import { EmptyState, Panel } from '@/components/app/ui/Panel';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { listCustomerAppointments } from '@/data/appointments';
+import { listForCustomer } from '@/data/leads';
+import { leadStatus, quoteStatus, SOURCE_LABELS } from '@/domain/leads';
+import { formatCents } from '@/domain/service';
 import { findDuplicates, getCustomer } from '@/data/customers';
 import { SOURCE_LABEL } from '@/domain/appointments';
 import { displayStatus, STATUS_LABEL } from '@/domain/bookings';
@@ -50,6 +53,8 @@ export default async function CustomerPage({
   const flash = saved ? SAVED[saved] : undefined;
   const duplicates = customer.archived_at ? [] : (await findDuplicates(customer.phone_e164, customer.email, id)).filter((d) => !d.archived_at);
   const appointments = await listCustomerAppointments(id);
+  const pipeline = await listForCustomer(id);
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: business.timezone }).format(new Date());
   const name = customerName(customer);
   const vehicles = customer.vehicles.filter((v) => !v.archived_at);
   const archivedVehicles = customer.vehicles.filter((v) => v.archived_at);
@@ -217,6 +222,55 @@ export default async function CustomerPage({
             </details>
           ) : null}
         </Panel>
+
+        <Panel
+          title="Quotes"
+          id="quotes"
+          action={customer.archived_at ? null : <Link href={`/app/quotes/new?customer=${id}`}>New quote</Link>}
+          flush
+        >
+          {pipeline.quotes.length === 0 ? (
+            <EmptyState title="No quotes" body="Quotes for this customer appear here, including accepted and booked ones." />
+          ) : (
+            <ul className={styles.vehicles} role="list">
+              {pipeline.quotes.map((q) => {
+                const qs = quoteStatus(q.status, q.valid_until, today);
+                return (
+                  <li key={q.id} className={styles.vehicle}>
+                    <div>
+                      <Link href={`/app/quotes/${q.id}`}>Quote #{q.number} · {formatCents(q.total_cents)}</Link>
+                      <p className={styles.secondary}>
+                        {q.decided_at && (q.status === 'accepted' || q.status === 'converted')
+                          ? `Accepted ${formatDate(business.timezone, q.decided_at, { month: 'short', day: 'numeric', year: 'numeric' })}`
+                          : `Created ${formatDate(business.timezone, q.created_at, { month: 'short', day: 'numeric', year: 'numeric' })}`}
+                      </p>
+                    </div>
+                    <StatusBadge tone={qs.tone}>{qs.label}</StatusBadge>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Panel>
+
+        {pipeline.leads.length ? (
+          <Panel title="Leads" id="leads" flush>
+            <ul className={styles.vehicles} role="list">
+              {pipeline.leads.map((l) => {
+                const ls = leadStatus(l.status);
+                return (
+                  <li key={l.id} className={styles.vehicle}>
+                    <div>
+                      <Link href={`/app/leads/${l.id}`}>{SOURCE_LABELS[l.source] ?? l.source} lead · {formatDate(business.timezone, l.created_at, { month: 'short', day: 'numeric', year: 'numeric' })}</Link>
+                      {l.request_text ? <p className={styles.secondary}>{l.request_text.slice(0, 120)}</p> : null}
+                    </div>
+                    <StatusBadge tone={ls.tone}>{ls.label}</StatusBadge>
+                  </li>
+                );
+              })}
+            </ul>
+          </Panel>
+        ) : null}
 
         <Panel title="Appointments" id="appointments" flush>
           {appointments.length === 0 ? (

@@ -16,6 +16,7 @@ export type Source = (typeof SOURCES)[number]['value'];
 
 export const SOURCE_LABEL: Record<string, string> = {
   booking_page: 'Booking page',
+  quote: 'Accepted quote',
   ...Object.fromEntries(SOURCES.map((s) => [s.value, s.label])),
 };
 

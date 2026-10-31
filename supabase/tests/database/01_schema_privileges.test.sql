@@ -61,8 +61,8 @@ select is(
 select is(
   (select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public_api' and has_function_privilege('booking_api', p.oid, 'EXECUTE')),
-  array['accept_proposal','cancel_appointment','decline_proposal','get_available_slots','get_booking_page','get_request_status',
-        'submit_booking_request','submit_inquiry','withdraw_request'],
+  array['accept_proposal','accept_quote','cancel_appointment','decline_proposal','decline_quote','get_available_slots','get_booking_page',
+        'get_quote','get_request_status','submit_booking_request','submit_inquiry','withdraw_request'],
   'booking_api can execute exactly the public_api functions');
 
 select is(

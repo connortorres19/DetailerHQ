@@ -105,6 +105,19 @@ language sql as $$
   returning id
 $$;
 
+-- Quote links (migration 15): the database makes the token from its own random nonce; tests stand
+-- in for the server, which holds the link key and derives the same token from the stored nonce.
+create function pg_temp.link_key() returns bytea
+language sql immutable as $$ select sha256('pgtap-quote-link-key'::bytea) $$;
+
+create function pg_temp.quote_token(p_quote uuid) returns text
+language sql security definer as $$
+  select app.quote_link_token(q.token_nonce, pg_temp.link_key()) from public.quotes q where q.id = p_quote
+$$;
+
+create function pg_temp.quote_hash(p_quote uuid) returns bytea
+language sql security definer as $$ select sha256(convert_to(pg_temp.quote_token(p_quote), 'UTF8')) $$;
+
 -- Test roles may call the read-only helpers above (rolled back with the test).
 do $$
 declare f regprocedure;

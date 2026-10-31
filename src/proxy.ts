@@ -12,6 +12,7 @@ export const config = {
     '/app/:path*',
     '/book/:path*',
     '/r/:path*',
+    '/q/:path*',
     '/onboarding/:path*',
     '/sign-in',
     '/sign-up',

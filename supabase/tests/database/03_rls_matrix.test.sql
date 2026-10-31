@@ -54,7 +54,8 @@ create temp table tbl as
 select c.relname::text as t,
        case when c.relname = 'businesses' then 'id' else 'business_id' end as key_col,
        c.relname in ('booking_settings','availability_rules','time_off','vehicle_size_classes','service_categories',
-                     'services','service_prices','customers','vehicles','leads','quotes','quote_items') as owner_writable
+                     'services','service_prices','customers','vehicles','leads') as owner_writable
+       -- quotes and quote_items: read-only for owners since migration 14 (writes go through functions)
   from pg_class c join pg_namespace n on n.oid = c.relnamespace
  where n.nspname = 'public' and c.relkind = 'r';
 
@@ -156,7 +157,10 @@ select t.t, actor, op,
       end
     else -- owner A on its own rows
       case op
-        when 'select' then case when t.t = 'memberships' then '1' else (select n::text from a_rows where a_rows.t = t.t) end
+        -- activity_events can grow during the matrix itself (owner A's allowed lead insert is logged).
+        when 'select' then case when t.t = 'memberships' then '1'
+                                when t.t = 'activity_events' then 'at-least-' || (select n::text from a_rows where a_rows.t = t.t)
+                                else (select n::text from a_rows where a_rows.t = t.t) end
         when 'insert' then case when t.owner_writable and t.t <> 'booking_settings' then 'not-42501' else '42501' end
         when 'update' then case when t.owner_writable or t.t = 'businesses' then 'ok' else '42501' end
         when 'delete' then case when t.owner_writable and t.t <> 'booking_settings' then '0' else '42501' end
@@ -174,6 +178,7 @@ select is(
   case
     when e.outcome = 'ok' and r.outcome ~ '^[0-9]+$' then 'ok'
     when e.outcome = 'not-42501' and r.outcome <> '42501' then 'not-42501'
+    when e.outcome like 'at-least-%' and r.outcome ~ '^[0-9]+$' and r.outcome::bigint >= substr(e.outcome, 10)::bigint then e.outcome
     else r.outcome
   end,
   e.outcome,

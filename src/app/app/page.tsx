@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { CalendarDays, Check, Circle, Inbox, Plus, UserPlus } from 'lucide-react';
+import { BellRing, CalendarDays, Check, Circle, FileText, Inbox, Plus, UserPlus } from 'lucide-react';
+import { countFollowUpsDue } from '@/data/leads';
+import { dayRange } from '@/domain/time';
 import { PageHeader } from '@/components/app/shell/PageHeader';
 import { ButtonLink } from '@/components/app/ui/Button';
 import { EmptyState, Panel } from '@/components/app/ui/Panel';
@@ -14,7 +16,7 @@ export const metadata: Metadata = { title: 'Today' };
 // DESIGN_SYSTEM §10.3, ordered by urgency. No vanity KPI tiles.
 export default async function TodayPage() {
   const { business } = await requireBusiness();
-  const today = await getToday(business);
+  const [today, pipeline] = await Promise.all([getToday(business), countFollowUpsDue(dayRange(business.timezone).end.toISOString())]);
   const tz = business.timezone;
 
   const checklist = [
@@ -40,14 +42,32 @@ export default async function TodayPage() {
       />
       <div className={styles.grid}>
         <div className={styles.column}>
-          {today.pendingRequests > 0 ? (
+          {today.pendingRequests > 0 || pipeline.due > 0 || pipeline.acceptedToBook > 0 ? (
             <Panel title="Needs your action" id="needs-action">
-              <p className={styles.attention}>
-                <Inbox size={16} strokeWidth={1.5} aria-hidden="true" />
-                <Link href="/app/bookings?view=pending">
-                  {today.pendingRequests} pending {today.pendingRequests === 1 ? 'request' : 'requests'}
-                </Link>
-              </p>
+              {today.pendingRequests > 0 ? (
+                <p className={styles.attention}>
+                  <Inbox size={16} strokeWidth={1.5} aria-hidden="true" />
+                  <Link href="/app/bookings?view=pending">
+                    {today.pendingRequests} pending {today.pendingRequests === 1 ? 'request' : 'requests'}
+                  </Link>
+                </p>
+              ) : null}
+              {pipeline.acceptedToBook > 0 ? (
+                <p className={styles.attention}>
+                  <FileText size={16} strokeWidth={1.5} aria-hidden="true" />
+                  <Link href="/app/quotes?status=accepted">
+                    {pipeline.acceptedToBook} accepted {pipeline.acceptedToBook === 1 ? 'quote' : 'quotes'} to book
+                  </Link>
+                </p>
+              ) : null}
+              {pipeline.due > 0 ? (
+                <p className={styles.attention}>
+                  <BellRing size={16} strokeWidth={1.5} aria-hidden="true" />
+                  <Link href="/app/follow-ups">
+                    {pipeline.due} {pipeline.due === 1 ? 'follow-up' : 'follow-ups'} due
+                  </Link>
+                </p>
+              ) : null}
             </Panel>
           ) : null}
 

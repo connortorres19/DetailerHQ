@@ -124,7 +124,15 @@ export default async function BookingPage({ params, searchParams }: { params: Pr
               <dt>Where</dt>
               <dd>{location}</dd>
               <dt>Source</dt>
-              <dd>{SOURCE_LABEL[row.source] ?? row.source}</dd>
+              <dd>
+                {SOURCE_LABEL[row.source] ?? row.source}
+                {appointment?.quote_id ? (
+                  <>
+                    {' · '}
+                    <Link href={`/app/quotes/${String(appointment.quote_id)}`}>View quote</Link>
+                  </>
+                ) : null}
+              </dd>
               {appointment?.internal_notes ? (
                 <>
                   <dt>Internal notes</dt>

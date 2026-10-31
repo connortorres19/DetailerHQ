@@ -141,7 +141,7 @@ Not in the MVP: automated SMS/email/social messages, customer payments or deposi
 
 ### 3.3 Later — not in the MVP
 
-Automated SMS/email to customers; owner email notifications; social integrations; deposits and online payments; tax calculation; CSV import (unless pilots prove essential, D-8); online quote acceptance; customer self-service rescheduling; auto-approval; **employee management, per-bay or per-resource scheduling** (the data model is prepared for it, §8.6.3); calendar sync; photo uploads; multiple locations; non-US markets; dashboard dark mode; native apps; public API; AI features.
+Automated SMS/email to customers; owner email notifications; social integrations; deposits and online payments; tax calculation; CSV import (unless pilots prove essential, D-8); online quote acceptance; customer self-service rescheduling; ~~auto-approval~~ (now Mode B, D-28); **employee management, per-bay or per-resource scheduling** (the data model is prepared for it, §8.6.3); calendar sync; photo uploads; multiple locations; non-US markets; dashboard dark mode; native apps; public API; AI features.
 
 ### 3.4 Feature intake rule
 
@@ -1098,6 +1098,11 @@ Original checklist (kept for reference):
 | **D-25** | Public booking must not expose private business or customer information *(user's "R-1")* | Rev 4 |
 | **D-26** | Capacity-aware scheduling: mobile defaults to 1 simultaneous job; shops configure capacity; confirmed appointments and active holds never exceed capacity; duration-aware overlap; enforced in the database under concurrency; extensible to employees/bays/resources without building employee management | Rev 4 |
 | **D-27** | Holds expire automatically by timestamp; expired holds don't block; holds cannot bypass capacity; safe handling of expiry and concurrent bookings | Rev 4 |
+| **D-28** | **Hybrid booking.** Each business chooses Mode A (approval required — the default) or Mode B (instant booking: available slots, revalidated at submission, automatically confirmed). Owners switch to instant only after setting up services and availability. Supersedes "auto-approval" in §3.3 | Phase 4 |
+| **D-29** | Public bookings create **new** customer and vehicle records; possible duplicates (phone or email) are flagged for the owner; no automatic merging; no existing customer information is ever shown publicly | Phase 4 |
+| **D-30** | Packages are services (own name, description, duration, base price, vehicle-size pricing); add-ons are services marked add-on. No bundle entity | Phase 4 |
+| **D-31** | R2 fixed: failed and successful public attempts are both rate-limited, per IP and per business | Phase 4 |
+| **D-32** | Instant booking only for services that don't require a quote; minimum notice and booking window apply; customers cancel before the cutoff; owners cancel and reschedule; pending requests don't consume capacity, confirmed appointments and valid holds do | Phase 4 |
 
 ### 17.2 Recommendations (not approved)
 

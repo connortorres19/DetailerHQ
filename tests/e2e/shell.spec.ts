@@ -13,13 +13,18 @@ test('Today shows real, empty state for a new business and only working navigati
   await expect(page.getByText('Needs your action')).toHaveCount(0); // hidden when nothing is pending
 
   const nav = page.getByRole('navigation', { name: 'Main navigation' });
-  await expect(nav.getByRole('link')).toHaveText(['Today', 'Customers', 'Settings']);
+  await expect(nav.getByRole('link')).toHaveText(['Today', 'Customers', 'Services', 'Settings']);
   await expect(nav.getByRole('link', { name: 'Today' })).toHaveAttribute('aria-current', 'page');
   await expect(page.getByText('Ridgeway Mobile Detailing').first()).toBeVisible();
 
   // Setup checklist reflects real data: workspace done, contact details done (email prefilled), customer to do.
   const setup = page.getByRole('region', { name: 'Setup checklist' });
-  await expect(setup.getByRole('listitem')).toHaveText([/Create your workspace\(done\)/, /Add business contact details\(done\)/, /Add your first customer\(to do\)/]);
+  await expect(setup.getByRole('listitem')).toHaveText([
+    /Create your workspace\(done\)/,
+    /Add business contact details\(done\)/,
+    /Add your first customer\(to do\)/,
+    /Add your services\(to do\)/,
+  ]);
 });
 
 for (const [width, height] of [[1280, 800], [820, 1180], [390, 844]] as const) {

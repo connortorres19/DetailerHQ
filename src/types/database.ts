@@ -223,14 +223,14 @@ isOneToOne: false
                   ]
                 },"booking_settings": {
                   Row: {
-                    "buffer_min": number,"business_id": string,"cancel_cutoff_hours": number,"cancellation_policy_text": string | null,"customer_can_cancel": boolean,"default_hold_hours": number,"horizon_days": number,"intro_text": string | null,"max_jobs_per_day": number | null,"min_notice_min": number,"prep_instructions": string | null,"proposal_expiry_hours": number,"reschedule_cutoff_hours": number,"reschedule_policy_text": string | null,"slot_interval_min": number,"updated_at": string
+                    "booking_mode": Database["public"]['Enums']["booking_mode"],"buffer_min": number,"business_id": string,"cancel_cutoff_hours": number,"cancellation_policy_text": string | null,"customer_can_cancel": boolean,"default_hold_hours": number,"horizon_days": number,"intro_text": string | null,"max_jobs_per_day": number | null,"min_notice_min": number,"prep_instructions": string | null,"proposal_expiry_hours": number,"reschedule_cutoff_hours": number,"reschedule_policy_text": string | null,"slot_interval_min": number,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "buffer_min"?: number,"business_id": string,"cancel_cutoff_hours"?: number,"cancellation_policy_text"?: string | null,"customer_can_cancel"?: boolean,"default_hold_hours"?: number,"horizon_days"?: number,"intro_text"?: string | null,"max_jobs_per_day"?: number | null,"min_notice_min"?: number,"prep_instructions"?: string | null,"proposal_expiry_hours"?: number,"reschedule_cutoff_hours"?: number,"reschedule_policy_text"?: string | null,"slot_interval_min"?: number,"updated_at"?: string
+                    "booking_mode"?: Database["public"]['Enums']["booking_mode"],"buffer_min"?: number,"business_id": string,"cancel_cutoff_hours"?: number,"cancellation_policy_text"?: string | null,"customer_can_cancel"?: boolean,"default_hold_hours"?: number,"horizon_days"?: number,"intro_text"?: string | null,"max_jobs_per_day"?: number | null,"min_notice_min"?: number,"prep_instructions"?: string | null,"proposal_expiry_hours"?: number,"reschedule_cutoff_hours"?: number,"reschedule_policy_text"?: string | null,"slot_interval_min"?: number,"updated_at"?: string
                   }
                   Update: {
-                    "buffer_min"?: number,"business_id"?: string,"cancel_cutoff_hours"?: number,"cancellation_policy_text"?: string | null,"customer_can_cancel"?: boolean,"default_hold_hours"?: number,"horizon_days"?: number,"intro_text"?: string | null,"max_jobs_per_day"?: number | null,"min_notice_min"?: number,"prep_instructions"?: string | null,"proposal_expiry_hours"?: number,"reschedule_cutoff_hours"?: number,"reschedule_policy_text"?: string | null,"slot_interval_min"?: number,"updated_at"?: string
+                    "booking_mode"?: Database["public"]['Enums']["booking_mode"],"buffer_min"?: number,"business_id"?: string,"cancel_cutoff_hours"?: number,"cancellation_policy_text"?: string | null,"customer_can_cancel"?: boolean,"default_hold_hours"?: number,"horizon_days"?: number,"intro_text"?: string | null,"max_jobs_per_day"?: number | null,"min_notice_min"?: number,"prep_instructions"?: string | null,"proposal_expiry_hours"?: number,"reschedule_cutoff_hours"?: number,"reschedule_policy_text"?: string | null,"slot_interval_min"?: number,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -648,6 +648,9 @@ isOneToOne: false
             "activate_business":
 { Args: Record<PropertyKey, never>; Returns: boolean
                            },
+"add_time_off":
+{ Args: { "p_end_date": string,"p_end_time"?: string,"p_label"?: string,"p_start_date": string,"p_start_time"?: string }; Returns: string
+                           },
 "approve_request":
 { Args: { "p_customer_id"?: string,"p_request_id": string,"p_vehicle_id"?: string }; Returns: string
                            },
@@ -693,6 +696,9 @@ isOneToOne: false
 "save_service":
 { Args: { "p_prices": Json,"p_service": Json,"p_service_id": string }; Returns: string
                            },
+"save_weekly_hours":
+{ Args: { "p_windows": Json }; Returns: number
+                           },
 "set_capacity":
 { Args: { "p_capacity": number }; Returns: undefined
                            },
@@ -701,7 +707,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "account_status": "pending_activation"|"pilot"|"trialing"|"active"|"past_due"|"trial_expired"|"inactive"|"cancelled"|"suspended"|"closing","actor_type": "owner"|"customer"|"system"|"operator","appointment_status": "scheduled"|"in_progress"|"completed"|"cancelled"|"no_show","block_kind": "appointment"|"hold"|"proposal","cancelled_by": "customer"|"business","contact_preference": "call"|"text"|"email","lead_source": "booking_page"|"phone"|"text"|"instagram"|"facebook"|"google"|"referral"|"walk_in"|"repeat"|"other","lead_status": "new"|"contacted"|"quote_sent"|"follow_up_due"|"booked"|"lost","location_type": "mobile"|"shop","lost_reason": "price"|"timing"|"went_elsewhere"|"no_response"|"not_a_fit"|"other","membership_role": "owner","payment_note": "not_recorded"|"unpaid"|"paid_cash"|"paid_card"|"paid_transfer"|"paid_other","price_type": "fixed"|"starting_at"|"quote_required","quote_status": "draft"|"sent"|"accepted"|"declined"|"expired","request_status": "pending"|"time_proposed"|"approved"|"declined"|"proposal_declined"|"withdrawn"|"expired"|"closed_duplicate","resource_kind": "general"|"bay"|"staff"|"equipment","service_mode": "mobile"|"shop"|"both"
+            "account_status": "pending_activation"|"pilot"|"trialing"|"active"|"past_due"|"trial_expired"|"inactive"|"cancelled"|"suspended"|"closing","actor_type": "owner"|"customer"|"system"|"operator","appointment_status": "scheduled"|"in_progress"|"completed"|"cancelled"|"no_show","block_kind": "appointment"|"hold"|"proposal","booking_mode": "approval"|"instant","cancelled_by": "customer"|"business","contact_preference": "call"|"text"|"email","lead_source": "booking_page"|"phone"|"text"|"instagram"|"facebook"|"google"|"referral"|"walk_in"|"repeat"|"other","lead_status": "new"|"contacted"|"quote_sent"|"follow_up_due"|"booked"|"lost","location_type": "mobile"|"shop","lost_reason": "price"|"timing"|"went_elsewhere"|"no_response"|"not_a_fit"|"other","membership_role": "owner","payment_note": "not_recorded"|"unpaid"|"paid_cash"|"paid_card"|"paid_transfer"|"paid_other","price_type": "fixed"|"starting_at"|"quote_required","quote_status": "draft"|"sent"|"accepted"|"declined"|"expired","request_status": "pending"|"time_proposed"|"approved"|"declined"|"proposal_declined"|"withdrawn"|"expired"|"closed_duplicate","resource_kind": "general"|"bay"|"staff"|"equipment","service_mode": "mobile"|"shop"|"both"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -817,7 +823,7 @@ export type CompositeTypes<
 export const Constants = {
   "public": {
           Enums: {
-            "account_status": ["pending_activation", "pilot", "trialing", "active", "past_due", "trial_expired", "inactive", "cancelled", "suspended", "closing"],"actor_type": ["owner", "customer", "system", "operator"],"appointment_status": ["scheduled", "in_progress", "completed", "cancelled", "no_show"],"block_kind": ["appointment", "hold", "proposal"],"cancelled_by": ["customer", "business"],"contact_preference": ["call", "text", "email"],"lead_source": ["booking_page", "phone", "text", "instagram", "facebook", "google", "referral", "walk_in", "repeat", "other"],"lead_status": ["new", "contacted", "quote_sent", "follow_up_due", "booked", "lost"],"location_type": ["mobile", "shop"],"lost_reason": ["price", "timing", "went_elsewhere", "no_response", "not_a_fit", "other"],"membership_role": ["owner"],"payment_note": ["not_recorded", "unpaid", "paid_cash", "paid_card", "paid_transfer", "paid_other"],"price_type": ["fixed", "starting_at", "quote_required"],"quote_status": ["draft", "sent", "accepted", "declined", "expired"],"request_status": ["pending", "time_proposed", "approved", "declined", "proposal_declined", "withdrawn", "expired", "closed_duplicate"],"resource_kind": ["general", "bay", "staff", "equipment"],"service_mode": ["mobile", "shop", "both"]
+            "account_status": ["pending_activation", "pilot", "trialing", "active", "past_due", "trial_expired", "inactive", "cancelled", "suspended", "closing"],"actor_type": ["owner", "customer", "system", "operator"],"appointment_status": ["scheduled", "in_progress", "completed", "cancelled", "no_show"],"block_kind": ["appointment", "hold", "proposal"],"booking_mode": ["approval", "instant"],"cancelled_by": ["customer", "business"],"contact_preference": ["call", "text", "email"],"lead_source": ["booking_page", "phone", "text", "instagram", "facebook", "google", "referral", "walk_in", "repeat", "other"],"lead_status": ["new", "contacted", "quote_sent", "follow_up_due", "booked", "lost"],"location_type": ["mobile", "shop"],"lost_reason": ["price", "timing", "went_elsewhere", "no_response", "not_a_fit", "other"],"membership_role": ["owner"],"payment_note": ["not_recorded", "unpaid", "paid_cash", "paid_card", "paid_transfer", "paid_other"],"price_type": ["fixed", "starting_at", "quote_required"],"quote_status": ["draft", "sent", "accepted", "declined", "expired"],"request_status": ["pending", "time_proposed", "approved", "declined", "proposal_declined", "withdrawn", "expired", "closed_duplicate"],"resource_kind": ["general", "bay", "staff", "equipment"],"service_mode": ["mobile", "shop", "both"]
           }
         }
 } as const

@@ -64,7 +64,10 @@ export function SelectField({
   const id = select.id ?? `field-${name}`;
   return (
     <Frame id={id} name={name} label={label} hint={hint} error={error} className={className}>
+      {/* Keyed on defaultValue: React 19 resets a form after its action runs, and a select resets
+          to the option chosen when it mounted, so remount it when the echoed/saved value changes. */}
       <select
+        key={String(select.defaultValue ?? '')}
         {...select}
         id={id}
         name={name}

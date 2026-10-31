@@ -22,6 +22,7 @@ export default async function TodayPage() {
     { done: Boolean(business.phone_e164 || business.email), label: 'Add business contact details', href: '/app/settings' },
     { done: today.activeCustomers > 0, label: 'Add your first customer', href: '/app/customers/new' },
     { done: today.activeServices > 0, label: 'Add your services', href: '/app/services/new' },
+    { done: today.hourWindows > 0, label: 'Set your working hours', href: '/app/availability' },
   ];
   const setupDone = checklist.every((i) => i.done);
 
@@ -103,7 +104,7 @@ export default async function TodayPage() {
                   </li>
                 ))}
               </ul>
-              <p className={styles.later}>Working hours and your booking page aren’t available yet.</p>
+              <p className={styles.later}>Your booking page isn’t available yet.</p>
             </Panel>
           )}
         </div>

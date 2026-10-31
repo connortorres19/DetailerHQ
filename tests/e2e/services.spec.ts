@@ -29,8 +29,11 @@ test('a package with vehicle-size pricing is stored in cents with per-size overr
   // Server-side validation messages.
   await page.getByLabel('Name', { exact: true }).fill('Full detail package');
   await page.getByLabel('Price', { exact: true }).fill('12.345');
+  await page.getByLabel('Time hours', { exact: true }).selectOption('3');
   await page.getByRole('button', { name: 'Save service' }).click();
   await expect(page.getByText('Enter a price like 180 or 180.00.')).toBeVisible();
+  // A failed submit keeps every choice, selects included (React 19 resets forms after actions).
+  await expect(page.getByLabel('Time hours', { exact: true })).toHaveValue('3');
 
   await page.getByLabel('Price', { exact: true }).fill('260');
   await page.getByLabel('Description (optional)').fill('Interior and exterior, clay and sealant.');

@@ -93,3 +93,26 @@ export async function changePassword(_: FormState, formData: FormData): Promise<
   if (error) return failed(authMessage(error.code), formData, error.code === 'same_password' ? { password: authMessage(error.code) } : undefined);
   return { status: 'success', message: 'Password changed.' };
 }
+
+// Booking mode (D-28). The database refuses instant booking until the business has a bookable,
+// set-price service and working hours (trigger in migration 10); its reasons become messages.
+export async function updateBookingMode(_: FormState, formData: FormData): Promise<FormState> {
+  const { business } = await requireBusiness('/app/settings');
+  const mode = formData.get('bookingMode');
+  if (mode !== 'approval' && mode !== 'instant') return failed('Choose how customers book.', formData);
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.from('booking_settings').update({ booking_mode: mode }).eq('business_id', business.id).select('booking_mode').maybeSingle();
+  if (error || !data) {
+    const message =
+      error?.details === 'instant_needs_services'
+        ? 'Instant booking needs at least one service customers can book online, with a set price. Add one in Services first.'
+        : error?.details === 'instant_needs_hours'
+          ? 'Instant booking needs your working hours. Set them in Availability first.'
+          : 'That didn’t save. Please try again.';
+    if (error && !error.details?.startsWith('instant_')) console.error('[settings] booking mode', error);
+    return failed(message, formData);
+  }
+  revalidatePath('/app', 'layout');
+  return { status: 'success', message: mode === 'instant' ? 'Instant booking is on.' : 'Approval required is on.' };
+}

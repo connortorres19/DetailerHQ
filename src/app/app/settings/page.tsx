@@ -1,19 +1,18 @@
 import type { Metadata } from 'next';
 import { Panel } from '@/components/app/ui/Panel';
-import { createClient } from '@/lib/supabase/server';
 import { requireBusiness } from '@/data/session';
 import { SERVICE_MODES, US_TIMEZONES, formatPhone } from '@/domain/business';
 import { env } from '@/lib/env';
-import { BusinessProfileForm, CapacityForm } from './forms';
+import Link from 'next/link';
+import { BookingModeForm, BusinessProfileForm } from './forms';
+import { getBookingMode } from '@/data/availability';
 import styles from './settings.module.css';
 
 export const metadata: Metadata = { title: 'Business settings' };
 
 export default async function BusinessSettingsPage() {
   const { business } = await requireBusiness('/app/settings');
-  const supabase = await createClient();
-  const { data: resource } = await supabase.from('schedule_resources').select('capacity').eq('kind', 'general').eq('active', true).maybeSingle();
-  const capacity = resource?.capacity ?? 1;
+  const bookingMode = await getBookingMode();
   const mode = SERVICE_MODES.find((m) => m.value === business.service_mode);
   const timezone = US_TIMEZONES.find((t) => t.value === business.timezone);
 
@@ -51,14 +50,11 @@ export default async function BusinessSettingsPage() {
         <p className={styles.muted}>These can’t be changed from the app yet. They affect your booking link and every time customers see.</p>
       </Panel>
 
-      <Panel title="Capacity" id="capacity">
-        {business.service_mode === 'mobile' ? (
-          <p>
-            <span className="tabular">1</span> job at a time. Mobile businesses take one job at a time.
-          </p>
-        ) : (
-          <CapacityForm current={capacity} />
-        )}
+      <Panel title="How customers book" id="booking-mode">
+        <BookingModeForm current={bookingMode} />
+        <p className={styles.muted}>
+          Working hours, blocked time, booking rules and jobs at the same time are in <Link href="/app/availability">Availability</Link>.
+        </p>
       </Panel>
     </div>
   );

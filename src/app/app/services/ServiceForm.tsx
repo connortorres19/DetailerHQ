@@ -33,7 +33,7 @@ function Duration({
 }) {
   return (
     <div className={styles.duration} role="group" aria-label={label}>
-      <select name={hoursName} defaultValue={values[hoursName] ?? ''} aria-label={`${label} hours`} aria-invalid={error ? true : undefined}>
+      <select key={values[hoursName] ?? ''} name={hoursName} defaultValue={values[hoursName] ?? ''} aria-label={`${label} hours`} aria-invalid={error ? true : undefined}>
         {optional ? <option value="">—</option> : null}
         {HOURS.map((h) => (
           <option key={h} value={h}>
@@ -41,7 +41,7 @@ function Duration({
           </option>
         ))}
       </select>
-      <select name={minutesName} defaultValue={values[minutesName] ?? ''} aria-label={`${label} minutes`} aria-invalid={error ? true : undefined}>
+      <select key={values[minutesName] ?? ''} name={minutesName} defaultValue={values[minutesName] ?? ''} aria-label={`${label} minutes`} aria-invalid={error ? true : undefined}>
         {optional ? <option value="">—</option> : null}
         {MINUTES.map((m) => (
           <option key={m} value={m}>

@@ -19,11 +19,15 @@ test('business details save to the database; setup-only fields are read-only', a
   const { rows } = await db.query('select name, phone_e164, service_area_text from public.businesses where id = $1', [businessId]);
   expect(rows[0]).toEqual({ name: 'Ridgeway Mobile Detailing LLC', phone_e164: '+15125550188', service_area_text: 'North Austin & Round Rock' });
 
-  // Slug / time zone / mode are shown, not editable; mobile capacity is fixed at 1.
+  // Slug / time zone / mode are shown, not editable. Approval required is the default booking mode.
   await expect(page.getByText('Central Time')).toBeVisible();
   await expect(page.getByLabel('Booking link')).toHaveCount(0);
+  await expect(page.getByRole('radio', { name: /Approval required/ })).toBeChecked();
+  // Capacity moved to Availability; mobile businesses are fixed at one job at a time.
+  await page.goto('/app/availability');
   await expect(page.getByText('Mobile businesses take one job at a time.')).toBeVisible();
   await expect(page.getByLabel('Jobs you can work on at the same time')).toHaveCount(0);
+  await page.goto('/app/settings');
 
   await page.getByLabel('Business phone').fill('12345');
   await page.getByRole('button', { name: 'Save business details' }).click();
@@ -45,7 +49,7 @@ test('shop capacity goes through set_capacity and is validated', async ({ page }
   await page.getByRole('button', { name: 'Create workspace' }).click();
   await expect(page).toHaveURL(/\/app$/);
 
-  await page.goto('/app/settings');
+  await page.goto('/app/availability');
   const field = page.getByLabel('Jobs you can work on at the same time');
   await expect(field).toHaveValue('2');
   await field.fill('21');

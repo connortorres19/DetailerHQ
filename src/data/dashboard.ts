@@ -12,7 +12,7 @@ export async function getToday(business: Business) {
   const today = dayRange(business.timezone);
   const week = weekRange(business.timezone);
 
-  const [pending, schedule, weekJobs, customers, services] = await Promise.all([
+  const [pending, schedule, weekJobs, customers, services, hours] = await Promise.all([
     supabase.from('booking_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
     supabase
       .from('appointments')
@@ -29,9 +29,10 @@ export async function getToday(business: Business) {
       .in('status', ACTIVE),
     supabase.from('customers').select('id', { count: 'exact', head: true }).is('archived_at', null),
     supabase.from('services').select('id', { count: 'exact', head: true }).is('archived_at', null),
+    supabase.from('availability_rules').select('id', { count: 'exact', head: true }),
   ]);
 
-  for (const result of [pending, schedule, weekJobs, customers, services]) {
+  for (const result of [pending, schedule, weekJobs, customers, services, hours]) {
     if (result.error) throw new Error(`Could not load Today: ${result.error.message}`);
   }
 
@@ -44,5 +45,6 @@ export async function getToday(business: Business) {
     },
     activeCustomers: customers.count ?? 0,
     activeServices: services.count ?? 0,
+    hourWindows: hours.count ?? 0,
   };
 }

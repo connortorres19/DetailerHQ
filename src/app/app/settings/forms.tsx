@@ -5,7 +5,8 @@ import { TextField } from '@/components/app/ui/Field';
 import { Notice } from '@/components/app/ui/Notice';
 import { SubmitButton } from '@/components/app/ui/SubmitButton';
 import { idle } from '@/domain/forms';
-import { changeEmail, changePassword, updateBusinessProfile, updateCapacity } from './actions';
+import { changeEmail, changePassword, updateBookingMode, updateBusinessProfile, updateCapacity } from './actions';
+import { BOOKING_MODES } from '@/domain/availability';
 import styles from './settings.module.css';
 
 function Status({ status, message }: { status: string; message?: string }) {
@@ -107,6 +108,27 @@ export function ChangePasswordForm() {
       </div>
       <div className={styles.actions}>
         <SubmitButton pendingLabel="Saving…">Change password</SubmitButton>
+      </div>
+    </form>
+  );
+}
+
+export function BookingModeForm({ current }: { current: 'approval' | 'instant' }) {
+  const [state, action] = useActionState(updateBookingMode, idle);
+  return (
+    <form action={action} className={styles.form} key={state.status}>
+      <Status {...state} />
+      <div className={styles.modes} role="radiogroup" aria-label="How customers book">
+        {BOOKING_MODES.map((m) => (
+          <label key={m.value} className={styles.mode}>
+            <input type="radio" name="bookingMode" value={m.value} defaultChecked={current === m.value} />
+            <span className={styles.modeTitle}>{m.label}</span>
+            <span className={styles.modeHint}>{m.description}</span>
+          </label>
+        ))}
+      </div>
+      <div className={styles.actions}>
+        <SubmitButton pendingLabel="Saving…">Save booking mode</SubmitButton>
       </div>
     </form>
   );

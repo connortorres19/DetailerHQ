@@ -395,3 +395,32 @@ for (const [width, height] of [[1280, 900], [390, 844]] as const) {
     await visitor.screenshot({ path: `test-results/booking-time-${width}.png`, fullPage: false });
   });
 }
+
+test('the booking link shown in Settings is the real public route; offline stays unavailable', async ({ page, browser }) => {
+  const biz = await bookableBusiness(page, 'settingslink', { published: false });
+  await page.goto('/app/settings');
+  const link = page.getByRole('link', { name: /\/book\// });
+  const href = (await link.getAttribute('href'))!;
+  expect(href).toBe(`http://localhost:3000/book/${biz.slug}`);
+  await expect(link).toHaveText(href); // what's displayed is exactly what opens
+  await expect(page.getByText('Offline — shows “not available” until you put it live')).toBeVisible();
+
+  const visitor = await (await browser.newContext()).newPage();
+  // Unpublished: the exact link (and the old /b/ form) give the generic unavailable page.
+  expect((await visitor.goto(href))?.status()).toBe(404);
+  await expect(visitor.getByRole('heading', { name: 'This booking page isn’t available' })).toBeVisible();
+  expect((await visitor.goto(`/b/${biz.slug}`))?.status()).toBe(404);
+  await expect(visitor).toHaveURL(`/book/${biz.slug}`);
+
+  // Put live from the owner screen, then the same link works.
+  await page.getByRole('link', { name: 'Manage' }).click();
+  await page.getByRole('button', { name: 'Put booking page live' }).click();
+  await expect(page.getByText('Your booking page is live.')).toBeVisible();
+  expect((await visitor.goto(href))?.status()).toBe(200);
+  await expect(visitor.getByRole('heading', { name: 'Northside Detail Co.' })).toBeVisible();
+  await visitor.goto(`/b/${biz.slug}`); // old-style links land on the real page
+  await expect(visitor).toHaveURL(`/book/${biz.slug}`);
+  await expect(visitor.getByRole('heading', { name: 'Northside Detail Co.' })).toBeVisible();
+  await page.goto('/app/settings');
+  await expect(page.getByText(/· Live ·/)).toBeVisible();
+});

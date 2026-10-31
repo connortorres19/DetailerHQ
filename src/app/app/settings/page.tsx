@@ -13,6 +13,9 @@ export const metadata: Metadata = { title: 'Business settings' };
 export default async function BusinessSettingsPage() {
   const { business } = await requireBusiness('/app/settings');
   const bookingMode = await getBookingMode();
+  // Same URL as the Booking page screen: the public route is /book/[slug].
+  const bookingUrl = `${env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, '')}/book/${business.slug}`;
+  const live = Boolean(business.published_at && business.accepting_requests);
   const mode = SERVICE_MODES.find((m) => m.value === business.service_mode);
   const timezone = US_TIMEZONES.find((t) => t.value === business.timezone);
 
@@ -37,8 +40,14 @@ export default async function BusinessSettingsPage() {
       <Panel title="Set at setup" id="fixed">
         <dl className={styles.dl}>
           <dt>Booking link</dt>
-          <dd className={styles.mono}>
-            {new URL(env.NEXT_PUBLIC_SITE_URL).host}/book/{business.slug} · <Link href="/app/booking-page">Manage</Link>
+          <dd>
+            <a className={styles.mono} href={bookingUrl} target="_blank" rel="noopener noreferrer">
+              {bookingUrl}
+            </a>
+            <span className={styles.muted}>
+              {' '}
+              · {live ? 'Live' : 'Offline — shows “not available” until you put it live'} · <Link href="/app/booking-page">Manage</Link>
+            </span>
           </dd>
           <dt>Time zone</dt>
           <dd>

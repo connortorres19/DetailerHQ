@@ -20,6 +20,7 @@ test('mobile business: one call creates the workspace with capacity 1 and activa
 
   await page.getByLabel('Business name').fill('Northside Detail Co.');
   await expect(page.getByLabel('Booking link')).toHaveValue('northside-detail-co');
+  await expect(page.getByText('/book/northside-detail-co')).toBeVisible(); // the real public route
   const slug = slugFor('northside');
   await page.getByLabel('Booking link').fill(slug);
   await page.getByLabel('Time zone').selectOption('America/Chicago');

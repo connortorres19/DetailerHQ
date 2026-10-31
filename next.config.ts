@@ -5,6 +5,11 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // Don't write an AGENTS.md into the repository on `next dev`.
   agentRules: false,
+  // Earlier links (Phase 3 Settings/onboarding text, the product plan) used /b/<slug>. Send them to
+  // the public booking route; /book/<slug> still decides whether the page is available.
+  async redirects() {
+    return [{ source: '/b/:slug', destination: '/book/:slug', permanent: false }];
+  },
   async headers() {
     return [
       {

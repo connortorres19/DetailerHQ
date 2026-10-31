@@ -51,7 +51,7 @@ export function OnboardingForm({ defaultEmail, siteHost }: { defaultEmail: strin
           label="Booking link"
           hint={
             <>
-              Your booking page will be <span className={styles.mono}>{siteHost}/b/{slug || 'your-business'}</span>. It can’t be changed
+              Your booking page will be <span className={styles.mono}>{siteHost}/book/{slug || 'your-business'}</span>. It can’t be changed
               from the app after setup.
             </>
           }

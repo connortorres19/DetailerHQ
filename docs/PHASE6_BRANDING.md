@@ -70,3 +70,18 @@ light inside a dark dashboard.
   remove with file deletion, booking on a branded page, cancel/reset/discard, isolation between
   businesses, cross-site upload refusal, theme persistence across sign-in, no-flash SSR, an automated
   contrast audit of every dashboard screen in light and dark, 390 px and 1280 px layouts.
+
+## Troubleshooting: `relation "storage.buckets" does not exist`
+
+The `storage` schema is created by the Supabase Storage service the first time it starts against a
+database (hosted projects always have it). A local stack that was running before Storage was
+enabled in `supabase/config.toml` doesn't have it: `supabase start` on an already-running stack keeps
+the old settings. Restart the stack (keeps your data — never `db reset`), then apply the migration:
+
+    npx supabase stop
+    npx supabase start
+    npm run storage:check
+    npx supabase migration up --local
+
+`npm run storage:check` (read-only) reports what's missing and the command that fixes it. The Phase 6
+migration checks this first and stops with these instructions before changing anything.

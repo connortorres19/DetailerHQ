@@ -101,3 +101,7 @@
     grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
   }
 }
+
+.emailNotice {
+  margin-bottom: var(--space-5);
+}

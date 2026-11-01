@@ -21,7 +21,7 @@ const nextConfig: NextConfig = {
         ],
       },
       // Status and quote links are secrets: never leak them in a Referer header or to search engines.
-      ...['/r/:path*', '/q/:path*'].map((source) => ({
+      ...['/r/:path*', '/q/:path*', '/u/:path*'].map((source) => ({
         source,
         headers: [
           { key: 'Referrer-Policy', value: 'no-referrer' },

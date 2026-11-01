@@ -327,6 +327,126 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"email_connections": {
+                  Row: {
+                    "business_id": string,"connected_by": string | null,"created_at": string,"from_address": string,"from_name": string | null,"last_error": string | null,"last_error_at": string | null,"last_sent_at": string | null,"provider": Database["public"]['Enums']["email_provider"],"secret": string,"smtp_host": string | null,"smtp_port": number | null,"smtp_username": string | null,"status": Database["public"]['Enums']["email_connection_status"],"updated_at": string,"verification_attempts": number,"verification_expires_at": string | null,"verification_hash": string | null,"verified_at": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"connected_by"?: string | null,"created_at"?: string,"from_address": string,"from_name"?: string | null,"last_error"?: string | null,"last_error_at"?: string | null,"last_sent_at"?: string | null,"provider": Database["public"]['Enums']["email_provider"],"secret": string,"smtp_host"?: string | null,"smtp_port"?: number | null,"smtp_username"?: string | null,"status"?: Database["public"]['Enums']["email_connection_status"],"updated_at"?: string,"verification_attempts"?: number,"verification_expires_at"?: string | null,"verification_hash"?: string | null,"verified_at"?: string | null
+                  }
+                  Update: {
+                    "business_id"?: string,"connected_by"?: string | null,"created_at"?: string,"from_address"?: string,"from_name"?: string | null,"last_error"?: string | null,"last_error_at"?: string | null,"last_sent_at"?: string | null,"provider"?: Database["public"]['Enums']["email_provider"],"secret"?: string,"smtp_host"?: string | null,"smtp_port"?: number | null,"smtp_username"?: string | null,"status"?: Database["public"]['Enums']["email_connection_status"],"updated_at"?: string,"verification_attempts"?: number,"verification_expires_at"?: string | null,"verification_hash"?: string | null,"verified_at"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "email_connections_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: true
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"email_outbox": {
+                  Row: {
+                    "attempts": number,"business_id": string,"category": string,"created_at": string,"id": string,"idempotency_key": string,"last_error": string | null,"locked_until": string | null,"next_attempt_at": string,"provider_message_id": string | null,"recipient": string,"refs": NonNullable<Json>,"sent_at": string | null,"status": Database["public"]['Enums']["email_status"],"template": Database["public"]['Enums']["email_template"],"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "attempts"?: number,"business_id": string,"category"?: string,"created_at"?: string,"id"?: string,"idempotency_key": string,"last_error"?: string | null,"locked_until"?: string | null,"next_attempt_at"?: string,"provider_message_id"?: string | null,"recipient": string,"refs"?: NonNullable<Json>,"sent_at"?: string | null,"status"?: Database["public"]['Enums']["email_status"],"template": Database["public"]['Enums']["email_template"],"updated_at"?: string
+                  }
+                  Update: {
+                    "attempts"?: number,"business_id"?: string,"category"?: string,"created_at"?: string,"id"?: string,"idempotency_key"?: string,"last_error"?: string | null,"locked_until"?: string | null,"next_attempt_at"?: string,"provider_message_id"?: string | null,"recipient"?: string,"refs"?: NonNullable<Json>,"sent_at"?: string | null,"status"?: Database["public"]['Enums']["email_status"],"template"?: Database["public"]['Enums']["email_template"],"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "email_outbox_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"email_owner_prefs": {
+                  Row: {
+                    "business_id": string,"prefs": NonNullable<Json>,"summary_hour": number,"updated_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"prefs"?: NonNullable<Json>,"summary_hour"?: number,"updated_at"?: string,"user_id": string
+                  }
+                  Update: {
+                    "business_id"?: string,"prefs"?: NonNullable<Json>,"summary_hour"?: number,"updated_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "email_owner_prefs_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"email_settings": {
+                  Row: {
+                    "business_id": string,"daily_limit": number,"reminder_hours": (number)[],"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"daily_limit"?: number,"reminder_hours"?: (number)[],"updated_at"?: string
+                  }
+                  Update: {
+                    "business_id"?: string,"daily_limit"?: number,"reminder_hours"?: (number)[],"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "email_settings_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: true
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"email_suppressions": {
+                  Row: {
+                    "business_id": string,"category": string,"created_at": string,"email": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"category": string,"created_at"?: string,"email": string
+                  }
+                  Update: {
+                    "business_id"?: string,"category"?: string,"created_at"?: string,"email"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "email_suppressions_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"email_template_settings": {
+                  Row: {
+                    "business_id": string,"enabled": boolean,"intro": string | null,"signoff": string | null,"subject": string | null,"template": Database["public"]['Enums']["email_template"],"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"enabled"?: boolean,"intro"?: string | null,"signoff"?: string | null,"subject"?: string | null,"template": Database["public"]['Enums']["email_template"],"updated_at"?: string
+                  }
+                  Update: {
+                    "business_id"?: string,"enabled"?: boolean,"intro"?: string | null,"signoff"?: string | null,"subject"?: string | null,"template"?: Database["public"]['Enums']["email_template"],"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "email_template_settings_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"leads": {
                   Row: {
                     "booking_request_id": string | null,"business_id": string,"contact_email": string | null,"contact_first_name": string,"contact_last_name": string | null,"contact_phone_e164": string | null,"created_at": string,"customer_id": string | null,"follow_up_note": string | null,"id": string,"last_contacted_at": string | null,"last_inbound_at": string | null,"lost_reason": Database["public"]['Enums']["lost_reason"] | null,"next_follow_up_at": string | null,"notes": string | null,"request_text": string | null,"service_id": string | null,"size_class_id": string | null,"source": Database["public"]['Enums']["lead_source"],"status": Database["public"]['Enums']["lead_status"],"updated_at": string,"vehicle_description": string | null,"vehicle_id": string | null,"vehicle_make": string | null,"vehicle_model": string | null,"vehicle_year": number | null
@@ -738,6 +858,9 @@ isOneToOne: false
 "cancel_appointment":
 { Args: { "p_appointment_id": string,"p_customer_message"?: string,"p_reason"?: string }; Returns: undefined
                            },
+"cancel_email":
+{ Args: { "p_id": string }; Returns: undefined
+                           },
 "cancel_media_upload":
 { Args: { "p_asset": string }; Returns: string
                            },
@@ -772,6 +895,9 @@ isOneToOne: false
 { Args: { "p_quote_id": string }; Returns: undefined
                            },
 "discard_branding_draft":
+{ Args: Record<PropertyKey, never>; Returns: undefined
+                           },
+"disconnect_email":
 { Args: Record<PropertyKey, never>; Returns: undefined
                            },
 "finish_media_upload":
@@ -816,6 +942,9 @@ isOneToOne: false
 "purge_media":
 { Args: Record<PropertyKey, never>; Returns: number
                            },
+"queue_test_email":
+{ Args: Record<PropertyKey, never>; Returns: string
+                           },
 "release_calendar_hold":
 { Args: { "p_block_id": string }; Returns: boolean
                            },
@@ -831,8 +960,23 @@ isOneToOne: false
 "retract_proposal":
 { Args: { "p_request_id": string }; Returns: undefined
                            },
+"retry_email":
+{ Args: { "p_id": string }; Returns: undefined
+                           },
 "save_branding_draft":
 { Args: { "p_draft": Json }; Returns: undefined
+                           },
+"save_email_connection":
+{ Args: { "p_from": string,"p_from_name": string,"p_provider": Database["public"]['Enums']["email_provider"],"p_secret": string,"p_smtp_host"?: string,"p_smtp_port"?: number,"p_smtp_username"?: string }; Returns: undefined
+                           },
+"save_email_settings":
+{ Args: { "p_reminder_hours": (number)[],"p_templates": Json }; Returns: undefined
+                           },
+"save_email_template":
+{ Args: { "p_intro": string,"p_signoff": string,"p_subject": string,"p_template": Database["public"]['Enums']["email_template"] }; Returns: undefined
+                           },
+"save_owner_email_prefs":
+{ Args: { "p_prefs": Json,"p_summary_hour": number }; Returns: undefined
                            },
 "save_quote":
 { Args: { "p_customer": Json,"p_customer_id": string,"p_items": Json,"p_quote": Json,"p_quote_id": string,"p_vehicle": Json,"p_vehicle_id": string }; Returns: string
@@ -855,12 +999,15 @@ isOneToOne: false
 "start_appointment":
 { Args: { "p_appointment_id": string }; Returns: undefined
                            },
+"verify_email_code":
+{ Args: { "p_code": string }; Returns: boolean
+                           },
 "withdraw_quote":
 { Args: { "p_quote_id": string }; Returns: undefined
                            }
           }
           Enums: {
-            "account_status": "pending_activation"|"pilot"|"trialing"|"active"|"past_due"|"trial_expired"|"inactive"|"cancelled"|"suspended"|"closing","actor_type": "owner"|"customer"|"system"|"operator","appointment_source": "booking_page"|"phone"|"text"|"walk_in"|"in_person"|"other"|"quote","appointment_status": "scheduled"|"in_progress"|"completed"|"cancelled"|"no_show","block_kind": "appointment"|"hold"|"proposal","booking_mode": "approval"|"instant","cancelled_by": "customer"|"business","contact_preference": "call"|"text"|"email","lead_source": "booking_page"|"phone"|"text"|"instagram"|"facebook"|"google"|"referral"|"walk_in"|"repeat"|"other"|"website"|"social_media","lead_status": "new"|"contacted"|"quote_sent"|"follow_up_due"|"booked"|"lost","location_type": "mobile"|"shop","lost_reason": "price"|"timing"|"went_elsewhere"|"no_response"|"not_a_fit"|"other","media_kind": "logo"|"cover"|"gallery"|"service","media_status": "pending"|"ready"|"deleting","membership_role": "owner","payment_note": "not_recorded"|"unpaid"|"paid_cash"|"paid_card"|"paid_transfer"|"paid_other","price_type": "fixed"|"starting_at"|"quote_required","quote_status": "draft"|"sent"|"accepted"|"declined"|"expired"|"converted","request_status": "pending"|"time_proposed"|"approved"|"declined"|"proposal_declined"|"withdrawn"|"expired"|"closed_duplicate","resource_kind": "general"|"bay"|"staff"|"equipment","service_mode": "mobile"|"shop"|"both"
+            "account_status": "pending_activation"|"pilot"|"trialing"|"active"|"past_due"|"trial_expired"|"inactive"|"cancelled"|"suspended"|"closing","actor_type": "owner"|"customer"|"system"|"operator","appointment_source": "booking_page"|"phone"|"text"|"walk_in"|"in_person"|"other"|"quote","appointment_status": "scheduled"|"in_progress"|"completed"|"cancelled"|"no_show","block_kind": "appointment"|"hold"|"proposal","booking_mode": "approval"|"instant","cancelled_by": "customer"|"business","contact_preference": "call"|"text"|"email","email_connection_status": "pending"|"verified"|"needs_attention","email_provider": "google"|"microsoft"|"smtp","email_status": "queued"|"sending"|"sent"|"failed"|"held"|"skipped"|"cancelled","email_template": "request_received"|"booking_confirmed"|"booking_declined"|"time_proposed"|"proposal_accepted"|"proposal_declined"|"booking_rescheduled"|"booking_cancelled"|"appointment_reminder"|"quote_sent"|"quote_accepted"|"quote_declined"|"quote_expiring"|"quote_expired"|"owner_new_request"|"owner_new_appointment"|"owner_new_lead"|"owner_customer_response"|"owner_daily_summary"|"owner_overdue_followups"|"connection_test","lead_source": "booking_page"|"phone"|"text"|"instagram"|"facebook"|"google"|"referral"|"walk_in"|"repeat"|"other"|"website"|"social_media","lead_status": "new"|"contacted"|"quote_sent"|"follow_up_due"|"booked"|"lost","location_type": "mobile"|"shop","lost_reason": "price"|"timing"|"went_elsewhere"|"no_response"|"not_a_fit"|"other","media_kind": "logo"|"cover"|"gallery"|"service","media_status": "pending"|"ready"|"deleting","membership_role": "owner","payment_note": "not_recorded"|"unpaid"|"paid_cash"|"paid_card"|"paid_transfer"|"paid_other","price_type": "fixed"|"starting_at"|"quote_required","quote_status": "draft"|"sent"|"accepted"|"declined"|"expired"|"converted","request_status": "pending"|"time_proposed"|"approved"|"declined"|"proposal_declined"|"withdrawn"|"expired"|"closed_duplicate","resource_kind": "general"|"bay"|"staff"|"equipment","service_mode": "mobile"|"shop"|"both"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -976,7 +1123,7 @@ export type CompositeTypes<
 export const Constants = {
   "public": {
           Enums: {
-            "account_status": ["pending_activation", "pilot", "trialing", "active", "past_due", "trial_expired", "inactive", "cancelled", "suspended", "closing"],"actor_type": ["owner", "customer", "system", "operator"],"appointment_source": ["booking_page", "phone", "text", "walk_in", "in_person", "other", "quote"],"appointment_status": ["scheduled", "in_progress", "completed", "cancelled", "no_show"],"block_kind": ["appointment", "hold", "proposal"],"booking_mode": ["approval", "instant"],"cancelled_by": ["customer", "business"],"contact_preference": ["call", "text", "email"],"lead_source": ["booking_page", "phone", "text", "instagram", "facebook", "google", "referral", "walk_in", "repeat", "other", "website", "social_media"],"lead_status": ["new", "contacted", "quote_sent", "follow_up_due", "booked", "lost"],"location_type": ["mobile", "shop"],"lost_reason": ["price", "timing", "went_elsewhere", "no_response", "not_a_fit", "other"],"media_kind": ["logo", "cover", "gallery", "service"],"media_status": ["pending", "ready", "deleting"],"membership_role": ["owner"],"payment_note": ["not_recorded", "unpaid", "paid_cash", "paid_card", "paid_transfer", "paid_other"],"price_type": ["fixed", "starting_at", "quote_required"],"quote_status": ["draft", "sent", "accepted", "declined", "expired", "converted"],"request_status": ["pending", "time_proposed", "approved", "declined", "proposal_declined", "withdrawn", "expired", "closed_duplicate"],"resource_kind": ["general", "bay", "staff", "equipment"],"service_mode": ["mobile", "shop", "both"]
+            "account_status": ["pending_activation", "pilot", "trialing", "active", "past_due", "trial_expired", "inactive", "cancelled", "suspended", "closing"],"actor_type": ["owner", "customer", "system", "operator"],"appointment_source": ["booking_page", "phone", "text", "walk_in", "in_person", "other", "quote"],"appointment_status": ["scheduled", "in_progress", "completed", "cancelled", "no_show"],"block_kind": ["appointment", "hold", "proposal"],"booking_mode": ["approval", "instant"],"cancelled_by": ["customer", "business"],"contact_preference": ["call", "text", "email"],"email_connection_status": ["pending", "verified", "needs_attention"],"email_provider": ["google", "microsoft", "smtp"],"email_status": ["queued", "sending", "sent", "failed", "held", "skipped", "cancelled"],"email_template": ["request_received", "booking_confirmed", "booking_declined", "time_proposed", "proposal_accepted", "proposal_declined", "booking_rescheduled", "booking_cancelled", "appointment_reminder", "quote_sent", "quote_accepted", "quote_declined", "quote_expiring", "quote_expired", "owner_new_request", "owner_new_appointment", "owner_new_lead", "owner_customer_response", "owner_daily_summary", "owner_overdue_followups", "connection_test"],"lead_source": ["booking_page", "phone", "text", "instagram", "facebook", "google", "referral", "walk_in", "repeat", "other", "website", "social_media"],"lead_status": ["new", "contacted", "quote_sent", "follow_up_due", "booked", "lost"],"location_type": ["mobile", "shop"],"lost_reason": ["price", "timing", "went_elsewhere", "no_response", "not_a_fit", "other"],"media_kind": ["logo", "cover", "gallery", "service"],"media_status": ["pending", "ready", "deleting"],"membership_role": ["owner"],"payment_note": ["not_recorded", "unpaid", "paid_cash", "paid_card", "paid_transfer", "paid_other"],"price_type": ["fixed", "starting_at", "quote_required"],"quote_status": ["draft", "sent", "accepted", "declined", "expired", "converted"],"request_status": ["pending", "time_proposed", "approved", "declined", "proposal_declined", "withdrawn", "expired", "closed_duplicate"],"resource_kind": ["general", "bay", "staff", "equipment"],"service_mode": ["mobile", "shop", "both"]
           }
         }
 } as const

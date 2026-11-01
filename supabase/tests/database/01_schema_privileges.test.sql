@@ -10,8 +10,9 @@ select tables_are('public', array[
   'schedule_resources','vehicle_size_classes','service_categories','services','service_prices',
   'customers','vehicles','leads','quotes','quote_items','booking_requests','booking_request_items',
   'appointments','appointment_items','schedule_blocks','activity_events','rate_limit_events',
-  'media_assets','business_branding','user_preferences'
-], 'public schema contains exactly the Phase 1 tables plus the Phase 6 branding, image and preference tables');
+  'media_assets','business_branding','user_preferences',
+  'email_connections','email_settings','email_template_settings','email_owner_prefs','email_outbox','email_suppressions'
+], 'public schema contains exactly the Phase 1 tables plus the Phase 6 and Phase 7 tables');
 
 select is(
   (select count(*)::int from pg_class c join pg_namespace n on n.oid = c.relnamespace

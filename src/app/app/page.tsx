@@ -7,6 +7,8 @@ import { PageHeader } from '@/components/app/shell/PageHeader';
 import { ButtonLink } from '@/components/app/ui/Button';
 import { EmptyState, Panel } from '@/components/app/ui/Panel';
 import { getToday } from '@/data/dashboard';
+import { getEmailHealth } from '@/data/email';
+import { Notice } from '@/components/app/ui/Notice';
 import { requireBusiness } from '@/data/session';
 import { formatDate, formatMoney, formatTimeRange } from '@/domain/time';
 import styles from './today.module.css';
@@ -16,7 +18,7 @@ export const metadata: Metadata = { title: 'Today' };
 // DESIGN_SYSTEM §10.3, ordered by urgency. No vanity KPI tiles.
 export default async function TodayPage() {
   const { business } = await requireBusiness();
-  const [today, pipeline] = await Promise.all([getToday(business), countFollowUpsDue(dayRange(business.timezone).end.toISOString())]);
+  const [today, pipeline, email] = await Promise.all([getToday(business), countFollowUpsDue(dayRange(business.timezone).end.toISOString()), getEmailHealth()]);
   const tz = business.timezone;
 
   const checklist = [
@@ -40,6 +42,26 @@ export default async function TodayPage() {
           </ButtonLink>
         }
       />
+      {/* Phase 7: automatic emails need a connected account; problems are surfaced here. */}
+      {email.status === 'needs_attention' ? (
+        <div className={styles.emailNotice}>
+          <Notice tone="critical" action={<Link href="/app/settings/notifications">Reconnect</Link>}>
+            Your email needs attention — {email.held} {email.held === 1 ? 'email is' : 'emails are'} on hold until you reconnect.
+          </Notice>
+        </div>
+      ) : email.status !== 'verified' ? (
+        <div className={styles.emailNotice}>
+          <Notice tone="info" action={<Link href="/app/settings/notifications">Connect email</Link>}>
+            Connect your email account to send booking confirmations, quotes and reminders to customers automatically.
+          </Notice>
+        </div>
+      ) : email.failed > 0 ? (
+        <div className={styles.emailNotice}>
+          <Notice tone="attention" action={<Link href="/app/settings/notifications/activity?show=problems">Review</Link>}>
+            {email.failed} {email.failed === 1 ? 'email' : 'emails'} failed to send this week.
+          </Notice>
+        </div>
+      ) : null}
       <div className={styles.grid}>
         <div className={styles.column}>
           {today.pendingRequests > 0 || pipeline.due > 0 || pipeline.acceptedToBook > 0 ? (

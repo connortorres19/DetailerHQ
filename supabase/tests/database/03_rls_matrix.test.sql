@@ -32,6 +32,13 @@ begin
   -- Phase 6: an image and the branding row (both read-only for owners; writes go through functions).
   insert into public.media_assets (business_id, kind, status, width, height, bytes, ready_at) values (a, 'logo', 'ready', 64, 64, 100, now());
   insert into public.business_branding (business_id, primary_color) values (a, '#1f4e79');
+  -- Phase 7: email (all read-only for owners; writes go through functions or the worker).
+  insert into public.email_connections (business_id, provider, from_address, secret) values (a, 'google', 'shop@example.com', extensions.gen_random_bytes(64));
+  insert into public.email_settings (business_id) values (a);
+  insert into public.email_template_settings (business_id, template, enabled) values (a, 'request_received', true);
+  insert into public.email_owner_prefs (business_id, user_id) values (a, pg_temp.owner_of(a));
+  insert into public.email_outbox (business_id, template, recipient, idempotency_key) values (a, 'connection_test', 'shop@example.com', 'matrix-' || a);
+  insert into public.email_suppressions (business_id, email, category) values (a, 'x@example.com', 'follow_up');
 end
 $$;
 

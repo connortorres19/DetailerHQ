@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // Dev-only stand-in for Mailpit, for machines that can't pull the Mailpit image.
-// Accepts SMTP on :2525 (no auth checks, no TLS, nothing is relayed) and keeps messages in memory.
+// Accepts SMTP on :2525 (no TLS, nothing is relayed) and keeps messages in memory. To local clients
+// it advertises AUTH PLAIN and accepts any login, except — for the email tests (Phase 7) — the password
+// "wrong-password" (535), recipients containing "+bounce" (550, permanent) and "+busy" (451, try later).
 // Read them with:  GET http://127.0.0.1:54330/messages      DELETE clears them.
 //
 // To use it, point Supabase at it in a local, uncommitted config:
@@ -30,7 +32,7 @@ function parse(raw, envelope) {
       return b.length > 40 ? Buffer.from(b, 'base64').toString('utf8') : p;
     }).join('\n');
   }
-  return { from: envelope.from, to: envelope.to, subject: header('Subject'), html: body, receivedAt: new Date().toISOString() };
+  return { from: envelope.from, to: envelope.to, subject: header('Subject'), html: body, headers: head, receivedAt: new Date().toISOString() };
 }
 
 net.createServer((socket) => {
@@ -59,11 +61,27 @@ net.createServer((socket) => {
       const line = buffer.slice(0, index);
       buffer = buffer.slice(index + 2);
       const cmd = line.slice(0, 4).toUpperCase();
-      if (cmd === 'EHLO') reply('250 dev-mail-sink'); // no AUTH advertised, so clients skip it
+      // AUTH only for local clients (the app's SMTP tests). Supabase Auth connects over the Docker
+      // network, and Go's SMTP client won't send a login over plain text to a non-local host.
+      if (cmd === 'EHLO') {
+        const local = /^(::ffff:)?127\.|^::1$/.test(socket.remoteAddress ?? '');
+        reply('250-dev-mail-sink');
+        if (local) reply('250-AUTH PLAIN');
+        reply('250 8BITMIME');
+      }
       else if (cmd === 'HELO') reply('250 dev-mail-sink');
-      else if (cmd === 'AUTH') reply('235 Authentication successful');
-      else if (cmd === 'MAIL') { envelope.from = line.replace(/^MAIL FROM:\s*/i, '').replace(/[<>]/g, ''); reply('250 OK'); }
-      else if (cmd === 'RCPT') { envelope.to.push(line.replace(/^RCPT TO:\s*/i, '').replace(/[<>]/g, '')); reply('250 OK'); }
+      else if (cmd === 'AUTH') {
+        const plain = Buffer.from(line.split(' ')[2] ?? '', 'base64').toString('utf8').split('\0');
+        if (plain[2] === 'wrong-password') reply('535 5.7.8 Authentication credentials invalid');
+        else reply('235 Authentication successful');
+      }
+      else if (cmd === 'MAIL') { envelope.from = line.replace(/^MAIL FROM:\s*/i, '').replace(/[<>]/g, '').split(' ')[0]; reply('250 OK'); }
+      else if (cmd === 'RCPT') {
+        const to = line.replace(/^RCPT TO:\s*/i, '').replace(/[<>]/g, '').split(' ')[0];
+        if (to.includes('+bounce')) reply('550 5.1.1 No such user');
+        else if (to.includes('+busy')) reply('451 4.3.0 Try again later');
+        else { envelope.to.push(to); reply('250 OK'); }
+      }
       else if (cmd === 'DATA') { data = ''; buffer = '\r\n' + buffer; reply('354 End data with <CR><LF>.<CR><LF>'); }
       else if (cmd === 'QUIT') { reply('221 Bye'); socket.end(); }
       else reply('250 OK');

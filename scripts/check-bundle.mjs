@@ -12,7 +12,20 @@ const forbidden = [
   [/booking_api/, 'booking_api database role'],
   [/postgres(ql)?:\/\/[^"'\s]+/, 'database connection string'],
   [/Could not load customers|Could not load business|\[workflow:/, 'server-only data module'],
+  // Phase 7 email: the worker role, server-only variables and secret material.
+  [/email_worker|EMAIL_WORKER_SECRET|EMAIL_ENCRYPTION_KEY|EMAIL_WORKER_DATABASE_URL|GOOGLE_CLIENT_SECRET|MICROSOFT_CLIENT_SECRET/, 'email server-only variable or role'],
+  [/refresh_token|nodemailer|email_api\./, 'email server-only code'],
 ];
+// The actual secret values from this machine's .env.local must never appear either.
+try {
+  const env = readFileSync('.env.local', 'utf8');
+  for (const name of ['EMAIL_ENCRYPTION_KEY', 'EMAIL_WORKER_SECRET', 'BOOKING_HASH_SECRET']) {
+    const value = env.match(new RegExp(`^${name}=(.+)$`, 'm'))?.[1];
+    if (value && value.length >= 20) forbidden.push([new RegExp(value.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')), `${name} value`]);
+  }
+} catch {
+  /* no .env.local (CI): name patterns still apply */
+}
 
 const files = [];
 (function walk(dir) {

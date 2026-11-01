@@ -17,6 +17,24 @@
 -- Owners read these tables under RLS; every write goes through the functions below.
 
 -- ---------------------------------------------------------------------------
+-- Precondition: Supabase Storage must be running against this database. Its own service creates
+-- the storage schema the first time it starts (hosted projects always have it; locally it needs
+-- [storage] enabled = true in supabase/config.toml AND a restart of the stack — `supabase start`
+-- on a stack that is already running keeps the old configuration). Stop here, before changing
+-- anything, with instructions, rather than half-applying the image rules.
+-- ---------------------------------------------------------------------------
+do $$
+begin
+  if to_regclass('storage.buckets') is null or to_regclass('storage.objects') is null then
+    raise exception 'Supabase Storage is not initialised in this database (storage.buckets / storage.objects are missing).'
+      using hint = 'Local: make sure supabase/config.toml has [storage] enabled = true, then run `npx supabase stop` and `npx supabase start` '
+                   '(this keeps your data), check `npx supabase status` lists Storage, and run `npx supabase migration up --local` again. '
+                   'Run `npm run storage:check` to diagnose.';
+  end if;
+end
+$$;
+
+-- ---------------------------------------------------------------------------
 -- Bucket (also declared in supabase/config.toml for the local stack)
 -- ---------------------------------------------------------------------------
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)

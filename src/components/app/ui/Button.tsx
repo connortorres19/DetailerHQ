@@ -24,7 +24,24 @@ export function Button({
   );
 }
 
-export function ButtonLink({ variant = 'secondary', size = 'md', icon, children, className, href, target }: Common & { href: string; target?: '_blank' }) {
+export function ButtonLink({
+  variant = 'secondary',
+  size = 'md',
+  icon,
+  children,
+  className,
+  href,
+  target,
+  native = false,
+}: Common & { href: string; target?: '_blank'; native?: boolean }) {
+  // native: a full page load with no prefetching — for links that start a flow on the server (OAuth).
+  if (native)
+    return (
+      <a href={href} className={classes(variant, size, className)}>
+        {icon}
+        <span>{children}</span>
+      </a>
+    );
   return (
     <Link href={href} className={classes(variant, size, className)} target={target} rel={target ? 'noopener' : undefined}>
       {icon}

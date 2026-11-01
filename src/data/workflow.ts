@@ -2,6 +2,7 @@ import 'server-only';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { classifyDbError, withRetry, type DbErrorKind } from '@/db/errors.js';
 import { createClient } from '@/lib/supabase/server';
+import { kickEmail } from '@/lib/email/kick';
 import type { Database } from '@/types/database';
 
 type Functions = Database['public']['Functions'];
@@ -58,6 +59,7 @@ export async function callWorkflow<N extends WorkflowName>(
       }
       return data as Functions[N]['Returns'];
     });
+    kickEmail(); // Phase 7: send any emails this change queued, after the response
     return { ok: true, data };
   } catch (error) {
     const pgError = error instanceof RetryableError ? error.error : (error as PostgrestError);

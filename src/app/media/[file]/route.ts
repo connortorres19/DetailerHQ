@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import sharp from 'sharp';
 import { isMediaFile } from '@/domain/branding';
 import { MEDIA_BUCKET } from '@/lib/media/server';
 import { createClient } from '@/lib/supabase/server';
@@ -12,7 +13,10 @@ import { createClient } from '@/lib/supabase/server';
 const notFound = () => new NextResponse('Not found', { status: 404, headers: { 'Cache-Control': 'no-store', 'Content-Type': 'text/plain' } });
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ file: string }> }) {
-  const { file } = await params;
+  const { file: requested } = await params;
+  // <id>.png: the same image as PNG, for email clients that can't show WebP (Outlook for Windows).
+  const png = /\.png$/.test(requested);
+  const file = png ? requested.replace(/\.png$/, '.webp') : requested;
   if (!isMediaFile(file)) return notFound();
 
   const supabase = await createClient();
@@ -20,16 +24,18 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   const signedIn = Boolean(claims?.claims?.sub);
   const { data, error } = await supabase.storage.from(MEDIA_BUCKET).download(file);
   if (error || !data) return notFound();
+  const body = png ? await sharp(Buffer.from(await data.arrayBuffer())).png({ compressionLevel: 9 }).toBuffer() : null;
 
-  return new NextResponse(data.stream(), {
+  return new NextResponse(body ? new Uint8Array(body) : data.stream(), {
     headers: {
-      'Content-Type': 'image/webp',
-      'Content-Length': String(data.size),
+      'Content-Type': png ? 'image/png' : 'image/webp',
+      'Content-Length': String(body ? body.length : data.size),
       // Image names are never reused (a replacement is a new image), so caching is safe; public
       // copies expire quickly so a removed image disappears soon. Owners' views are never shared.
       'Cache-Control': signedIn ? 'private, no-store' : 'public, max-age=300, s-maxage=300',
       'Content-Security-Policy': "default-src 'none'; sandbox",
-      'Cross-Origin-Resource-Policy': 'same-origin',
+      // Email logos are loaded by webmail on other origins.
+      'Cross-Origin-Resource-Policy': png ? 'cross-origin' : 'same-origin',
       'X-Content-Type-Options': 'nosniff',
     },
   });

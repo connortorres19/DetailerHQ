@@ -57,6 +57,9 @@ export async function callPublic<T>(fn: PublicFunction, args: unknown[]): Promis
   const { rows } = await pool().query(`select public_api.${fn}(${placeholders}) as result`, args);
   const result = rows[0]?.result as (T & { error?: PublicError }) | null;
   if (result && typeof result === 'object' && 'error' in result && result.error) return { ok: false, error: result.error };
+  // Phase 7: send any emails this change queued (requests, answers, cancellations) after the response.
+  if (fn !== 'get_booking_page' && fn !== 'get_available_slots' && fn !== 'get_request_status' && fn !== 'get_quote')
+    void import('@/lib/email/kick').then((m) => m.kickEmail()).catch(() => undefined);
   return { ok: true, data: result as T };
 }
 

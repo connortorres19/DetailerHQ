@@ -5,6 +5,7 @@ import { emailConfig } from './config';
 import { decryptCredentials, encryptCredentials, type Credentials } from './crypto';
 import { accessToken, endpoints, OAuthError } from './oauth';
 import { checkSmtpHost } from './smtp-guard';
+import { describeSmtpError, securityFor, smtpTransportOptions } from './smtp-options';
 
 // Sends one message through the business's own mailbox. Errors are classified for the worker:
 //   auth       the provider refused the credentials → connection "needs attention", emails held
@@ -21,6 +22,7 @@ export type Connection = {
   smtpHost: string | null;
   smtpPort: number | null;
   smtpUsername: string | null;
+  smtpSecurity?: string | null;
 };
 export type Message = { to: string; subject: string; html: string; text: string; headers?: Record<string, string> };
 export type SendResult = { messageId: string | null };
@@ -103,59 +105,56 @@ function httpError(who: string, status: number) {
   return new SendError(`${who} rejected the message (${status}).`, 'permanent');
 }
 
-async function smtpTransport(conn: Pick<Connection, 'smtpHost' | 'smtpPort' | 'smtpUsername'>, password: string) {
+type SmtpConn = Pick<Connection, 'smtpHost' | 'smtpPort' | 'smtpUsername' | 'smtpSecurity'>;
+const where = (conn: SmtpConn) => ({ host: conn.smtpHost ?? '', port: conn.smtpPort ?? 587, security: securityFor(conn.smtpPort ?? 587, conn.smtpSecurity) });
+
+async function smtpTransport(conn: SmtpConn, password: string) {
   const c = emailConfig()!;
   const host = await checkSmtpHost(conn.smtpHost ?? '', c.allowPrivateSmtp);
   if (!host.ok) throw new SendError(host.message, 'permanent');
-  const port = conn.smtpPort ?? 587;
-  const loopback = c.allowPrivateSmtp && /^(127\.|::1$)/.test(host.address);
-  return nodemailer.createTransport({
-    host: host.address, // pinned to the checked address
-    port,
-    secure: port === 465,
-    requireTLS: port !== 465 && !loopback, // never send credentials in clear text (local test sink only)
-    ignoreTLS: loopback,
-    tls: { servername: conn.smtpHost ?? undefined, rejectUnauthorized: true, minVersion: 'TLSv1.2' },
-    auth: { user: conn.smtpUsername ?? '', pass: password },
-    connectionTimeout: 15_000,
-    greetingTimeout: 15_000,
-    socketTimeout: 30_000,
-    logger: false,
-    debug: false,
-  });
+  const w = where(conn);
+  return nodemailer.createTransport(
+    smtpTransportOptions({
+      address: host.address, // pinned to the checked address
+      servername: w.host,
+      port: w.port,
+      security: w.security,
+      username: conn.smtpUsername ?? '',
+      password,
+      // The local test mail sink only (private SMTP hosts are refused on any public site).
+      loopback: c.allowPrivateSmtp && /^(127\.|::1$)/.test(host.address),
+    }),
+  );
 }
 
-function smtpError(e: unknown): SendError {
+function smtpError(e: unknown, conn: SmtpConn): SendError {
   if (e instanceof SendError) return e;
-  const err = e as { code?: string; responseCode?: number };
-  if (err.code === 'EAUTH' || err.responseCode === 535 || err.responseCode === 534) return new SendError('The mail server refused the login. Check the password and reconnect.', 'auth');
-  if (err.responseCode && err.responseCode >= 500) return new SendError(`The mail server rejected the message (${err.responseCode}).`, 'permanent');
-  if (err.responseCode && err.responseCode >= 400) return new SendError(`The mail server asked to try later (${err.responseCode}).`, 'transient');
-  if (err.code === 'ETLS' || (err.code === 'ESOCKET' && /certificate|TLS|SSL/i.test(String((e as Error).message)))) return new SendError('A secure (TLS) connection to the mail server failed.', 'permanent');
-  return new SendError('Couldn’t reach the mail server; will retry.', 'transient');
+  const p = describeSmtpError(e, where(conn));
+  return new SendError(p.message, p.kind);
 }
 
 /** Checks an SMTP login (connect, TLS, AUTH) without sending anything and without storing it. */
-export async function checkSmtpLogin(conn: Pick<Connection, 'smtpHost' | 'smtpPort' | 'smtpUsername'>, password: string) {
+export async function checkSmtpLogin(conn: SmtpConn, password: string) {
   let transport: nodemailer.Transporter | null = null;
   try {
     transport = await smtpTransport(conn, password);
     await transport.verify();
   } catch (e) {
-    throw smtpError(e);
+    throw smtpError(e, conn);
   } finally {
     transport?.close();
   }
 }
 
 async function sendSmtp(conn: Connection, password: string, msg: Message): Promise<SendResult> {
-  const transport = await smtpTransport(conn, password);
+  let transport: nodemailer.Transporter | null = null;
   try {
+    transport = await smtpTransport(conn, password);
     const info = await transport.sendMail({ from: fromHeader(conn), to: msg.to, subject: msg.subject, html: msg.html, text: msg.text, headers: msg.headers });
     return { messageId: info.messageId ?? null };
   } catch (e) {
-    throw smtpError(e);
+    throw smtpError(e, conn);
   } finally {
-    transport.close();
+    transport?.close();
   }
 }

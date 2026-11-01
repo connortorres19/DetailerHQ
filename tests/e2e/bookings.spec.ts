@@ -191,8 +191,8 @@ test('holds: request holds and calendar holds take capacity, never replace appoi
   const day = new Date(Date.now() + 8 * 86400_000).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
   await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Calendar' }).click();
   await page.getByLabel('Date').fill(day);
-  await page.getByLabel('From').selectOption('13:00');
-  await page.getByLabel('To').selectOption('15:00');
+  await page.getByLabel('From', { exact: true }).selectOption('13:00');
+  await page.getByLabel('To', { exact: true }).selectOption('15:00');
   await page.getByLabel('Keep it for').selectOption('48');
   await page.getByLabel('Note (optional, private)').fill('Fleet van — waiting on PO');
   await page.getByRole('button', { name: 'Hold time' }).click();
@@ -214,8 +214,8 @@ test('holds: request holds and calendar holds take capacity, never replace appoi
   await expect(page.getByText('Booking confirmed.')).toBeVisible();
   await page.goto('/app/calendar');
   await page.getByLabel('Date').fill(new Date(other.start).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' }));
-  await page.getByLabel('From').selectOption('10:00');
-  await page.getByLabel('To').selectOption('11:00');
+  await page.getByLabel('From', { exact: true }).selectOption('10:00');
+  await page.getByLabel('To', { exact: true }).selectOption('11:00');
   await page.getByRole('button', { name: 'Hold time' }).click();
   await expect(page.getByText('That time is already fully booked. Holds never replace confirmed appointments.')).toBeVisible();
 

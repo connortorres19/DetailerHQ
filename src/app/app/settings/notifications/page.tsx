@@ -6,6 +6,7 @@ import { getUser, requireBusiness } from '@/data/session';
 import { CUSTOMER_TEMPLATES, OWNER_TEMPLATES } from '@/domain/email';
 import { emailConfig, providerConfigured } from '@/lib/email/config';
 import { createClient } from '@/lib/supabase/server';
+import { ConnectHelp } from './ConnectHelp';
 import { Activity, ConnectionPanel, CustomerEmailsForm, OwnerPrefsForm } from './forms';
 import styles from './notifications.module.css';
 
@@ -14,13 +15,14 @@ export const metadata: Metadata = { title: 'Notifications' };
 const RESULT: Record<string, { tone: 'positive' | 'critical' | 'attention'; text: string }> = {
   connected: { tone: 'positive', text: 'Email connected and verified — a test email is on its way to you. Automatic emails are on.' },
   smtp_verified: { tone: 'positive', text: 'Email connected and verified. Automatic emails are on.' },
+  smtp_updated: { tone: 'positive', text: 'New email settings saved — the connection works. Automatic emails continue.' },
   denied: { tone: 'attention', text: 'Access wasn’t granted, so nothing was connected.' },
   invalid_state: { tone: 'critical', text: 'That sign-in link expired or didn’t match. Start again.' },
   provider_error: { tone: 'critical', text: 'The email provider returned an error. Try again in a moment.' },
   no_offline_access: { tone: 'critical', text: 'The provider didn’t allow ongoing access. Remove DetailerHQ from your account’s connected apps, then connect again.' },
   save_failed: { tone: 'critical', text: 'The connection couldn’t be saved. Try again.' },
   test_failed: { tone: 'critical', text: 'Connected, but the test email failed, so automatic emails stay off. Check the error below and try again.' },
-  not_configured: { tone: 'attention', text: 'This sign-in option isn’t set up on this server yet. Use another email option, or see the setup guide.' },
+  not_configured: { tone: 'attention', text: 'That sign-in option isn’t available. Connect your email with its SMTP settings below.' },
 };
 
 export default async function NotificationsPage({ searchParams }: { searchParams: Promise<{ email?: string }> }) {
@@ -29,7 +31,7 @@ export default async function NotificationsPage({ searchParams }: { searchParams
   const result = RESULT[(await searchParams).email ?? ''];
   const supabase = await createClient();
   const [conn, settings, templates, prefs, activity] = await Promise.all([
-    supabase.from('email_connections').select('provider, from_address, from_name, status, smtp_host, smtp_port, smtp_username, verification_expires_at, verified_at, last_error, last_error_at, last_sent_at').maybeSingle(),
+    supabase.from('email_connections').select('provider, from_address, from_name, status, smtp_host, smtp_port, smtp_username, smtp_security, verification_expires_at, verified_at, last_checked_at, last_error, last_error_at, last_sent_at').maybeSingle(),
     supabase.from('email_settings').select('reminder_hours').maybeSingle(),
     supabase.from('email_template_settings').select('template, enabled, subject, intro, signoff'),
     supabase.from('email_owner_prefs').select('prefs, summary_hour').maybeSingle(),
@@ -44,15 +46,18 @@ export default async function NotificationsPage({ searchParams }: { searchParams
   return (
     <div className={styles.stack}>
       {result ? <Notice tone={result.tone}>{result.text}</Notice> : null}
-      {!configured ? <Notice tone="attention">Email isn’t set up on this server yet. Everything else works; automatic emails are off.</Notice> : null}
+
+      <Panel title="How to Connect Your Business Email" id="email-help">
+        <ConnectHelp />
+      </Panel>
 
       <Panel title="Email account" id="email-account">
         <ConnectionPanel
           connection={c ? { ...c, smtp_port: c.smtp_port ?? null } : null}
-          businessName={business.name}
-          google={providerConfigured('google')}
-          microsoft={providerConfigured('microsoft')}
+          // Google / Microsoft sign-in stays hidden unless EMAIL_OAUTH_ENABLED=1 (SMTP is the supported way).
+          oauth={{ google: providerConfigured('google'), microsoft: providerConfigured('microsoft') }}
           configured={configured}
+          timezone={business.timezone}
         />
       </Panel>
 

@@ -9,7 +9,7 @@ import { Notice } from '@/components/app/ui/Notice';
 import { SubmitButton } from '@/components/app/ui/SubmitButton';
 import { CUSTOMER_TEMPLATES, OWNER_TEMPLATES, REMINDER_CHOICES } from '@/domain/email';
 import { idle, type FormState } from '@/domain/forms';
-import { cancelEmail, connectSmtp, disconnectEmail, resendCode, retryEmail, saveCustomerEmails, saveOwnerPrefs, sendTestEmail, verifyCode } from './actions';
+import { cancelEmail, disconnectEmail, resendCode, retryEmail, saveCustomerEmails, saveOwnerPrefs, sendTestEmail, smtpConnection, testSavedConnection, verifyCode } from './actions';
 import styles from './notifications.module.css';
 
 type Conn = {
@@ -20,13 +20,16 @@ type Conn = {
   smtp_host: string | null;
   smtp_port: number | null;
   smtp_username: string | null;
+  smtp_security: string | null;
   verification_expires_at: string | null;
   verified_at: string | null;
+  last_checked_at: string | null;
   last_error: string | null;
   last_sent_at: string | null;
 };
 
-const PROVIDER = { google: 'Gmail / Google Workspace', microsoft: 'Outlook / Microsoft 365', smtp: 'Your own domain (SMTP)' } as const;
+const PROVIDER = { google: 'Gmail (Google sign-in)', microsoft: 'Microsoft 365 (Microsoft sign-in)', smtp: 'SMTP' } as const;
+const SECURITY: Record<string, string> = { starttls: 'STARTTLS', ssl: 'SSL/TLS' };
 
 function Status({ state }: { state: FormState }) {
   if (state.status === 'success') return <Notice tone="positive">{state.message}</Notice>;
@@ -34,28 +37,37 @@ function Status({ state }: { state: FormState }) {
   return null;
 }
 
-export function ConnectionPanel({ connection, google, microsoft, configured }: { connection: Conn | null; businessName: string; google: boolean; microsoft: boolean; configured: boolean }) {
+const latest = (...dates: (string | null)[]) => dates.filter(Boolean).sort().at(-1) ?? null;
+
+export function ConnectionPanel({ connection, oauth, configured, timezone }: { connection: Conn | null; oauth: { google: boolean; microsoft: boolean }; configured: boolean; timezone: string }) {
   const [testState, test, testing] = useActionState(sendTestEmail, idle);
+  const [checkState, check, checking] = useActionState(testSavedConnection, idle);
   const [discState, disconnect, disconnecting] = useActionState(disconnectEmail, idle);
   const [confirm, setConfirm] = useState(false);
   const [change, setChange] = useState(false);
+  const fmt = (d: string) => new Intl.DateTimeFormat('en-US', { timeZone: timezone, month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(d));
 
   if (!connection || change) {
+    const replacing = connection && change;
     return (
       <div className={styles.stack}>
         <Status state={discState} />
-        <p>Connect the email account you already use. Customers get emails from your address, and replies come straight to you. DetailerHQ can only <strong>send</strong> — it never reads your inbox.</p>
-        <div className={styles.providers}>
-          <ProviderButton href="/app/settings/notifications/connect/google" enabled={google} label="Connect Gmail or Google Workspace" />
-          <ProviderButton href="/app/settings/notifications/connect/microsoft" enabled={microsoft} label="Connect Outlook or Microsoft 365" />
-        </div>
-        <details className={styles.smtp} open={!google && !microsoft && configured}>
-          <summary>Use another email address (your own domain, via SMTP)</summary>
-          <SmtpForm />
-        </details>
+        {!configured ? <Notice tone="attention">Email sending isn’t set up on this server yet, so connecting is unavailable. Everything else works.</Notice> : null}
+        <p>
+          {replacing
+            ? 'Enter the new details. Your current connection keeps working until the new one is checked.'
+            : 'Customers get emails from your address, and their replies come straight to you. DetailerHQ only sends — it never reads your inbox.'}
+        </p>
+        <SmtpForm initial={replacing && connection.provider === 'smtp' ? connection : null} />
+        {oauth.google || oauth.microsoft ? (
+          <div className={styles.providers}>
+            {oauth.google ? <ButtonLink href="/app/settings/notifications/connect/google" variant="ghost" native>Sign in with Google instead</ButtonLink> : null}
+            {oauth.microsoft ? <ButtonLink href="/app/settings/notifications/connect/microsoft" variant="ghost" native>Sign in with Microsoft instead</ButtonLink> : null}
+          </div>
+        ) : null}
         {change ? (
           <Button type="button" variant="ghost" onClick={() => setChange(false)}>
-            Keep the current account
+            Keep the current settings
           </Button>
         ) : null}
       </div>
@@ -63,56 +75,80 @@ export function ConnectionPanel({ connection, google, microsoft, configured }: {
   }
 
   const state = connection.status;
+  const smtp = connection.provider === 'smtp';
+  const lastOk = smtp ? latest(connection.last_checked_at, connection.last_sent_at, connection.verified_at) : latest(connection.last_sent_at, connection.verified_at);
   return (
     <div className={styles.stack}>
       <div className={styles.account} data-status={state}>
         <span className={styles.accountIcon} aria-hidden="true">
           {state === 'verified' ? <CheckCircle2 size={20} /> : state === 'needs_attention' ? <AlertTriangle size={20} /> : <Mail size={20} />}
         </span>
-        <div>
+        <div className={styles.accountBody}>
           <p className={styles.accountAddress}>{connection.from_address}</p>
-          <p className={styles.muted}>
-            {PROVIDER[connection.provider]}
-            {connection.provider === 'smtp' ? ` · ${connection.smtp_host}:${connection.smtp_port}` : ''} ·{' '}
+          <p>
             <span className={styles.badge} data-tone={state === 'verified' ? 'positive' : state === 'needs_attention' ? 'critical' : 'attention'}>
               {state === 'verified' ? 'Connected' : state === 'needs_attention' ? 'Needs attention' : 'Waiting for verification'}
             </span>
-            {connection.last_sent_at ? ` · last sent ${new Date(connection.last_sent_at).toLocaleString()}` : ''}
           </p>
+          <dl className={styles.facts}>
+            <div>
+              <dt>Connection</dt>
+              <dd>
+                {smtp ? `${connection.smtp_host}, port ${connection.smtp_port}, ${SECURITY[connection.smtp_security ?? (connection.smtp_port === 465 ? 'ssl' : 'starttls')]}` : PROVIDER[connection.provider]}
+              </dd>
+            </div>
+            <div>
+              <dt>Last successful connection</dt>
+              <dd>{lastOk ? fmt(lastOk) : 'Not yet'}</dd>
+            </div>
+            {connection.last_sent_at ? (
+              <div>
+                <dt>Last email sent</dt>
+                <dd>{fmt(connection.last_sent_at)}</dd>
+              </div>
+            ) : null}
+          </dl>
         </div>
       </div>
       {state === 'needs_attention' ? (
         <Notice tone="critical">
-          Emails are on hold: {connection.last_error ?? 'the provider refused the connection.'} Reconnect to send them (held emails from the last 24 hours, and upcoming reminders, will go out).
+          Emails are on hold: {connection.last_error ?? 'the mail server refused the connection.'}{' '}
+          {smtp ? 'Select Update password or settings and enter the new password' : 'Connect again'} to send them — held emails from the last 24 hours, and upcoming reminders, will go out.
         </Notice>
       ) : null}
-      {state === 'pending' && connection.provider === 'smtp' ? <CodeForm address={connection.from_address} /> : null}
-      {state === 'pending' && connection.provider !== 'smtp' ? <Notice tone="attention">The test email didn’t go through yet, so automatic emails are off. Send a test to try again.</Notice> : null}
+      {state === 'pending' && smtp ? <CodeForm address={connection.from_address} /> : null}
+      {state === 'pending' && !smtp ? <Notice tone="attention">The test email didn’t go through yet, so automatic emails are off. Send a test to try again.</Notice> : null}
+      <Status state={checkState} />
       <Status state={testState} />
       <Status state={discState} />
       <div className={styles.buttons}>
-        {state !== 'pending' || connection.provider !== 'smtp' ? (
+        {smtp ? (
+          <Button type="button" variant={state === 'pending' ? 'ghost' : 'secondary'} disabled={checking} onClick={() => startTransition(() => check())}>
+            {checking ? 'Testing…' : 'Test connection'}
+          </Button>
+        ) : null}
+        {state !== 'pending' || !smtp ? (
           <Button type="button" icon={<Send size={14} aria-hidden="true" />} disabled={testing} onClick={() => startTransition(() => test())}>
             {testing ? 'Sending…' : 'Send test email'}
           </Button>
         ) : null}
-        {state === 'needs_attention' && connection.provider !== 'smtp' ? (
+        {state === 'needs_attention' && connection.provider !== 'smtp' && oauth[connection.provider] ? (
           <ButtonLink href={`/app/settings/notifications/connect/${connection.provider}`} variant="primary" native>
             Reconnect
           </ButtonLink>
         ) : null}
-        <Button type="button" variant="ghost" onClick={() => setChange(true)}>
-          {state === 'needs_attention' && connection.provider === 'smtp' ? 'Reconnect' : 'Use a different account'}
+        <Button type="button" variant={state === 'needs_attention' ? 'primary' : 'ghost'} onClick={() => setChange(true)}>
+          {smtp ? 'Update password or settings' : 'Switch to SMTP'}
         </Button>
         {!confirm ? (
           <Button type="button" variant="ghost" onClick={() => setConfirm(true)}>
-            Disconnect
+            Disconnect email
           </Button>
         ) : null}
       </div>
       {confirm ? (
         <div className={styles.confirm} role="group" aria-label="Disconnect email">
-          <p>Disconnect {connection.from_address}? Its saved login is deleted, waiting emails are cancelled, and automatic emails stop until you connect again.</p>
+          <p>Disconnect {connection.from_address}? Its saved password is deleted, waiting emails are cancelled, and automatic emails stop until you connect again.</p>
           <div className={styles.buttons}>
             <Button type="button" variant="danger" disabled={disconnecting} onClick={() => (setConfirm(false), startTransition(() => disconnect()))}>
               Disconnect
@@ -127,56 +163,131 @@ export function ConnectionPanel({ connection, google, microsoft, configured }: {
   );
 }
 
-function ProviderButton({ href, enabled, label }: { href: string; enabled: boolean; label: string }) {
-  return enabled ? (
-    <ButtonLink href={href} native>
-      {label}
-    </ButtonLink>
-  ) : (
-    <span className={styles.unavailable} title="Not set up on this server yet">
-      <Button type="button" disabled>
-        {label}
-      </Button>
-      <span className={styles.muted}>Not set up on this server yet</span>
-    </span>
-  );
-}
+// Typical settings for the common providers (the owner can change any of them).
+const PRESETS = {
+  gmail: { host: 'smtp.gmail.com', port: '587', security: 'starttls' },
+  microsoft: { host: 'smtp.office365.com', port: '587', security: 'starttls' },
+  other: null,
+} as const;
+type Preset = keyof typeof PRESETS;
+const presetFor = (host?: string): Preset => (host === PRESETS.gmail.host ? 'gmail' : host === PRESETS.microsoft.host ? 'microsoft' : 'other');
 
-function SmtpForm() {
-  const [state, action] = useActionState(connectSmtp, idle);
+function SmtpForm({ initial }: { initial: Conn | null }) {
+  const [state, action, pending] = useActionState(smtpConnection, idle);
+  const [intent, setIntent] = useState<'test' | 'connect'>('connect');
   const v = state.values ?? {};
+  const start = {
+    fromAddress: v.fromAddress ?? initial?.from_address ?? '',
+    fromName: v.fromName ?? initial?.from_name ?? '',
+    host: v.host ?? initial?.smtp_host ?? '',
+    port: v.port ?? (initial?.smtp_port ? String(initial.smtp_port) : '587'),
+    security: v.security ?? initial?.smtp_security ?? (initial?.smtp_port === 465 ? 'ssl' : 'starttls'),
+    username: v.username ?? initial?.smtp_username ?? '',
+  };
+  const [provider, setProvider] = useState<Preset>(v.provider ? (v.provider as Preset) : presetFor(start.host));
+  const [host, setHost] = useState(start.host);
+  const [port, setPort] = useState(start.port);
+  const [security, setSecurity] = useState(start.security);
   const e = state.fieldErrors ?? {};
+
+  function choose(p: Preset) {
+    setProvider(p);
+    const preset = PRESETS[p];
+    if (preset) {
+      setHost(preset.host);
+      setPort(preset.port);
+      setSecurity(preset.security);
+    } else if (host === PRESETS.gmail.host || host === PRESETS.microsoft.host) setHost('');
+  }
+  // Port 465 means SSL/TLS and 587 means STARTTLS almost everywhere: follow the port unless the owner picks otherwise.
+  function changePort(value: string) {
+    setPort(value);
+    if (value.trim() === '465') setSecurity('ssl');
+    else if (value.trim() === '587') setSecurity('starttls');
+  }
+
   return (
-    <form action={action} className={styles.form} noValidate autoComplete="off">
-      <p className={styles.muted}>
-        Use the outgoing (SMTP) settings from your email host. Many hosts need an <strong>app password</strong> rather than your normal password. We email a code to the address to
-        prove it’s yours; the password is stored encrypted and never shown again.
-      </p>
-      <Status state={state.status === 'error' ? state : idle} />
+    <form
+      className={styles.form}
+      noValidate
+      autoComplete="off"
+      aria-label="SMTP connection"
+      onSubmit={(ev) => {
+        // Submitted by hand (not as a form action) so the form keeps what was typed — including
+        // the password — between "Test connection" and "Connect email". The password stays in
+        // this page; the server never sends it back.
+        ev.preventDefault();
+        const submitter = (ev.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+        const fd = new FormData(ev.currentTarget);
+        const which = submitter?.value === 'test' ? 'test' : 'connect';
+        fd.set('intent', which);
+        setIntent(which);
+        startTransition(() => action(fd));
+      }}
+    >
+      <Status state={state} />
+      <SelectField
+        name="provider"
+        label="Email provider"
+        value={provider}
+        onChange={(ev) => choose(ev.target.value as Preset)}
+        hint="Choosing Gmail or Outlook fills in their usual settings. You can change any of them."
+        options={[
+          { value: 'gmail', label: 'Gmail or Google Workspace' },
+          { value: 'microsoft', label: 'Outlook or Microsoft 365' },
+          { value: 'other', label: 'Other provider or my own domain' },
+        ]}
+      />
       <div className={styles.grid2}>
-        <TextField name="fromAddress" label="Send from (email address)" type="email" defaultValue={v.fromAddress} error={e.fromAddress} />
-        <TextField name="fromName" label="Sender name (optional)" defaultValue={v.fromName} error={e.fromName} />
+        <TextField name="fromAddress" label="Business email address" type="email" defaultValue={start.fromAddress} error={e.fromAddress} autoCapitalize="none" spellCheck={false} />
+        <TextField name="fromName" label="Sender name (optional)" placeholder="Your business name" defaultValue={start.fromName} error={e.fromName} />
       </div>
       <div className={styles.grid3}>
-        <TextField name="host" label="SMTP server" placeholder="smtp.yourdomain.com" defaultValue={v.host} error={e.host} autoCapitalize="none" spellCheck={false} />
-        <SelectField
-          name="port"
-          label="Port"
-          defaultValue={v.port ?? '587'}
-          error={e.port}
-          options={[
-            { value: '587', label: '587 (STARTTLS)' },
-            { value: '465', label: '465 (SSL)' },
-            { value: '2525', label: '2525' },
-          ]}
+        <TextField
+          name="host"
+          label="SMTP hostname"
+          placeholder="smtp.yourprovider.com"
+          value={host}
+          onChange={(ev) => setHost(ev.target.value)}
+          error={e.host}
+          autoCapitalize="none"
+          spellCheck={false}
+        />
+        <TextField name="port" label="SMTP port" inputMode="numeric" value={port} onChange={(ev) => changePort(ev.target.value)} error={e.port} hint="Usually 587 or 465" />
+      </div>
+      <SelectField
+        name="security"
+        label="Encryption"
+        value={security}
+        onChange={(ev) => setSecurity(ev.target.value)}
+        error={e.security}
+        hint="STARTTLS for port 587, SSL/TLS for port 465 — use what your provider lists."
+        options={[
+          { value: 'starttls', label: 'STARTTLS' },
+          { value: 'ssl', label: 'SSL/TLS' },
+        ]}
+      />
+      <div className={styles.grid2}>
+        <TextField name="username" label="SMTP username" hint="Usually your full email address" defaultValue={start.username} error={e.username} autoCapitalize="none" spellCheck={false} />
+        <TextField
+          name="password"
+          label="SMTP password or app password"
+          type="password"
+          error={e.password}
+          autoComplete="new-password"
+          hint={initial ? 'Enter it again — the saved one is never shown.' : 'Stored encrypted and never shown again.'}
         />
       </div>
-      <div className={styles.grid2}>
-        <TextField name="username" label="Username" defaultValue={v.username} error={e.username} autoCapitalize="none" spellCheck={false} />
-        <TextField name="password" label="Password or app password" type="password" error={e.password} autoComplete="new-password" />
-      </div>
+      <p className={styles.muted}>
+        We log in to your mail server to check these settings before anything is saved. For a new address we then email a 6-digit code to it, to make sure it’s yours.
+      </p>
       <div className={styles.buttons}>
-        <SubmitButton pendingLabel="Checking…">Connect and send code</SubmitButton>
+        <Button type="submit" name="intent" value="test" variant="secondary" disabled={pending}>
+          {pending && intent === 'test' ? 'Testing…' : 'Test connection'}
+        </Button>
+        <Button type="submit" name="intent" value="connect" variant="primary" disabled={pending}>
+          {pending && intent === 'connect' ? 'Connecting…' : 'Connect email'}
+        </Button>
       </div>
     </form>
   );
@@ -187,7 +298,7 @@ function CodeForm({ address }: { address: string }) {
   const [resent, resend, resending] = useActionState(resendCode, idle);
   return (
     <form action={action} className={styles.form}>
-      <p>Enter the 6-digit code we emailed to {address}.</p>
+      <p>Last step: enter the 6-digit code we emailed to {address}. It proves the address is yours. Automatic emails start once it’s verified.</p>
       <Status state={state.status === 'error' && !state.fieldErrors ? state : idle} />
       <Status state={resent} />
       <div className={styles.codeRow}>

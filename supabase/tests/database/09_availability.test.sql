@@ -2,12 +2,25 @@
 -- (DST), booking mode prerequisites, and how the public time check honours all of it.
 begin;
 \ir _helpers.psql
-select plan(55);
+select plan(56);
 
 select pg_temp.make_business('hours-a@example.com', 'hours-a', 'shop', 2) as a \gset
 select pg_temp.make_business('hours-b@example.com', 'hours-b', 'mobile') as b \gset
 select pg_temp.owner_of(:'a') as owner_a \gset
 select pg_temp.owner_of(:'b') as owner_b \gset
+
+-- Booking checks refuse past times ("too soon"), so every date the public time check sees is
+-- computed from today, in the business time zone (America/Chicago): a Monday 8–14 days ahead and
+-- the days after it. Storage-only tests below keep their fixed historical dates (no clock involved).
+create temp table anchor (name text primary key, day date not null);
+insert into anchor
+select v.name, m.day + v.plus
+  from (select (now() at time zone 'America/Chicago')::date + n as day from generate_series(8, 14) n) m,
+       (values ('mon', 0), ('tue', 1), ('wed', 2), ('thu', 3), ('sun', 6), ('mon2', 7)) v (name, plus)
+ where extract(dow from m.day) = 1;
+create function pg_temp.d(p_name text, p_time time) returns timestamptz language sql stable as $$
+  select (a.day + p_time) at time zone 'America/Chicago' from anchor a where a.name = p_name $$;
+select day::text as mon2 from anchor where name = 'mon2' \gset
 
 -- ---- Weekly hours ------------------------------------------------------------------------
 -- Monday 08:00–12:00 and 13:00–17:00 (lunch break), Saturday 09:00–14:00; touching windows OK.
@@ -64,7 +77,7 @@ select public.add_time_off('2026-03-08', '2026-03-08', null, null, 'Spring forwa
 select public.add_time_off('2026-12-24', '2026-12-26', null, null, 'Holidays') as off_hol \gset
 select public.add_time_off('2026-03-08', '2026-03-08', '01:30', '03:30', 'Across the gap') as off_gap \gset
 select public.add_time_off('2026-11-10', '2026-11-10', '12:00', '13:30', 'Dentist') as off_dentist \gset
-select public.add_time_off('2026-11-16', '2026-11-16', '09:00', '11:00', 'Supplier visit') as off_supplier \gset
+select public.add_time_off(:'mon2', :'mon2', '09:00', '11:00', 'Supplier visit') as off_supplier \gset
 reset role;
 select is((select upper(during) - lower(during) from public.time_off where id = :'off_fall'), interval '25 hours', 'all-day Nov 1 (fall back) is 25 hours long');
 select is((select lower(during) from public.time_off where id = :'off_fall'), '2026-11-01 05:00+00'::timestamptz, 'Nov 1 starts at local midnight (CDT, 05:00 UTC)');
@@ -87,19 +100,19 @@ reset role;
 select is((select count(*)::int from public.time_off where id = :'off_dentist'), 1, 'B cannot delete A''s blocked time');
 
 -- ---- The public time check honours hours, breaks, blocked time and capacity ----------------
--- Business A: Monday 08–12 and 13–17 (Chicago). Mon 2026-11-09 and Tue 2026-11-10.
-select lives_ok(format($$select app.check_public_time(b, '2026-11-09 08:00 America/Chicago', '2026-11-09 10:00 America/Chicago') from public.businesses b where id = %L$$, :'a'),
+-- Business A: Monday 08–12 and 13–17 (Chicago). A Monday and Tuesday 8–14 days ahead.
+select lives_ok(format($$select app.check_public_time(b, pg_temp.d('mon', '08:00'), pg_temp.d('mon', '10:00')) from public.businesses b where id = %L$$, :'a'),
   'a job inside the morning window is allowed');
-select throws_ok(format($$select app.check_public_time(b, '2026-11-09 11:00 America/Chicago', '2026-11-09 13:30 America/Chicago') from public.businesses b where id = %L$$, :'a'),
+select throws_ok(format($$select app.check_public_time(b, pg_temp.d('mon', '11:00'), pg_temp.d('mon', '13:30')) from public.businesses b where id = %L$$, :'a'),
   'DH004', 'time_unavailable', 'a job running into the lunch break is rejected');
-select lives_ok(format($$select app.check_public_time(b, '2026-11-09 13:00 America/Chicago', '2026-11-09 17:00 America/Chicago') from public.businesses b where id = %L$$, :'a'),
+select lives_ok(format($$select app.check_public_time(b, pg_temp.d('mon', '13:00'), pg_temp.d('mon', '17:00')) from public.businesses b where id = %L$$, :'a'),
   'a job filling the afternoon window exactly is allowed');
-select throws_ok(format($$select app.check_public_time(b, '2026-11-10 09:00 America/Chicago', '2026-11-10 10:00 America/Chicago') from public.businesses b where id = %L$$, :'a'),
+select throws_ok(format($$select app.check_public_time(b, pg_temp.d('tue', '09:00'), pg_temp.d('tue', '10:00')) from public.businesses b where id = %L$$, :'a'),
   'DH004', 'time_unavailable', 'a day with no windows (Tuesday) is closed');
--- Monday 2026-11-16 is a working day with 09:00–11:00 blocked.
-select throws_ok(format($$select app.check_public_time(b, '2026-11-16 08:00 America/Chicago', '2026-11-16 10:00 America/Chicago') from public.businesses b where id = %L$$, :'a'),
+-- The following Monday is a working day with 09:00–11:00 blocked.
+select throws_ok(format($$select app.check_public_time(b, pg_temp.d('mon2', '08:00'), pg_temp.d('mon2', '10:00')) from public.businesses b where id = %L$$, :'a'),
   'DH004', 'time_unavailable', 'a job overlapping a blocked period on a working day is rejected');
-select lives_ok(format($$select app.check_public_time(b, '2026-11-16 14:00 America/Chicago', '2026-11-16 16:00 America/Chicago') from public.businesses b where id = %L$$, :'a'),
+select lives_ok(format($$select app.check_public_time(b, pg_temp.d('mon2', '14:00'), pg_temp.d('mon2', '16:00')) from public.businesses b where id = %L$$, :'a'),
   'the rest of that working day stays bookable');
 
 -- ---- Every booking rule, enforced by the public time check (detail says which) --------------
@@ -126,57 +139,77 @@ select public.save_weekly_hours('[{"weekday":0,"start":"00:00","end":"04:00"},{"
 update public.booking_settings set slot_interval_min = 60, buffer_min = 30, max_jobs_per_day = null where business_id = :'c';
 reset role;
 
--- DST: working hours use the real local end time. Sun 2026-11-01 (fall back, 25 h day):
--- 00:00 CDT + 5 h real time ends 04:00 CST (fits exactly). Sun 2027-03-14 (spring forward, 23 h):
+-- DST: working hours use the real local end time, checked on the next real clock changes in
+-- Chicago (found from the time-zone rules, so never in the past). Fall back (25 h day):
+-- 00:00 CDT + 5 h real time ends 04:00 CST (fits exactly). Spring forward (23 h day):
 -- 01:00 + 3 h real time ends 05:00 CDT (outside 00–04); 01:00 + 2 h ends 04:00 CDT (fits).
-select is(pg_temp.why(:'c', '2026-11-01 00:00 America/Chicago', 270), 'ok', 'fall back: 4h30 from midnight ends 3:30 AM CST → inside the window');
-select is(pg_temp.why(:'c', '2026-11-01 00:00 America/Chicago', 300), 'ok', 'fall back: 5 h from midnight ends exactly 4:00 AM CST → fits (local start + 5 h would wrongly say 5:00)');
-select is(pg_temp.why(:'c', '2026-11-01 00:00 America/Chicago', 315), 'outside working hours', 'fall back: 5h15 ends 4:15 AM CST → outside');
-select is(pg_temp.why(:'c', '2027-03-14 01:00 America/Chicago', 180), 'outside working hours', 'spring forward: 3 h from 1:00 AM ends 5:00 AM CDT → outside 00–04');
-select is(pg_temp.why(:'c', '2027-03-14 01:00 America/Chicago', 120), 'ok', 'spring forward: 2 h from 1:00 AM ends 4:00 AM CDT → fits exactly');
+-- Business D works only Sunday 00:00–04:00. The next clock change can be up to 371 days away
+-- (e.g. in the week after one), past the 365-day booking horizon a business may choose; so, in
+-- this rolled-back test only, D's horizon is lifted to 400 days and the 1–365 rule is restored
+-- (and re-validated) right after these checks.
+select pg_temp.make_business('hours-d@example.com', 'hours-d', 'shop', 2) as dst \gset
+select pg_temp.owner_of(:'dst') as owner_dst \gset
+select pg_temp.as_user(:'owner_dst');
+select public.save_weekly_hours('[{"weekday":0,"start":"00:00","end":"04:00"}]');
+update public.booking_settings set slot_interval_min = 60, buffer_min = 30, max_jobs_per_day = null where business_id = :'dst';
+reset role;
+alter table public.booking_settings drop constraint booking_settings_horizon_days_check;
+update public.booking_settings set horizon_days = 400 where business_id = :'dst';
+create function pg_temp.next_dst(p_hours integer) returns text language sql stable as $$
+  select min(d)::text from (select (now() at time zone 'America/Chicago')::date + n as d from generate_series(1, 380) n) x
+   where ((d + 1)::timestamp at time zone 'America/Chicago') - (d::timestamp at time zone 'America/Chicago') = make_interval(hours => p_hours) $$;
+select pg_temp.next_dst(25) as fall, pg_temp.next_dst(23) as spring \gset
+select ok(extract(dow from :'fall'::date) = 0 and extract(dow from :'spring'::date) = 0, 'the next fall-back and spring-forward days are Sundays (found from the time-zone rules)');
+select is(pg_temp.why(:'dst', (:'fall'::date + time '00:00') at time zone 'America/Chicago', 270), 'ok', 'fall back: 4h30 from midnight ends 3:30 AM CST → inside the window');
+select is(pg_temp.why(:'dst', (:'fall'::date + time '00:00') at time zone 'America/Chicago', 300), 'ok', 'fall back: 5 h from midnight ends exactly 4:00 AM CST → fits (local start + 5 h would wrongly say 5:00)');
+select is(pg_temp.why(:'dst', (:'fall'::date + time '00:00') at time zone 'America/Chicago', 315), 'outside working hours', 'fall back: 5h15 ends 4:15 AM CST → outside');
+select is(pg_temp.why(:'dst', (:'spring'::date + time '01:00') at time zone 'America/Chicago', 180), 'outside working hours', 'spring forward: 3 h from 1:00 AM ends 5:00 AM CDT → outside 00–04');
+select is(pg_temp.why(:'dst', (:'spring'::date + time '01:00') at time zone 'America/Chicago', 120), 'ok', 'spring forward: 2 h from 1:00 AM ends 4:00 AM CDT → fits exactly');
+update public.booking_settings set horizon_days = 365 where business_id = :'dst';
+alter table public.booking_settings add constraint booking_settings_horizon_days_check check (horizon_days >= 1 and horizon_days <= 365);
 -- A window ending at midnight takes a job that ends at midnight; one minute past is a new day.
-select is(pg_temp.why(:'c', '2026-11-15 22:00 America/Chicago', 120), 'ok', 'a job may end at midnight in a window ending 24:00');
-select is(pg_temp.why(:'c', '2026-11-15 23:00 America/Chicago', 120), 'spans more than one day', 'a job past midnight is refused');
+select is(pg_temp.why(:'c', pg_temp.d('sun', '22:00'), 120), 'ok', 'a job may end at midnight in a window ending 24:00');
+select is(pg_temp.why(:'c', pg_temp.d('sun', '23:00'), 120), 'spans more than one day', 'a job past midnight is refused');
 
 -- Start times line up with the interval, counted from the window start.
-select is(pg_temp.why(:'c', '2026-11-09 08:30 America/Chicago', 60), 'not an offered start time', 'hourly slots: 8:30 is not offered');
+select is(pg_temp.why(:'c', pg_temp.d('mon', '08:30'), 60), 'not an offered start time', 'hourly slots: 8:30 is not offered');
 update public.booking_settings set slot_interval_min = 30 where business_id = :'c';
-select is(pg_temp.why(:'c', '2026-11-09 08:30 America/Chicago', 60), 'ok', 'half-hour slots: 8:30 is offered');
+select is(pg_temp.why(:'c', pg_temp.d('mon', '08:30'), 60), 'ok', 'half-hour slots: 8:30 is offered');
 
--- Capacity 2 + buffer 30: two confirmed jobs 09:00–11:00 on Tue 2026-11-10.
-select pg_temp.make_request(:'c', '2026-11-10 09:00 America/Chicago', 120, '+15125550201') as r1 \gset
-select pg_temp.make_request(:'c', '2026-11-10 09:00 America/Chicago', 120, '+15125550202') as r2 \gset
+-- Capacity 2 + buffer 30: two confirmed jobs 09:00–11:00 on the Tuesday.
+select pg_temp.make_request(:'c', pg_temp.d('tue', '09:00'), 120, '+15125550201') as r1 \gset
+select pg_temp.make_request(:'c', pg_temp.d('tue', '09:00'), 120, '+15125550202') as r2 \gset
 select pg_temp.as_user(:'owner_c');
 select public.approve_request(:'r1');
 reset role;
-select is(pg_temp.why(:'c', '2026-11-10 10:00 America/Chicago', 60), 'ok', 'capacity 2: one confirmed job leaves room for a second');
+select is(pg_temp.why(:'c', pg_temp.d('tue', '10:00'), 60), 'ok', 'capacity 2: one confirmed job leaves room for a second');
 select pg_temp.as_user(:'owner_c');
 select public.approve_request(:'r2');
 reset role;
-select is(pg_temp.why(:'c', '2026-11-10 10:00 America/Chicago', 60), 'fully booked', 'capacity 2: two confirmed jobs → full');
-select is(pg_temp.why(:'c', '2026-11-10 11:00 America/Chicago', 60), 'fully booked', 'buffer: 11:00 is inside the 30-minute buffer after both jobs');
-select is(pg_temp.why(:'c', '2026-11-10 11:30 America/Chicago', 60), 'ok', 'buffer: 11:30 is free');
-select is(pg_temp.why(:'c', '2026-11-10 07:30 America/Chicago', 60), 'outside working hours', 'buffer does not open hours before the window');
+select is(pg_temp.why(:'c', pg_temp.d('tue', '10:00'), 60), 'fully booked', 'capacity 2: two confirmed jobs → full');
+select is(pg_temp.why(:'c', pg_temp.d('tue', '11:00'), 60), 'fully booked', 'buffer: 11:00 is inside the 30-minute buffer after both jobs');
+select is(pg_temp.why(:'c', pg_temp.d('tue', '11:30'), 60), 'ok', 'buffer: 11:30 is free');
+select is(pg_temp.why(:'c', pg_temp.d('tue', '07:30'), 60), 'outside working hours', 'buffer does not open hours before the window');
 update public.booking_settings set buffer_min = 0 where business_id = :'c';
-select is(pg_temp.why(:'c', '2026-11-10 11:00 America/Chicago', 60), 'ok', 'no buffer: back-to-back at 11:00 is allowed');
+select is(pg_temp.why(:'c', pg_temp.d('tue', '11:00'), 60), 'ok', 'no buffer: back-to-back at 11:00 is allowed');
 update public.booking_settings set buffer_min = 30 where business_id = :'c';
 
 -- Pending requests don't consume capacity (D-32): three pending at 14:00 leave 14:00 open.
-select pg_temp.make_request(:'c', '2026-11-10 14:00 America/Chicago', 120, '+1512555020' || n) from generate_series(3, 5) n;
-select is(pg_temp.why(:'c', '2026-11-10 14:00 America/Chicago', 60), 'ok', 'pending requests do not take capacity');
+select pg_temp.make_request(:'c', pg_temp.d('tue', '14:00'), 120, '+1512555020' || n) from generate_series(3, 5) n;
+select is(pg_temp.why(:'c', pg_temp.d('tue', '14:00'), 60), 'ok', 'pending requests do not take capacity');
 
 -- Daily cap counts confirmed jobs (and valid holds) starting that local day.
 update public.booking_settings set max_jobs_per_day = 2 where business_id = :'c';
-select is(pg_temp.why(:'c', '2026-11-10 15:00 America/Chicago', 60), 'daily limit reached', 'daily cap 2 with two confirmed jobs → no more that day');
-select is(pg_temp.why(:'c', '2026-11-11 09:00 America/Chicago', 60), 'ok', 'the next day is unaffected');
-select pg_temp.make_request(:'c', '2026-11-11 09:00 America/Chicago', 120, '+15125550206') as r6 \gset
+select is(pg_temp.why(:'c', pg_temp.d('tue', '15:00'), 60), 'daily limit reached', 'daily cap 2 with two confirmed jobs → no more that day');
+select is(pg_temp.why(:'c', pg_temp.d('wed', '09:00'), 60), 'ok', 'the next day is unaffected');
+select pg_temp.make_request(:'c', pg_temp.d('wed', '09:00'), 120, '+15125550206') as r6 \gset
 select pg_temp.as_user(:'owner_c');
 select public.place_hold(:'r6', 24);
 reset role;
 update public.booking_settings set max_jobs_per_day = 1 where business_id = :'c';
-select is(pg_temp.why(:'c', '2026-11-11 14:00 America/Chicago', 60), 'daily limit reached', 'a valid hold counts toward the daily cap');
-select pg_temp.make_request(:'c', '2026-11-12 09:00 America/Chicago', 120, '+15125550207');
-select is(pg_temp.why(:'c', '2026-11-12 14:00 America/Chicago', 60), 'ok', 'a pending request does not count toward the daily cap');
+select is(pg_temp.why(:'c', pg_temp.d('wed', '14:00'), 60), 'daily limit reached', 'a valid hold counts toward the daily cap');
+select pg_temp.make_request(:'c', pg_temp.d('thu', '09:00'), 120, '+15125550207');
+select is(pg_temp.why(:'c', pg_temp.d('thu', '14:00'), 60), 'ok', 'a pending request does not count toward the daily cap');
 
 -- ---- Booking mode --------------------------------------------------------------------------
 select is((select booking_mode::text from public.booking_settings where business_id = :'a'), 'approval', 'approval required is the default');

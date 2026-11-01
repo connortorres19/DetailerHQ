@@ -3,10 +3,12 @@ import { expect, test, type Page } from '@playwright/test';
 import { cleanup, db } from './support';
 import { asVisitor, bookableBusiness, fillDetails, pickFirstTime } from './support-booking';
 
-// Phase 7 email, end to end against the server's MOCK providers (EMAIL_TRANSPORT=mock, local only):
-// Google/Microsoft OAuth + Gmail/Graph sending are simulated by /api/dev/email-mock, SMTP goes to the
-// local dev mail sink (scripts/dev-mail-sink.mjs). No real provider is contacted — real-provider
-// testing needs real OAuth apps and accounts (see docs/PHASE7_EMAIL.md).
+// Phase 7 email, end to end against SIMULATED providers (local only): SMTP goes to the local dev mail
+// sink (scripts/dev-mail-sink.mjs, plain SMTP on localhost:2525 — real TLS is covered by
+// tests/unit/smtp-tls.test.ts). No real provider is contacted.
+// SMTP is the connection method businesses see. The hidden Google/Microsoft OAuth backend is still
+// tested with its mock (/api/dev/email-mock) when the server runs with EMAIL_OAUTH_ENABLED=1 and
+// E2E_OAUTH=1 is set for the tests.
 
 test.afterAll(cleanup);
 
@@ -45,9 +47,34 @@ const runWorker = async () => {
 const outbox = async (businessId: string) =>
   (await db.query('select template, status, recipient, attempts, last_error from public.email_outbox where business_id = $1 order by created_at', [businessId])).rows;
 
+const OAUTH = Boolean(process.env.E2E_OAUTH);
+
+/** Fills the SMTP form (pointing at the local sink unless told otherwise) and presses a button. */
+async function fillSmtp(page: Page, o: { from: string; password: string; host?: string; port?: string; security?: 'STARTTLS' | 'SSL/TLS'; button?: 'Test connection' | 'Connect email' }) {
+  await page.getByLabel('Email provider').selectOption({ label: 'Other provider or my own domain' });
+  await page.getByLabel('Business email address').fill(o.from);
+  await page.getByLabel('SMTP hostname').fill(o.host ?? 'localhost');
+  await page.getByLabel('SMTP port').fill(o.port ?? '2525');
+  await page.getByLabel('Encryption').selectOption({ label: o.security ?? 'STARTTLS' });
+  await page.getByLabel('SMTP username').fill(o.from);
+  await page.getByLabel('SMTP password or app password').fill(o.password);
+  await page.getByRole('button', { name: o.button ?? 'Connect email' }).click();
+}
+
+/** Connects through SMTP and enters the emailed code. Private hosts are allowed only on this local test server. */
+async function connectSmtp(page: Page, from: string) {
+  await page.goto('/app/settings/notifications');
+  await fillSmtp(page, { from, password: 'app-password-123' });
+  await expect(page.getByText(/enter the 6-digit code we emailed to/i)).toBeVisible();
+  const code = (await mailTo(from, /Your DetailerHQ code/)).subject.match(/(\d{6})/)![1]!;
+  await page.getByLabel('Verification code').fill(code);
+  await page.getByRole('button', { name: 'Verify' }).click();
+  await expect(page.getByText(/Email connected and verified/)).toBeVisible();
+}
+
 async function connectOAuth(page: Page, provider: 'Gmail or Google Workspace' | 'Outlook or Microsoft 365', mailbox: string) {
   await page.goto('/app/settings/notifications');
-  await page.getByRole('link', { name: `Connect ${provider}` }).click();
+  await page.getByRole('link', { name: `Sign in with ${provider.startsWith('Gmail') ? 'Google' : 'Microsoft'} instead` }).click();
   await expect(page.getByRole('heading', { name: /Mock (Google|Microsoft) sign-in/ })).toBeVisible();
   await page.getByLabel('Mailbox').fill(mailbox);
   await page.getByRole('button', { name: 'Allow' }).click();
@@ -66,6 +93,9 @@ async function bookAsVisitor(visitor: Page, slug: string, email: string) {
   await visitor.getByRole('button', { name: 'Send request' }).click();
   await expect(visitor.getByText(/Request sent to/)).toBeVisible();
 }
+
+test.describe('hidden OAuth backend (EMAIL_OAUTH_ENABLED=1)', () => {
+test.skip(!OAUTH, 'OAuth sign-in is hidden; run with E2E_OAUTH=1 against a server with EMAIL_OAUTH_ENABLED=1');
 
 test('Gmail (mock OAuth): connect, verified by a test email, booking emails with working links, disconnect', async ({ page, browser }) => {
   test.setTimeout(150_000);
@@ -119,7 +149,7 @@ test('Gmail (mock OAuth): connect, verified by a test email, booking emails with
   if (appt.far) await expect(activity).toContainText('Appointment reminder');
 
   // Disconnect: asks first; credentials deleted; waiting emails cancelled; the reminder banner returns.
-  await page.getByRole('button', { name: 'Disconnect' }).click();
+  await page.getByRole('button', { name: 'Disconnect email' }).click();
   await page.getByRole('group', { name: 'Disconnect email' }).getByRole('button', { name: 'Disconnect' }).click();
   await expect(page.getByText(/Email disconnected/)).toBeVisible();
   expect((await db.query('select count(*)::int as n from public.email_connections where business_id = $1', [biz.businessId])).rows[0].n).toBe(0);
@@ -158,25 +188,18 @@ test('Outlook (mock OAuth): revoked access holds emails, the dashboard asks to r
   await mailTo(customer, /We received your booking request/);
 });
 
+});
+
 test('SMTP (own domain): wrong password refused, code verification, failures visible with retry, quote email + unsubscribe', async ({ page, browser }) => {
   test.setTimeout(300_000);
   const biz = await bookableBusiness(page, 'mailsmtp');
   const from = `hello-${tag()}@detailshop.example.com`;
   await page.goto('/app/settings/notifications');
-  await page.getByText('Use another email address').click();
-  const fillSmtp = async (password: string) => {
-    await page.getByLabel('Send from (email address)').fill(from);
-    await page.getByLabel('SMTP server').fill('localhost');
-    await page.getByLabel('Port').selectOption('2525');
-    await page.getByLabel('Username').fill(from);
-    await page.getByLabel('Password or app password').fill(password);
-    await page.getByRole('button', { name: 'Connect and send code' }).click();
-  };
   // Private network hosts are refused in production; this local test server allows them (EMAIL_ALLOW_PRIVATE_SMTP).
-  await fillSmtp('wrong-password');
-  await expect(page.getByText(/The mail server refused the login/)).toBeVisible();
-  await fillSmtp('app-password-123');
-  await expect(page.getByText(/Enter the 6-digit code we emailed to/)).toBeVisible();
+  await fillSmtp(page, { from, password: 'wrong-password' });
+  await expect(page.getByText(/refused the username or password/)).toBeVisible();
+  await fillSmtp(page, { from, password: 'app-password-123' });
+  await expect(page.getByText(/enter the 6-digit code we emailed to/i)).toBeVisible();
   const codeMail = await mailTo(from, /Your DetailerHQ code/);
   const code = codeMail.subject.match(/(\d{6})/)![1]!;
   await page.getByLabel('Verification code').fill(code === '000000' ? '111111' : '000000');
@@ -251,7 +274,7 @@ test('SMTP (own domain): wrong password refused, code verification, failures vis
 test('templates: edit with a live desktop/phone preview; the next email uses it; reset to default; preferences saved', async ({ page, browser }) => {
   test.setTimeout(120_000);
   const biz = await bookableBusiness(page, 'mailtpl');
-  await connectOAuth(page, 'Gmail or Google Workspace', `shop-${tag()}@gmail.example.com`);
+  await connectSmtp(page, `shop-${tag()}@detailshop.example.com`);
   await page.getByRole('link', { name: 'Edit Booking request received email' }).click();
   const subject = page.getByLabel('Subject');
   await subject.fill('Thanks {{customer_first_name}} — {{business_name}} got your request');
@@ -294,23 +317,65 @@ test('templates: edit with a live desktop/phone preview; the next email uses it;
   expect((await db.query('select prefs, summary_hour from public.email_owner_prefs where business_id = $1', [biz.businessId])).rows[0]).toMatchObject({ summary_hour: 6, prefs: { owner_new_request: false } });
 });
 
-test('isolation and OAuth safety: another business sees nothing; forged or replayed callbacks are refused', async ({ page, browser }) => {
+test('isolation: another business sees nothing of A’s email; credentials only work for their own business', async ({ page, browser }) => {
   test.setTimeout(120_000);
   const a = await bookableBusiness(page, 'mailisoA');
-  await connectOAuth(page, 'Gmail or Google Workspace', `a-${tag()}@gmail.example.com`);
+  const fromA = `a-${tag()}@detailshop.example.com`;
+  await connectSmtp(page, fromA);
   const pageB = await (await browser.newContext()).newPage();
   const b = await bookableBusiness(pageB, 'mailisoB', { name: 'Bravo Detailing' });
   await pageB.goto('/app/settings/notifications');
-  await expect(pageB.getByRole('link', { name: 'Connect Gmail or Google Workspace' })).toBeVisible(); // B has no connection
+  await expect(pageB.getByLabel('Business email address')).toHaveValue(''); // B has no connection
+  await expect(pageB.getByText(fromA)).toHaveCount(0);
   await expect(pageB.getByRole('list', { name: 'Email activity' })).toHaveCount(0);
   expect((await db.query('select count(*)::int as n from public.email_outbox where business_id = $1', [b.businessId])).rows[0].n).toBe(0);
+  // The worker route needs the secret.
+  expect((await fetch('http://localhost:3000/api/email/worker', { method: 'POST' })).status).toBe(404);
+  // Credentials are bound to their business: A's encrypted password copied into B's row can't be used.
+  await db.query(
+    `insert into public.email_connections (business_id, provider, from_address, secret, status, verified_at, smtp_host, smtp_port, smtp_username, smtp_security)
+     select $2, provider, 'stolen@detailshop.example.com', secret, 'verified', now(), smtp_host, smtp_port, smtp_username, smtp_security
+       from public.email_connections where business_id = $1`, [a.businessId, b.businessId]);
+  const { rows: [{ email: ownerB }] } = await db.query('select u.email from auth.users u join public.memberships m on m.user_id = u.id where m.business_id = $1', [b.businessId]);
+  await db.query(`insert into public.email_outbox (business_id, template, category, recipient, idempotency_key) values ($1, 'connection_test', 'system', $2, $3)`, [b.businessId, ownerB, `stolen-${b.businessId}`]);
+  await runWorker();
+  const { rows: [stolen] } = await db.query('select status, last_error from public.email_outbox where idempotency_key = $1', [`stolen-${b.businessId}`]);
+  expect(stolen).toMatchObject({ status: 'failed', last_error: expect.stringMatching(/couldn’t be read/) });
+  expect(await mailsTo(ownerB)).toHaveLength(0);
+  // B's "Test connection" with the stolen row can't read A's password either.
+  await pageB.goto('/app/settings/notifications');
+  await pageB.getByRole('button', { name: 'Test connection' }).click();
+  await expect(pageB.getByText(/saved password can’t be read/)).toBeVisible();
+});
 
+test('OAuth sign-in is hidden: no Google/Microsoft buttons; its start and callback routes refuse', async ({ page }) => {
+  test.skip(OAUTH, 'this server has EMAIL_OAUTH_ENABLED=1');
+  const biz = await bookableBusiness(page, 'mailnooauth');
+  await page.goto('/app/settings/notifications');
+  await expect(page.getByLabel('SMTP hostname')).toBeVisible();
+  await expect(page.getByRole('link', { name: /Connect Gmail|Connect Outlook|Sign in with/ })).toHaveCount(0);
+  for (const p of ['google', 'microsoft']) {
+    await page.goto(`/app/settings/notifications/connect/${p}`);
+    expect(new URL(page.url()).searchParams.get('email')).toBe('not_configured');
+    await expect(page.getByText(/Connect your email with its SMTP settings below/)).toBeVisible();
+    await page.goto(`/app/settings/notifications/callback/${p}?code=x&state=y`);
+    expect(new URL(page.url()).searchParams.get('email')).toBe('invalid_state');
+  }
+  expect((await db.query('select count(*)::int as n from public.email_connections where business_id = $1', [biz.businessId])).rows[0].n).toBe(0);
+});
+
+test('OAuth safety (hidden backend): forged or replayed callbacks are refused; denying connects nothing', async ({ page, browser }) => {
+  test.skip(!OAUTH, 'OAuth sign-in is hidden; run with E2E_OAUTH=1 against a server with EMAIL_OAUTH_ENABLED=1');
+  test.setTimeout(120_000);
+  await bookableBusiness(page, 'mailoauthA');
+  await connectOAuth(page, 'Gmail or Google Workspace', `a-${tag()}@gmail.example.com`);
+  const pageB = await (await browser.newContext()).newPage();
+  const b = await bookableBusiness(pageB, 'mailoauthB', { name: 'Bravo Detailing' });
   // A callback without the signed cookie (or with a different state) is refused.
   expect(new URL((await pageB.goto('/app/settings/notifications/callback/google?code=x&state=forged'))!.url()).searchParams.get('email')).toBe('invalid_state');
   await expect(pageB.getByText(/sign-in link expired or didn’t match/)).toBeVisible();
-  // Starting a flow in B, then replaying A's state, is refused too.
-  await pageB.goto('/app/settings/notifications');
-  await pageB.getByRole('link', { name: 'Connect Gmail or Google Workspace' }).click();
+  // Starting a flow in B, then replaying a changed state, is refused too.
+  await pageB.goto('/app/settings/notifications/connect/google');
   const consentUrl = new URL(pageB.url());
   await pageB.goto(`/app/settings/notifications/callback/google?code=stolen&state=${consentUrl.searchParams.get('state')}x`);
   await expect(pageB.getByText(/sign-in link expired or didn’t match/)).toBeVisible();
@@ -319,18 +384,115 @@ test('isolation and OAuth safety: another business sees nothing; forged or repla
   await pageB.getByRole('button', { name: 'Deny' }).click();
   await expect(pageB.getByText('Access wasn’t granted, so nothing was connected.')).toBeVisible();
   expect((await db.query('select count(*)::int as n from public.email_connections where business_id = $1', [b.businessId])).rows[0].n).toBe(0);
-  // The worker route needs the secret.
-  expect((await fetch('http://localhost:3000/api/email/worker', { method: 'POST' })).status).toBe(404);
-  // Credentials are bound to their business: A's encrypted token copied into B's row can't be used.
-  await db.query(
-    `insert into public.email_connections (business_id, provider, from_address, secret, status, verified_at)
-     select $2, provider, 'stolen@gmail.example.com', secret, 'verified', now() from public.email_connections where business_id = $1`, [a.businessId, b.businessId]);
-  const { rows: [{ email: ownerB }] } = await db.query('select u.email from auth.users u join public.memberships m on m.user_id = u.id where m.business_id = $1', [b.businessId]);
-  await db.query(`insert into public.email_outbox (business_id, template, category, recipient, idempotency_key) values ($1, 'connection_test', 'system', $2, $3)`, [b.businessId, ownerB, `stolen-${b.businessId}`]);
-  await runWorker();
-  const { rows: [stolen] } = await db.query('select status, last_error from public.email_outbox where idempotency_key = $1', [`stolen-${b.businessId}`]);
-  expect(stolen).toMatchObject({ status: 'failed', last_error: expect.stringMatching(/couldn’t be read/) });
-  expect(await mailsTo(ownerB)).toHaveLength(0);
+});
+
+test('connection guide: the intro, provider steps that open and close, and the official help links', async ({ page }) => {
+  await bookableBusiness(page, 'mailhelp');
+  await page.goto('/app/settings/notifications');
+  await expect(page.getByRole('heading', { name: 'How to Connect Your Business Email' })).toBeVisible();
+  await expect(page.getByText('Connect the email address you already use for your detailing business. DetailerHQ will use this account to automatically send booking confirmations, appointment reminders, quote emails, and other customer notifications.')).toBeVisible();
+  await expect(page.getByText('You’ll need your email provider’s SMTP settings and an app password or approved SMTP credential. Your normal email password may not work.')).toBeVisible();
+  const gmail = page.locator('details', { has: page.getByText('Gmail or Google Workspace', { exact: true }) });
+  await expect(gmail.getByText('smtp.gmail.com')).toBeHidden();
+  await gmail.getByText('Gmail or Google Workspace', { exact: true }).click();
+  await expect(gmail.getByText('smtp.gmail.com')).toBeVisible();
+  await expect(gmail.getByText(/Enable|Turn on 2-Step Verification/)).toBeVisible();
+  await expect(gmail.getByRole('link', { name: /Google’s guide to app passwords/ })).toHaveAttribute('href', 'https://support.google.com/accounts/answer/185833');
+  await gmail.getByText('Gmail or Google Workspace', { exact: true }).click();
+  await expect(gmail.getByText('smtp.gmail.com')).toBeHidden();
+  const ms = page.locator('details', { has: page.getByText('Outlook or Microsoft 365', { exact: true }) });
+  await ms.getByText('Outlook or Microsoft 365', { exact: true }).click();
+  await expect(ms.getByText(/SMTP AUTH/).first()).toBeVisible();
+  await expect(ms.getByRole('link', { name: /Microsoft’s guide/ })).toHaveAttribute('href', 'https://learn.microsoft.com/en-us/exchange/clients-and-mobile-in-exchange-online/authenticated-client-smtp-submission');
+  const own = page.locator('details', { has: page.getByText('Your own domain or another provider', { exact: true }) });
+  await own.getByText('Your own domain or another provider', { exact: true }).click();
+  await expect(own.getByText(/Search its help pages for “SMTP settings”/)).toBeVisible();
+  // Choosing a provider fills in its usual settings.
+  await page.getByLabel('Email provider').selectOption({ label: 'Gmail or Google Workspace' });
+  await expect(page.getByLabel('SMTP hostname')).toHaveValue('smtp.gmail.com');
+  await expect(page.getByLabel('SMTP port')).toHaveValue('587');
+  await expect(page.getByLabel('Encryption')).toHaveValue('starttls');
+  await page.getByLabel('Email provider').selectOption({ label: 'Outlook or Microsoft 365' });
+  await expect(page.getByLabel('SMTP hostname')).toHaveValue('smtp.office365.com');
+  await page.getByLabel('SMTP port').fill('465');
+  await expect(page.getByLabel('Encryption')).toHaveValue('ssl'); // follows the port
+});
+
+test('SMTP settings: validation, Test connection, Connect email, last successful connection, replacing the password, disconnect', async ({ page }) => {
+  test.setTimeout(180_000);
+  const biz = await bookableBusiness(page, 'mailcfg');
+  const from = `office-${tag()}@detailshop.example.com`;
+  await page.goto('/app/settings/notifications');
+  const conns = async () => (await db.query('select status, smtp_security, last_checked_at, verified_at, secret from public.email_connections where business_id = $1', [biz.businessId])).rows;
+
+  // Validation before anything is contacted or saved.
+  await page.getByRole('button', { name: 'Connect email' }).click();
+  await expect(page.getByText('Enter the email address customers will get emails from.')).toBeVisible();
+  await expect(page.getByText('Enter the app password or SMTP password.')).toBeVisible();
+  await fillSmtp(page, { from, password: 'app-password-123', port: '25', button: 'Test connection' });
+  await expect(page.getByText(/Use port 587 \(STARTTLS\), 465 \(SSL\/TLS\) or 2525/)).toBeVisible();
+  await fillSmtp(page, { from, password: 'app-password-123', host: 'smtp.does-not-exist.invalid', port: '587', button: 'Test connection' });
+  await expect(page.getByText(/couldn’t find smtp\.does-not-exist\.invalid/).first()).toBeVisible();
+  // Wrong encryption for the server: a plain-language hint (the sink speaks plain SMTP, not SSL/TLS).
+  await fillSmtp(page, { from, password: 'app-password-123', security: 'SSL/TLS', button: 'Test connection' });
+  await expect(page.getByText(/didn’t accept an SSL\/TLS connection\. Try STARTTLS/)).toBeVisible();
+  // Wrong password.
+  await fillSmtp(page, { from, password: 'wrong-password', button: 'Test connection' });
+  await expect(page.getByText(/refused the username or password/)).toBeVisible();
+  // Test connection works — and saves nothing; the typed password stays in the form for Connect.
+  await fillSmtp(page, { from, password: 'app-password-123', button: 'Test connection' });
+  await expect(page.getByText(/Connection works: localhost accepted the login \(STARTTLS, port 2525\)\. Nothing is saved yet/)).toBeVisible();
+  expect(await conns()).toHaveLength(0);
+  await expect(page.getByLabel('SMTP password or app password')).toHaveValue('app-password-123');
+  // Nothing in the page ever contains a saved password.
+  await page.getByRole('button', { name: 'Connect email' }).click();
+  await expect(page.getByText(/enter the 6-digit code we emailed to/i)).toBeVisible();
+  expect((await conns())[0]).toMatchObject({ status: 'pending', smtp_security: 'starttls' });
+  const code = (await mailTo(from, /Your DetailerHQ code/)).subject.match(/(\d{6})/)![1]!;
+  await page.getByLabel('Verification code').fill(code);
+  await page.getByRole('button', { name: 'Verify' }).click();
+  await expect(page.getByText(/Email connected and verified/)).toBeVisible();
+  await expect(page.getByText('Connected', { exact: true })).toBeVisible();
+  await expect(page.getByText('localhost, port 2525, STARTTLS')).toBeVisible();
+  await expect(page.locator('dt', { hasText: 'Last successful connection' }).locator('+ dd')).not.toHaveText('Not yet');
+  expect(await page.content()).not.toContain('app-password-123');
+
+  // Test connection with the saved (encrypted) password.
+  const before = (await conns())[0].last_checked_at as Date;
+  await page.getByRole('button', { name: 'Test connection' }).click();
+  await expect(page.getByText('Connection works: localhost accepted the login.')).toBeVisible();
+  expect(((await conns())[0].last_checked_at as Date).getTime()).toBeGreaterThan(before.getTime());
+
+  // The password stops working (changed at the provider): the next email is held, the page says so.
+  await db.query("select email_api.connection_failed($1, 'The mail server refused the username or password.')", [biz.businessId]);
+  await page.reload();
+  await expect(page.getByText('Needs attention', { exact: true })).toBeVisible();
+
+  // Replace the password: a wrong one is refused and changes nothing; the right one reconnects at once (same address, no new code).
+  const oldSecret = (await conns())[0].secret as Buffer;
+  await page.getByRole('button', { name: 'Update password or settings' }).click();
+  await expect(page.getByLabel('Business email address')).toHaveValue(from);
+  await expect(page.getByLabel('SMTP hostname')).toHaveValue('localhost');
+  await expect(page.getByLabel('SMTP password or app password')).toHaveValue(''); // never sent back to the browser
+  await page.getByLabel('SMTP password or app password').fill('wrong-password');
+  await page.getByRole('button', { name: 'Connect email' }).click();
+  await expect(page.getByText(/refused the username or password/).first()).toBeVisible();
+  expect(((await conns())[0].secret as Buffer).equals(oldSecret)).toBe(true);
+  await page.getByLabel('SMTP password or app password').fill('new-app-password-456');
+  await page.getByRole('button', { name: 'Connect email' }).click();
+  await expect(page.getByText(/New email settings saved — the connection works/)).toBeVisible();
+  await expect(page.getByText('Connected', { exact: true })).toBeVisible();
+  const after = (await conns())[0];
+  expect(after.status).toBe('verified');
+  expect((after.secret as Buffer).equals(oldSecret)).toBe(false);
+  expect(after.secret.toString('latin1')).not.toContain('new-app-password-456');
+
+  // Disconnect: asks first; the saved password is deleted.
+  await page.getByRole('button', { name: 'Disconnect email' }).click();
+  await page.getByRole('group', { name: 'Disconnect email' }).getByRole('button', { name: 'Disconnect' }).click();
+  await expect(page.getByText(/Email disconnected/)).toBeVisible();
+  expect(await conns()).toHaveLength(0);
+  await expect(page.getByLabel('SMTP hostname')).toBeVisible();
 });
 
 for (const [width, height] of [[390, 844], [1280, 900]] as const) {
@@ -338,7 +500,9 @@ for (const [width, height] of [[390, 844], [1280, 900]] as const) {
     test.setTimeout(120_000);
     await page.setViewportSize({ width, height });
     const biz = await bookableBusiness(page, `mail${width}`);
-    await connectOAuth(page, 'Gmail or Google Workspace', `shop-${tag()}@gmail.example.com`);
+    await connectSmtp(page, `shop-${tag()}@detailshop.example.com`);
+    await page.getByRole('button', { name: 'Send test email' }).click();
+    await expect(page.getByText(/Test email sent to/)).toBeVisible();
     for (const path of ['/app/settings/notifications', '/app/settings/notifications/templates/booking_confirmed', '/app/settings/notifications/activity']) {
       await page.goto(path);
       expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), path).toBe(0);

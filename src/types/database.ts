@@ -329,14 +329,14 @@ isOneToOne: false
                   ]
                 },"email_connections": {
                   Row: {
-                    "business_id": string,"connected_by": string | null,"created_at": string,"from_address": string,"from_name": string | null,"last_error": string | null,"last_error_at": string | null,"last_sent_at": string | null,"provider": Database["public"]['Enums']["email_provider"],"secret": string,"smtp_host": string | null,"smtp_port": number | null,"smtp_username": string | null,"status": Database["public"]['Enums']["email_connection_status"],"updated_at": string,"verification_attempts": number,"verification_expires_at": string | null,"verification_hash": string | null,"verified_at": string | null
+                    "business_id": string,"connected_by": string | null,"created_at": string,"from_address": string,"from_name": string | null,"last_checked_at": string | null,"last_error": string | null,"last_error_at": string | null,"last_sent_at": string | null,"provider": Database["public"]['Enums']["email_provider"],"secret": string,"smtp_host": string | null,"smtp_port": number | null,"smtp_security": string | null,"smtp_username": string | null,"status": Database["public"]['Enums']["email_connection_status"],"updated_at": string,"verification_attempts": number,"verification_expires_at": string | null,"verification_hash": string | null,"verified_at": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "business_id": string,"connected_by"?: string | null,"created_at"?: string,"from_address": string,"from_name"?: string | null,"last_error"?: string | null,"last_error_at"?: string | null,"last_sent_at"?: string | null,"provider": Database["public"]['Enums']["email_provider"],"secret": string,"smtp_host"?: string | null,"smtp_port"?: number | null,"smtp_username"?: string | null,"status"?: Database["public"]['Enums']["email_connection_status"],"updated_at"?: string,"verification_attempts"?: number,"verification_expires_at"?: string | null,"verification_hash"?: string | null,"verified_at"?: string | null
+                    "business_id": string,"connected_by"?: string | null,"created_at"?: string,"from_address": string,"from_name"?: string | null,"last_checked_at"?: string | null,"last_error"?: string | null,"last_error_at"?: string | null,"last_sent_at"?: string | null,"provider": Database["public"]['Enums']["email_provider"],"secret": string,"smtp_host"?: string | null,"smtp_port"?: number | null,"smtp_security"?: string | null,"smtp_username"?: string | null,"status"?: Database["public"]['Enums']["email_connection_status"],"updated_at"?: string,"verification_attempts"?: number,"verification_expires_at"?: string | null,"verification_hash"?: string | null,"verified_at"?: string | null
                   }
                   Update: {
-                    "business_id"?: string,"connected_by"?: string | null,"created_at"?: string,"from_address"?: string,"from_name"?: string | null,"last_error"?: string | null,"last_error_at"?: string | null,"last_sent_at"?: string | null,"provider"?: Database["public"]['Enums']["email_provider"],"secret"?: string,"smtp_host"?: string | null,"smtp_port"?: number | null,"smtp_username"?: string | null,"status"?: Database["public"]['Enums']["email_connection_status"],"updated_at"?: string,"verification_attempts"?: number,"verification_expires_at"?: string | null,"verification_hash"?: string | null,"verified_at"?: string | null
+                    "business_id"?: string,"connected_by"?: string | null,"created_at"?: string,"from_address"?: string,"from_name"?: string | null,"last_checked_at"?: string | null,"last_error"?: string | null,"last_error_at"?: string | null,"last_sent_at"?: string | null,"provider"?: Database["public"]['Enums']["email_provider"],"secret"?: string,"smtp_host"?: string | null,"smtp_port"?: number | null,"smtp_security"?: string | null,"smtp_username"?: string | null,"status"?: Database["public"]['Enums']["email_connection_status"],"updated_at"?: string,"verification_attempts"?: number,"verification_expires_at"?: string | null,"verification_hash"?: string | null,"verified_at"?: string | null
                   }
                   Relationships: [
                     {
@@ -967,7 +967,7 @@ isOneToOne: false
 { Args: { "p_draft": Json }; Returns: undefined
                            },
 "save_email_connection":
-{ Args: { "p_from": string,"p_from_name": string,"p_provider": Database["public"]['Enums']["email_provider"],"p_secret": string,"p_smtp_host"?: string,"p_smtp_port"?: number,"p_smtp_username"?: string }; Returns: undefined
+{ Args: { "p_from": string,"p_from_name": string,"p_provider": Database["public"]['Enums']["email_provider"],"p_secret": string,"p_smtp_host"?: string,"p_smtp_port"?: number,"p_smtp_security"?: string,"p_smtp_username"?: string }; Returns: string
                            },
 "save_email_settings":
 { Args: { "p_reminder_hours": (number)[],"p_templates": Json }; Returns: undefined

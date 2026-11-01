@@ -155,21 +155,36 @@ test('blocked dates and times are stored in the business time zone, across DST',
     /Sun, Mar 14, 2027 · all day/,
   ].map((r) => new RegExp(`^${r.source}`)));
 
-  // The booking check honours them: Mon Nov 2 with 9–5 hours, 9–11 blocked.
+  // The booking check honours blocked time. The fixed dates above are in the past once they pass
+  // (the booking check refuses past times as "too soon"), so this uses the next Monday at least two
+  // days away — always bookable under the default 24-hour notice and 60-day horizon. 9–11 is blocked
+  // through the same form, then the check runs with 9–5 hours that day.
+  const { rows: [next] } = await db.query(
+    `select to_char(d, 'YYYY-MM-DD') as day, to_char((d + time '09:00') at time zone 'America/Chicago' at time zone 'UTC', 'YYYY-MM-DD HH24:MI') as start_utc
+       from (select (now() at time zone 'America/Chicago')::date + n as d from generate_series(2, 8) n) x
+      where extract(dow from d) = 1 order by d limit 1`,
+  );
+  await page.getByLabel('From', { exact: true }).fill(next.day);
+  await page.getByLabel('All day', { exact: true }).uncheck();
+  await page.getByLabel('Start time', { exact: true }).selectOption('09:00');
+  await page.getByLabel('End time', { exact: true }).selectOption('11:00');
+  await page.getByLabel('Note (optional)').fill('Booking check');
+  await submit();
+  expect((await blocks(businessId)).find((b) => b.label === 'Booking check')).toEqual({ label: 'Booking check', all_day: false, hours: 2, start_utc: next.start_utc });
   await db.query(`insert into public.availability_rules (business_id, weekday, start_time, end_time) values ($1, 1, '09:00', '17:00')`, [businessId]);
   const check = (start: string) =>
     db
       .query(`select app.check_public_time(b, $2::timestamptz, $2::timestamptz + interval '1 hour') from public.businesses b where id = $1`, [businessId, start])
       .then(() => 'ok', (e: { detail?: string }) => e.detail);
-  expect(await check('2026-11-02 10:00 America/Chicago')).toBe('time off');
-  expect(await check('2026-11-02 11:00 America/Chicago')).toBe('ok');
+  expect(await check(`${next.day} 10:00 America/Chicago`)).toBe('time off');
+  expect(await check(`${next.day} 11:00 America/Chicago`)).toBe('ok');
 
   // Remove one.
   const dentist = items.filter({ hasText: 'Dentist' });
   await dentist.getByRole('button', { name: 'Remove' }).click();
   await dentist.getByRole('button', { name: 'Remove blocked time' }).click();
   await expect(page.getByText('Blocked time removed.')).toBeVisible();
-  await expect(items).toHaveCount(4);
+  await expect(items).toHaveCount(5);
   expect((await blocks(businessId)).map((b) => b.label)).not.toContain('Dentist');
 });
 

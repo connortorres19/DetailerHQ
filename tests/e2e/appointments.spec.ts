@@ -204,8 +204,8 @@ test('calendar holds: booked in one step; expired holds are refused', async ({ p
   const day = dayAhead(4);
   await page.goto('/app/calendar');
   await page.getByLabel('Date').fill(day);
-  await page.getByLabel('From').selectOption('13:15');
-  await page.getByLabel('To').selectOption('15:15');
+  await page.getByLabel('From', { exact: true }).selectOption('13:15');
+  await page.getByLabel('To', { exact: true }).selectOption('15:15');
   await page.getByLabel('Note (optional, private)').fill('Fleet van — called back');
   await page.getByRole('button', { name: 'Hold time' }).click();
   await expect(page.getByText('Time held.')).toBeVisible();

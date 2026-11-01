@@ -1,7 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { NextResponse, type NextRequest } from 'next/server';
 import { getBusiness, getUser } from '@/data/session';
-import { emailConfig } from '@/lib/email/config';
+import { emailConfig, providerConfigured } from '@/lib/email/config';
 import { byteaHex, encryptCredentials, verify } from '@/lib/email/crypto';
 import { exchangeCode, forgetAccessToken, mailboxAddress, OAUTH_COOKIE, OAuthError, type OAuthProvider } from '@/lib/email/oauth';
 import { processDue } from '@/lib/email/worker';
@@ -28,6 +28,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const [user, business] = await Promise.all([getUser(), getBusiness()]);
   if (
     !emailConfig() ||
+    (provider !== 'google' && provider !== 'microsoft') ||
+    !providerConfigured(provider) || // OAuth sign-in is off unless EMAIL_OAUTH_ENABLED=1
     !saved ||
     saved.exp < Date.now() ||
     saved.provider !== provider ||

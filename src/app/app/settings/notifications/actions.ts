@@ -11,6 +11,7 @@ import { emailConfig } from '@/lib/email/config';
 import { byteaHex, decryptCredentials, encryptCredentials, toBuffer } from '@/lib/email/crypto';
 import { forgetAccessToken, revoke } from '@/lib/email/oauth';
 import { checkSmtpHost, SMTP_PORTS } from '@/lib/email/smtp-guard';
+import { SECURITY_LABEL } from '@/lib/email/smtp-options';
 import { checkSmtpLogin, sendMessage, SendError } from '@/lib/email/transport';
 import { processDue, workerPool } from '@/lib/email/worker';
 import { createClient } from '@/lib/supabase/server';
@@ -19,47 +20,103 @@ const PATH = '/app/settings/notifications';
 const ok = (message: string, extra: Record<string, string> = {}): FormState => ({ status: 'success', message, values: { at: String(Date.now()), ...extra } });
 const notConfigured = () => failed('Email isn’t set up on this server yet (see docs/PHASE7_EMAIL.md).');
 
-// --- SMTP (custom domain) -------------------------------------------------------------------------
+// --- SMTP (Gmail, Google Workspace, Outlook / Microsoft 365, custom domains) ---------------------
 
 const smtpSchema = z.object({
-  fromAddress: z.string().trim().toLowerCase().pipe(z.email('Enter the address customers will see emails from.')),
+  fromAddress: z.string().trim().toLowerCase().pipe(z.email('Enter the email address customers will get emails from.')),
   fromName: z.string().trim().max(80, 'Use 80 characters or fewer.').optional().default(''),
-  host: z.string().trim().toLowerCase().min(3, 'Enter your mail server, like smtp.yourdomain.com.').max(253),
-  port: z.coerce.number().refine((p) => (SMTP_PORTS as readonly number[]).includes(p), 'Use port 465 (SSL) or 587 (STARTTLS).'),
-  username: z.string().trim().min(1, 'Enter the login (usually your full email address).').max(254),
-  password: z.string().min(1, 'Enter the password or app password.').max(500),
+  host: z.string().trim().toLowerCase().min(3, 'Enter the SMTP server, like smtp.gmail.com.').max(253),
+  port: z.coerce
+    .number({ error: 'Enter the port — usually 587 or 465.' })
+    .refine((p) => (SMTP_PORTS as readonly number[]).includes(p), 'Use port 587 (STARTTLS), 465 (SSL/TLS) or 2525. Your provider lists the right one.'),
+  security: z.enum(['starttls', 'ssl'], { error: 'Choose the encryption your provider lists.' }),
+  username: z.string().trim().min(1, 'Enter the SMTP username (usually your full email address).').max(254),
+  password: z.string().min(1, 'Enter the app password or SMTP password.').max(500),
 });
 
-// Save the SMTP details (encrypted), check the login by sending a one-time code to the sending
-// address, and wait for the owner to type it in. Nothing else is sent until then.
-export async function connectSmtp(_: FormState, formData: FormData): Promise<FormState> {
+// Each check logs in to a mail server on the owner's behalf, so limit how often (per business, per
+// server process) — the server must not become a way to guess passwords.
+const checks = new Map<string, number[]>();
+function tooManyChecks(businessId: string) {
+  const now = Date.now();
+  const recent = (checks.get(businessId) ?? []).filter((t) => t > now - 10 * 60_000);
+  if (recent.length >= 10) return true;
+  checks.set(businessId, [...recent, now]);
+  return false;
+}
+const TOO_MANY = 'Too many connection checks. Wait a few minutes and try again.';
+
+/**
+ * The SMTP form: "Test connection" (intent=test) logs in without saving anything; "Connect email"
+ * (intent=connect) logs in, then saves the details encrypted. A new address gets a 6-digit code to
+ * prove it's the owner's; new details for the same verified address take effect at once.
+ */
+export async function smtpConnection(_: FormState, formData: FormData): Promise<FormState> {
   const { business } = await requireBusiness(PATH);
   const c = emailConfig();
   if (!c) return notConfigured();
+  const intent = formData.get('intent') === 'test' ? 'test' : 'connect';
+  const values = Object.fromEntries([...formData.entries()].filter(([k]) => k !== 'password' && k !== 'intent').map(([k, v]) => [k, String(v)]));
   const parsed = smtpSchema.safeParse(Object.fromEntries(formData));
-  const values = Object.fromEntries([...formData.entries()].filter(([k]) => k !== 'password').map(([k, v]) => [k, String(v)]));
-  if (!parsed.success) return { status: 'error', message: 'Check the highlighted fields.', fieldErrors: Object.fromEntries(parsed.error.issues.map((i) => [String(i.path[0]), i.message])), values };
+  if (!parsed.success)
+    return { status: 'error', message: 'Check the highlighted fields.', fieldErrors: Object.fromEntries(parsed.error.issues.map((i) => [String(i.path[0]), i.message])), values };
   const v = parsed.data;
   const host = await checkSmtpHost(v.host, c.allowPrivateSmtp);
   if (!host.ok) return { status: 'error', message: host.message, fieldErrors: { host: host.message }, values };
+  if (tooManyChecks(business.id)) return { status: 'error', message: TOO_MANY, values };
 
-  // Check the login first (nothing is saved, so a mistake never replaces a working connection).
+  // Always log in first: nothing is saved if it fails, so a typo never replaces a working connection.
   try {
-    await checkSmtpLogin({ smtpHost: v.host, smtpPort: v.port, smtpUsername: v.username }, v.password);
+    await checkSmtpLogin({ smtpHost: v.host, smtpPort: v.port, smtpUsername: v.username, smtpSecurity: v.security }, v.password);
   } catch (e) {
-    const err = e instanceof SendError ? e : null;
-    const message = err?.kind === 'auth' ? 'The mail server refused the login. Check the username and password (many hosts need an app password).' : (err?.message ?? 'Couldn’t connect to that server.');
-    return { status: 'error', message, values };
+    return { status: 'error', message: e instanceof SendError ? e.message : 'Couldn’t connect to that server.', values };
   }
+  if (intent === 'test')
+    return { status: 'success', message: `Connection works: ${v.host} accepted the login (${SECURITY_LABEL[v.security]}, port ${v.port}). Nothing is saved yet — select Connect email to finish.`, values: { ...values, tested: String(Date.now()) } };
+
   forgetAccessToken(business.id);
   const supabase = await createClient();
   const secret = encryptCredentials(business.id, 'smtp', { password: v.password });
   const saved = await supabase.rpc('save_email_connection', {
     p_provider: 'smtp', p_from: v.fromAddress, p_from_name: v.fromName || business.name, p_secret: byteaHex(secret),
-    p_smtp_host: v.host, p_smtp_port: v.port, p_smtp_username: v.username,
+    p_smtp_host: v.host, p_smtp_port: v.port, p_smtp_username: v.username, p_smtp_security: v.security,
   });
   if (saved.error) return { status: 'error', message: describeDbError(saved.error).message, values };
+  if (saved.data === 'verified') {
+    revalidatePath(PATH);
+    redirect(`${PATH}?email=smtp_updated`);
+  }
   return sendCode(business.id, business.name, values);
+}
+
+/** "Test connection" for the saved connection: logs in with the stored (encrypted) password. */
+export async function testSavedConnection(): Promise<FormState> {
+  const { business } = await requireBusiness(PATH);
+  const pool = workerPool();
+  if (!emailConfig() || !pool) return notConfigured();
+  const { rows: [conn] } = await pool.query('select * from email_api.connection($1)', [business.id]);
+  if (!conn) return failed('Connect your email first.');
+  if (conn.provider !== 'smtp') return failed('Use Send test email to check this account.');
+  if (tooManyChecks(business.id)) return failed(TOO_MANY);
+  let password: string;
+  try {
+    const creds = decryptCredentials(business.id, 'smtp', toBuffer(conn.secret));
+    password = 'password' in creds ? creds.password : '';
+  } catch {
+    return failed('The saved password can’t be read. Enter your SMTP details again.');
+  }
+  try {
+    await checkSmtpLogin({ smtpHost: conn.smtp_host, smtpPort: conn.smtp_port, smtpUsername: conn.smtp_username, smtpSecurity: conn.smtp_security }, password);
+  } catch (e) {
+    const err = e instanceof SendError ? e : new SendError('Couldn’t connect to the mail server.', 'transient');
+    // A refused login means emails can't go out: hold them (as the worker would) until it's fixed.
+    if (err.kind === 'auth') await pool.query('select email_api.connection_failed($1, $2)', [business.id, err.message]);
+    revalidatePath(PATH);
+    return failed(err.message);
+  }
+  const { rows: [{ status }] } = await pool.query('select email_api.connection_ok($1) as status', [business.id]);
+  revalidatePath(PATH);
+  return ok(status === 'verified' ? `Connection works: ${conn.smtp_host} accepted the login.` : `The login works. Enter the code we emailed to ${conn.from_address} to finish.`);
 }
 
 async function sendCode(businessId: string, businessName: string, values: Record<string, string> = {}): Promise<FormState> {
@@ -70,7 +127,7 @@ async function sendCode(businessId: string, businessName: string, values: Record
   const { rows: [{ code }] } = await pool.query('select email_api.start_verification($1) as code', [businessId]);
   try {
     await sendMessage(
-      { businessId, provider: 'smtp', fromAddress: conn.from_address, fromName: conn.from_name, secret: toBuffer(conn.secret), smtpHost: conn.smtp_host, smtpPort: conn.smtp_port, smtpUsername: conn.smtp_username },
+      { businessId, provider: 'smtp', fromAddress: conn.from_address, fromName: conn.from_name, secret: toBuffer(conn.secret), smtpHost: conn.smtp_host, smtpPort: conn.smtp_port, smtpUsername: conn.smtp_username, smtpSecurity: conn.smtp_security },
       {
         to: conn.from_address,
         subject: `Your DetailerHQ code: ${code}`,
@@ -80,9 +137,8 @@ async function sendCode(businessId: string, businessName: string, values: Record
       async () => undefined,
     );
   } catch (e) {
-    const err = e instanceof SendError ? e : null;
     revalidatePath(PATH);
-    return { status: 'error', message: err?.kind === 'auth' ? 'The mail server refused the login. Check the username and password (many hosts need an app password).' : (err?.message ?? 'Couldn’t send through that server.'), values };
+    return { status: 'error', message: e instanceof SendError ? e.message : 'Couldn’t send through that server.', values };
   }
   revalidatePath(PATH);
   return ok(`We sent a 6-digit code to ${conn.from_address}. Enter it below.`, { codeSent: '1' });

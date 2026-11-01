@@ -37,6 +37,7 @@ type Job = {
   smtp_host: string | null;
   smtp_port: number | null;
   smtp_username: string | null;
+  smtp_security: string | null;
 };
 
 export type RunResult = { sent: number; retried: number; failed: number; held: number; skipped: number };
@@ -105,6 +106,7 @@ async function deliver(pool: pg.Pool, job: Job): Promise<keyof RunResult> {
     smtpHost: job.smtp_host,
     smtpPort: job.smtp_port,
     smtpUsername: job.smtp_username,
+    smtpSecurity: job.smtp_security,
   };
   try {
     const res = await sendMessage(conn, { to: job.recipient, subject: rendered.subject, html: rendered.html, text: rendered.text, headers }, async (secret) => {

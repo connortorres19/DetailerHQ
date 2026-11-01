@@ -7,6 +7,8 @@ import { env } from '@/lib/env';
 //   EMAIL_ENCRYPTION_KEY       32-byte base64 key that encrypts connection credentials
 //   EMAIL_WORKER_SECRET        shared secret the database's scheduler sends to the worker route
 //   GOOGLE_* / MICROSOFT_*     OAuth apps the operator registers (optional; free)
+//   EMAIL_OAUTH_ENABLED=1      show "Connect Gmail / Outlook" sign-in buttons. Off by default: businesses
+//                              connect with SMTP. The OAuth code stays in place for later.
 //   EMAIL_TRANSPORT=mock       local development and tests only: no real provider is contacted
 const schema = z.object({
   EMAIL_WORKER_DATABASE_URL: z.string().regex(/^postgres(ql)?:\/\/email_worker[.:@]/, 'must connect as the email_worker role'),
@@ -18,6 +20,7 @@ const schema = z.object({
   MICROSOFT_CLIENT_SECRET: z.string().optional(),
   EMAIL_TRANSPORT: z.enum(['live', 'mock']).optional(),
   EMAIL_ALLOW_PRIVATE_SMTP: z.enum(['1']).optional(),
+  EMAIL_OAUTH_ENABLED: z.enum(['1']).optional(),
 });
 export type EmailConfig = z.infer<typeof schema> & { mock: boolean; allowPrivateSmtp: boolean; siteUrl: string };
 
@@ -36,5 +39,6 @@ export function emailConfig(): EmailConfig | null {
   return cached;
 }
 
+/** OAuth sign-in (Gmail / Microsoft) is available only when turned on and its app is registered. */
 export const providerConfigured = (p: 'google' | 'microsoft', c = emailConfig()) =>
-  Boolean(c && (c.mock || (p === 'google' ? c.GOOGLE_CLIENT_ID && c.GOOGLE_CLIENT_SECRET : c.MICROSOFT_CLIENT_ID && c.MICROSOFT_CLIENT_SECRET)));
+  Boolean(c && c.EMAIL_OAUTH_ENABLED === '1' && (c.mock || (p === 'google' ? c.GOOGLE_CLIENT_ID && c.GOOGLE_CLIENT_SECRET : c.MICROSOFT_CLIENT_ID && c.MICROSOFT_CLIENT_SECRET)));

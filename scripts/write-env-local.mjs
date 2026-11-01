@@ -22,7 +22,7 @@ const previousWorker = keep('EMAIL_WORKER_DATABASE_URL', '.+');
 const workerPassword = previousWorker ? decodeURIComponent(new URL(previousWorker).password) : randomBytes(24).toString('hex');
 const encryptionKey = keep('EMAIL_ENCRYPTION_KEY', '[A-Za-z0-9+/]{43}=') ?? randomBytes(32).toString('base64');
 const workerSecret = keep('EMAIL_WORKER_SECRET', '[0-9a-f]{64}') ?? randomBytes(32).toString('hex');
-const optional = ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'MICROSOFT_CLIENT_ID', 'MICROSOFT_CLIENT_SECRET', 'EMAIL_TRANSPORT', 'EMAIL_ALLOW_PRIVATE_SMTP']
+const optional = ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'MICROSOFT_CLIENT_ID', 'MICROSOFT_CLIENT_SECRET', 'EMAIL_TRANSPORT', 'EMAIL_ALLOW_PRIVATE_SMTP', 'EMAIL_OAUTH_ENABLED']
   .map((n) => [n, keep(n, '.+')]);
 const admin = new pg.Client({ connectionString: status.DB_URL });
 await admin.connect();

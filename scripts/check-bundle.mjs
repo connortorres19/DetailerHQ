@@ -14,12 +14,16 @@ const forbidden = [
   [/Could not load customers|Could not load business|\[workflow:/, 'server-only data module'],
   // Phase 7 email: the worker role, server-only variables and secret material.
   [/email_worker|EMAIL_WORKER_SECRET|EMAIL_ENCRYPTION_KEY|EMAIL_WORKER_DATABASE_URL|GOOGLE_CLIENT_SECRET|MICROSOFT_CLIENT_SECRET/, 'email server-only variable or role'],
+  // Phase 8 billing: Stripe secret material and the billing worker role (the app has no publishable key at all).
+  [/\b(sk|rk)_(test|live)_[A-Za-z0-9]{8,}/, 'Stripe secret key'],
+  [/\bwhsec_[A-Za-z0-9]{8,}/, 'Stripe webhook signing secret'],
+  [/billing_worker|BILLING_DATABASE_URL|STRIPE_SECRET_KEY|STRIPE_WEBHOOK_SECRET/, 'billing server-only variable or role'],
   [/refresh_token|nodemailer|email_api\./, 'email server-only code'],
 ];
 // The actual secret values from this machine's .env.local must never appear either.
 try {
   const env = readFileSync('.env.local', 'utf8');
-  for (const name of ['EMAIL_ENCRYPTION_KEY', 'EMAIL_WORKER_SECRET', 'BOOKING_HASH_SECRET']) {
+  for (const name of ['EMAIL_ENCRYPTION_KEY', 'EMAIL_WORKER_SECRET', 'BOOKING_HASH_SECRET', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET']) {
     const value = env.match(new RegExp(`^${name}=(.+)$`, 'm'))?.[1];
     if (value && value.length >= 20) forbidden.push([new RegExp(value.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')), `${name} value`]);
   }

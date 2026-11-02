@@ -27,5 +27,9 @@ if (workerUrl && workerSecret) {
     await admin.query('select app.configure_email_worker($1, $2)', ['http://host.docker.internal:3000/api/email/worker', workerSecret]);
   }
 }
+// Phase 8: the billing worker's login.
+const billingUrl = env.match(/^BILLING_DATABASE_URL=(.+)$/m)?.[1];
+if (billingUrl && (await admin.query("select 1 from pg_roles where rolname = 'billing_worker'")).rowCount)
+  await admin.query(`alter role billing_worker with login password '${decodeURIComponent(new URL(billingUrl).password).replaceAll("'", "''")}'`);
 await admin.end();
-console.log('booking_api (and email_worker) logins re-enabled for the local database');
+console.log('booking_api (and email_worker, billing_worker) logins re-enabled for the local database');

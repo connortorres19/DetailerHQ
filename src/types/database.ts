@@ -151,6 +151,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"billing_events": {
+                  Row: {
+                    "attempts": number,"business_id": string | null,"error": string | null,"id": string,"outcome": string | null,"processed_at": string | null,"received_at": string,"stripe_created": string | null,"type": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "attempts"?: number,"business_id"?: string | null,"error"?: string | null,"id": string,"outcome"?: string | null,"processed_at"?: string | null,"received_at"?: string,"stripe_created"?: string | null,"type": string
+                  }
+                  Update: {
+                    "attempts"?: number,"business_id"?: string | null,"error"?: string | null,"id"?: string,"outcome"?: string | null,"processed_at"?: string | null,"received_at"?: string,"stripe_created"?: string | null,"type"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "billing_events_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"booking_request_items": {
                   Row: {
                     "booking_request_id": string,"business_id": string,"duration_min": number,"id": string,"is_addon": boolean,"name": string,"price_cents": number,"price_type": Database["public"]['Enums']["price_type"],"service_id": string
@@ -239,6 +259,32 @@ isOneToOne: false
 isOneToOne: true
       referencedRelation: "businesses"
       referencedColumns: ["id"]
+    }
+                  ]
+                },"business_billing": {
+                  Row: {
+                    "business_id": string,"cancel_at_period_end": boolean,"created_at": string,"current_period_end": string | null,"ever_paid": boolean,"founding_access_revoked_at": string | null,"founding_revoked_reason": string | null,"founding_slot": number | null,"has_payment_method": boolean,"last_synced_at": string | null,"past_due_since": string | null,"plan": Database["public"]['Enums']["billing_plan"] | null,"stripe_customer_id": string | null,"stripe_subscription_id": string | null,"subscription_status": string | null,"trial_ends_at": string | null,"trial_used": boolean,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "business_id": string,"cancel_at_period_end"?: boolean,"created_at"?: string,"current_period_end"?: string | null,"ever_paid"?: boolean,"founding_access_revoked_at"?: string | null,"founding_revoked_reason"?: string | null,"founding_slot"?: number | null,"has_payment_method"?: boolean,"last_synced_at"?: string | null,"past_due_since"?: string | null,"plan"?: Database["public"]['Enums']["billing_plan"] | null,"stripe_customer_id"?: string | null,"stripe_subscription_id"?: string | null,"subscription_status"?: string | null,"trial_ends_at"?: string | null,"trial_used"?: boolean,"updated_at"?: string
+                  }
+                  Update: {
+                    "business_id"?: string,"cancel_at_period_end"?: boolean,"created_at"?: string,"current_period_end"?: string | null,"ever_paid"?: boolean,"founding_access_revoked_at"?: string | null,"founding_revoked_reason"?: string | null,"founding_slot"?: number | null,"has_payment_method"?: boolean,"last_synced_at"?: string | null,"past_due_since"?: string | null,"plan"?: Database["public"]['Enums']["billing_plan"] | null,"stripe_customer_id"?: string | null,"stripe_subscription_id"?: string | null,"subscription_status"?: string | null,"trial_ends_at"?: string | null,"trial_used"?: boolean,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "business_billing_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: true
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "business_billing_founding_slot_fkey"
+      columns: ["founding_slot"]
+isOneToOne: true
+      referencedRelation: "founding_slots"
+      referencedColumns: ["slot"]
     }
                   ]
                 },"business_branding": {
@@ -441,6 +487,26 @@ isOneToOne: false
                   Relationships: [
                     {
       foreignKeyName: "email_template_settings_business_id_fkey"
+      columns: ["business_id"]
+isOneToOne: false
+      referencedRelation: "businesses"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"founding_slots": {
+                  Row: {
+                    "amount_cents": number | null,"business_id": string | null,"checkout_session_id": string | null,"claimed_at": string | null,"currency": string | null,"disputed_at": string | null,"refunded_at": string | null,"reserved_until": string | null,"slot": number,"state": string,"stripe_payment_intent": string | null,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount_cents"?: number | null,"business_id"?: string | null,"checkout_session_id"?: string | null,"claimed_at"?: string | null,"currency"?: string | null,"disputed_at"?: string | null,"refunded_at"?: string | null,"reserved_until"?: string | null,"slot": number,"state"?: string,"stripe_payment_intent"?: string | null,"updated_at"?: string
+                  }
+                  Update: {
+                    "amount_cents"?: number | null,"business_id"?: string | null,"checkout_session_id"?: string | null,"claimed_at"?: string | null,"currency"?: string | null,"disputed_at"?: string | null,"refunded_at"?: string | null,"reserved_until"?: string | null,"slot"?: number,"state"?: string,"stripe_payment_intent"?: string | null,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "founding_slots_business_id_fkey"
       columns: ["business_id"]
 isOneToOne: false
       referencedRelation: "businesses"
@@ -903,6 +969,9 @@ isOneToOne: false
 "finish_media_upload":
 { Args: { "p_asset": string,"p_height": number,"p_service_id"?: string,"p_width": number }; Returns: undefined
                            },
+"founding_availability":
+{ Args: Record<PropertyKey, never>; Returns: Json
+                           },
 "log_lead_activity":
 { Args: { "p_channel"?: string,"p_kind": string,"p_lead_id": string,"p_note"?: string }; Returns: undefined
                            },
@@ -999,6 +1068,9 @@ isOneToOne: false
 "start_appointment":
 { Args: { "p_appointment_id": string }; Returns: undefined
                            },
+"start_founding_reservation":
+{ Args: Record<PropertyKey, never>; Returns: number
+                           },
 "verify_email_code":
 { Args: { "p_code": string }; Returns: boolean
                            },
@@ -1007,7 +1079,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "account_status": "pending_activation"|"pilot"|"trialing"|"active"|"past_due"|"trial_expired"|"inactive"|"cancelled"|"suspended"|"closing","actor_type": "owner"|"customer"|"system"|"operator","appointment_source": "booking_page"|"phone"|"text"|"walk_in"|"in_person"|"other"|"quote","appointment_status": "scheduled"|"in_progress"|"completed"|"cancelled"|"no_show","block_kind": "appointment"|"hold"|"proposal","booking_mode": "approval"|"instant","cancelled_by": "customer"|"business","contact_preference": "call"|"text"|"email","email_connection_status": "pending"|"verified"|"needs_attention","email_provider": "google"|"microsoft"|"smtp","email_status": "queued"|"sending"|"sent"|"failed"|"held"|"skipped"|"cancelled","email_template": "request_received"|"booking_confirmed"|"booking_declined"|"time_proposed"|"proposal_accepted"|"proposal_declined"|"booking_rescheduled"|"booking_cancelled"|"appointment_reminder"|"quote_sent"|"quote_accepted"|"quote_declined"|"quote_expiring"|"quote_expired"|"owner_new_request"|"owner_new_appointment"|"owner_new_lead"|"owner_customer_response"|"owner_daily_summary"|"owner_overdue_followups"|"connection_test","lead_source": "booking_page"|"phone"|"text"|"instagram"|"facebook"|"google"|"referral"|"walk_in"|"repeat"|"other"|"website"|"social_media","lead_status": "new"|"contacted"|"quote_sent"|"follow_up_due"|"booked"|"lost","location_type": "mobile"|"shop","lost_reason": "price"|"timing"|"went_elsewhere"|"no_response"|"not_a_fit"|"other","media_kind": "logo"|"cover"|"gallery"|"service","media_status": "pending"|"ready"|"deleting","membership_role": "owner","payment_note": "not_recorded"|"unpaid"|"paid_cash"|"paid_card"|"paid_transfer"|"paid_other","price_type": "fixed"|"starting_at"|"quote_required","quote_status": "draft"|"sent"|"accepted"|"declined"|"expired"|"converted","request_status": "pending"|"time_proposed"|"approved"|"declined"|"proposal_declined"|"withdrawn"|"expired"|"closed_duplicate","resource_kind": "general"|"bay"|"staff"|"equipment","service_mode": "mobile"|"shop"|"both"
+            "account_status": "pending_activation"|"pilot"|"trialing"|"active"|"past_due"|"trial_expired"|"inactive"|"cancelled"|"suspended"|"closing","actor_type": "owner"|"customer"|"system"|"operator","appointment_source": "booking_page"|"phone"|"text"|"walk_in"|"in_person"|"other"|"quote","appointment_status": "scheduled"|"in_progress"|"completed"|"cancelled"|"no_show","billing_plan": "founding"|"standard","block_kind": "appointment"|"hold"|"proposal","booking_mode": "approval"|"instant","cancelled_by": "customer"|"business","contact_preference": "call"|"text"|"email","email_connection_status": "pending"|"verified"|"needs_attention","email_provider": "google"|"microsoft"|"smtp","email_status": "queued"|"sending"|"sent"|"failed"|"held"|"skipped"|"cancelled","email_template": "request_received"|"booking_confirmed"|"booking_declined"|"time_proposed"|"proposal_accepted"|"proposal_declined"|"booking_rescheduled"|"booking_cancelled"|"appointment_reminder"|"quote_sent"|"quote_accepted"|"quote_declined"|"quote_expiring"|"quote_expired"|"owner_new_request"|"owner_new_appointment"|"owner_new_lead"|"owner_customer_response"|"owner_daily_summary"|"owner_overdue_followups"|"connection_test","lead_source": "booking_page"|"phone"|"text"|"instagram"|"facebook"|"google"|"referral"|"walk_in"|"repeat"|"other"|"website"|"social_media","lead_status": "new"|"contacted"|"quote_sent"|"follow_up_due"|"booked"|"lost","location_type": "mobile"|"shop","lost_reason": "price"|"timing"|"went_elsewhere"|"no_response"|"not_a_fit"|"other","media_kind": "logo"|"cover"|"gallery"|"service","media_status": "pending"|"ready"|"deleting","membership_role": "owner","payment_note": "not_recorded"|"unpaid"|"paid_cash"|"paid_card"|"paid_transfer"|"paid_other","price_type": "fixed"|"starting_at"|"quote_required","quote_status": "draft"|"sent"|"accepted"|"declined"|"expired"|"converted","request_status": "pending"|"time_proposed"|"approved"|"declined"|"proposal_declined"|"withdrawn"|"expired"|"closed_duplicate","resource_kind": "general"|"bay"|"staff"|"equipment","service_mode": "mobile"|"shop"|"both"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -1123,7 +1195,7 @@ export type CompositeTypes<
 export const Constants = {
   "public": {
           Enums: {
-            "account_status": ["pending_activation", "pilot", "trialing", "active", "past_due", "trial_expired", "inactive", "cancelled", "suspended", "closing"],"actor_type": ["owner", "customer", "system", "operator"],"appointment_source": ["booking_page", "phone", "text", "walk_in", "in_person", "other", "quote"],"appointment_status": ["scheduled", "in_progress", "completed", "cancelled", "no_show"],"block_kind": ["appointment", "hold", "proposal"],"booking_mode": ["approval", "instant"],"cancelled_by": ["customer", "business"],"contact_preference": ["call", "text", "email"],"email_connection_status": ["pending", "verified", "needs_attention"],"email_provider": ["google", "microsoft", "smtp"],"email_status": ["queued", "sending", "sent", "failed", "held", "skipped", "cancelled"],"email_template": ["request_received", "booking_confirmed", "booking_declined", "time_proposed", "proposal_accepted", "proposal_declined", "booking_rescheduled", "booking_cancelled", "appointment_reminder", "quote_sent", "quote_accepted", "quote_declined", "quote_expiring", "quote_expired", "owner_new_request", "owner_new_appointment", "owner_new_lead", "owner_customer_response", "owner_daily_summary", "owner_overdue_followups", "connection_test"],"lead_source": ["booking_page", "phone", "text", "instagram", "facebook", "google", "referral", "walk_in", "repeat", "other", "website", "social_media"],"lead_status": ["new", "contacted", "quote_sent", "follow_up_due", "booked", "lost"],"location_type": ["mobile", "shop"],"lost_reason": ["price", "timing", "went_elsewhere", "no_response", "not_a_fit", "other"],"media_kind": ["logo", "cover", "gallery", "service"],"media_status": ["pending", "ready", "deleting"],"membership_role": ["owner"],"payment_note": ["not_recorded", "unpaid", "paid_cash", "paid_card", "paid_transfer", "paid_other"],"price_type": ["fixed", "starting_at", "quote_required"],"quote_status": ["draft", "sent", "accepted", "declined", "expired", "converted"],"request_status": ["pending", "time_proposed", "approved", "declined", "proposal_declined", "withdrawn", "expired", "closed_duplicate"],"resource_kind": ["general", "bay", "staff", "equipment"],"service_mode": ["mobile", "shop", "both"]
+            "account_status": ["pending_activation", "pilot", "trialing", "active", "past_due", "trial_expired", "inactive", "cancelled", "suspended", "closing"],"actor_type": ["owner", "customer", "system", "operator"],"appointment_source": ["booking_page", "phone", "text", "walk_in", "in_person", "other", "quote"],"appointment_status": ["scheduled", "in_progress", "completed", "cancelled", "no_show"],"billing_plan": ["founding", "standard"],"block_kind": ["appointment", "hold", "proposal"],"booking_mode": ["approval", "instant"],"cancelled_by": ["customer", "business"],"contact_preference": ["call", "text", "email"],"email_connection_status": ["pending", "verified", "needs_attention"],"email_provider": ["google", "microsoft", "smtp"],"email_status": ["queued", "sending", "sent", "failed", "held", "skipped", "cancelled"],"email_template": ["request_received", "booking_confirmed", "booking_declined", "time_proposed", "proposal_accepted", "proposal_declined", "booking_rescheduled", "booking_cancelled", "appointment_reminder", "quote_sent", "quote_accepted", "quote_declined", "quote_expiring", "quote_expired", "owner_new_request", "owner_new_appointment", "owner_new_lead", "owner_customer_response", "owner_daily_summary", "owner_overdue_followups", "connection_test"],"lead_source": ["booking_page", "phone", "text", "instagram", "facebook", "google", "referral", "walk_in", "repeat", "other", "website", "social_media"],"lead_status": ["new", "contacted", "quote_sent", "follow_up_due", "booked", "lost"],"location_type": ["mobile", "shop"],"lost_reason": ["price", "timing", "went_elsewhere", "no_response", "not_a_fit", "other"],"media_kind": ["logo", "cover", "gallery", "service"],"media_status": ["pending", "ready", "deleting"],"membership_role": ["owner"],"payment_note": ["not_recorded", "unpaid", "paid_cash", "paid_card", "paid_transfer", "paid_other"],"price_type": ["fixed", "starting_at", "quote_required"],"quote_status": ["draft", "sent", "accepted", "declined", "expired", "converted"],"request_status": ["pending", "time_proposed", "approved", "declined", "proposal_declined", "withdrawn", "expired", "closed_duplicate"],"resource_kind": ["general", "bay", "staff", "equipment"],"service_mode": ["mobile", "shop", "both"]
           }
         }
 } as const

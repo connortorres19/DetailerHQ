@@ -48,7 +48,8 @@ type PublicFunction =
   | 'decline_proposal'
   | 'get_quote'
   | 'accept_quote'
-  | 'decline_quote';
+  | 'decline_quote'
+  | 'founding_availability'; // Phase 8: remaining Founding 5 spots (read-only)
 
 // Calls one public_api function. Since migration 11 they return {"error": …} instead of raising
 // (so failed attempts are rate-limited); unexpected database errors still throw.
@@ -58,7 +59,7 @@ export async function callPublic<T>(fn: PublicFunction, args: unknown[]): Promis
   const result = rows[0]?.result as (T & { error?: PublicError }) | null;
   if (result && typeof result === 'object' && 'error' in result && result.error) return { ok: false, error: result.error };
   // Phase 7: send any emails this change queued (requests, answers, cancellations) after the response.
-  if (fn !== 'get_booking_page' && fn !== 'get_available_slots' && fn !== 'get_request_status' && fn !== 'get_quote')
+  if (fn !== 'get_booking_page' && fn !== 'get_available_slots' && fn !== 'get_request_status' && fn !== 'get_quote' && fn !== 'founding_availability')
     void import('@/lib/email/kick').then((m) => m.kickEmail()).catch(() => undefined);
   return { ok: true, data: result as T };
 }

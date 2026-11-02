@@ -8,7 +8,7 @@ import styles from './Faq.module.css';
 const faqs = [
   {
     q: `Can I use ${brand.name} today?`,
-    a: 'Not yet. The product is in development and early access hasn’t opened. There is no sign-up, login or payment on this site.',
+    a: 'Early access is invite-only for now. Invited businesses sign in and choose a plan under Settings → Billing — see Pricing for the plans.',
   },
   {
     q: 'Who is it for?',
@@ -24,7 +24,7 @@ const faqs = [
   },
   {
     q: 'Does it take payments or deposits?',
-    a: 'No. The first version doesn’t process payments, deposits or tax. You record what a job was paid when you complete it.',
+    a: 'No. DetailerHQ never processes payments between you and your customers — no deposits, card payments or tax. You record what a job was paid when you complete it. (Your own DetailerHQ membership is billed through Stripe.)',
   },
   {
     q: 'Who owns my data?',

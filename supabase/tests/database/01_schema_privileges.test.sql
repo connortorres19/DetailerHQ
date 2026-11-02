@@ -3,7 +3,7 @@
 -- restricted to the public_api functions (D-21).
 begin;
 \ir _helpers.psql
-select plan(26);
+select plan(30);
 
 select tables_are('public', array[
   'businesses','memberships','business_counters','booking_settings','availability_rules','time_off',
@@ -11,8 +11,9 @@ select tables_are('public', array[
   'customers','vehicles','leads','quotes','quote_items','booking_requests','booking_request_items',
   'appointments','appointment_items','schedule_blocks','activity_events','rate_limit_events',
   'media_assets','business_branding','user_preferences',
-  'email_connections','email_settings','email_template_settings','email_owner_prefs','email_outbox','email_suppressions'
-], 'public schema contains exactly the Phase 1 tables plus the Phase 6 and Phase 7 tables');
+  'email_connections','email_settings','email_template_settings','email_owner_prefs','email_outbox','email_suppressions',
+  'founding_slots','business_billing','billing_events'
+], 'public schema contains exactly the Phase 1 tables plus the Phase 6, 7 and 8 tables');
 
 select is(
   (select count(*)::int from pg_class c join pg_namespace n on n.oid = c.relnamespace
@@ -63,7 +64,7 @@ select is(
 select is(
   (select array_agg(p.proname::text order by p.proname) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public_api' and has_function_privilege('booking_api', p.oid, 'EXECUTE')),
-  array['accept_proposal','accept_quote','cancel_appointment','decline_proposal','decline_quote','get_available_slots','get_booking_page',
+  array['accept_proposal','accept_quote','cancel_appointment','decline_proposal','decline_quote','founding_availability','get_available_slots','get_booking_page',
         'get_quote','get_request_status','submit_booking_request','submit_inquiry','withdraw_request'],
   'booking_api can execute exactly the public_api functions');
 
@@ -137,6 +138,25 @@ select is(
 select is(
   (select count(*)::int from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public'), 0,
   'no business table is published to Realtime');
+
+-- Phase 8: the billing worker is as restricted as booking_api — only billing_api functions, no tables.
+select is(
+  (select (rolbypassrls, rolsuper, rolinherit) from pg_roles where rolname = 'billing_worker'), (false, false, false),
+  'billing_worker: no BYPASSRLS, not superuser, NOINHERIT');
+select is(
+  (select count(*)::int from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname in ('public', 'app', 'public_api', 'billing_api') and c.relkind in ('r', 'v', 'm', 'S', 'p')
+      and has_table_privilege('billing_worker', c.oid, 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')),
+  0, 'billing_worker has no table privileges');
+select is(
+  (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname in ('public', 'app', 'public_api') and has_function_privilege('billing_worker', p.oid, 'EXECUTE')),
+  0, 'billing_worker cannot execute owner, public or internal functions');
+select is(
+  (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'billing_api' and (has_function_privilege('authenticated', p.oid, 'EXECUTE') or has_function_privilege('anon', p.oid, 'EXECUTE')
+          or has_function_privilege('booking_api', p.oid, 'EXECUTE') or has_function_privilege('service_role', p.oid, 'EXECUTE'))),
+  0, 'only billing_worker can execute billing_api functions');
 
 select * from finish();
 rollback;

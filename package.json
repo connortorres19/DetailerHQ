@@ -18,6 +18,9 @@
     "db:types": "supabase gen types typescript --local --schema public > src/types/database.ts",
     "storage:check": "node scripts/check-storage.mjs",
     "email:check-google": "node scripts/check-google-oauth.mjs",
+    "billing:check": "node scripts/check-billing.mjs",
+    "billing:mock": "node scripts/dev-stripe-mock.mjs",
+    "billing:setup-prices": "node scripts/setup-stripe-prices.mjs",
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset && node scripts/booking-role.mjs",
@@ -52,6 +55,7 @@
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "sharp": "0.35.5",
+    "stripe": "23.1.0",
     "zod": "4.6.7"
   }
 }

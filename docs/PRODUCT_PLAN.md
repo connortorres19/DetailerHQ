@@ -26,7 +26,7 @@ Revision 3 used the labels P-1…P-12 and R-1…R-5 for recommendations. The use
 - **Verification checklist** (§14.3) of Supabase, Vercel, Next.js and PostgreSQL documentation to check before implementation.
 - **Roadmap** (§16) now starts with a documentation-only verification phase, then a database-first foundation phase.
 
-Preserved approved decisions include: 7-day free trial starting at activation (D-14), booking requests without customer accounts (D-13), no customer deposits or payments (D-9), no automatic data deletion when a trial ends (D-18), and all other D-1–D-20.
+Preserved approved decisions include: free trial (D-14 — revised in Phase 8: 3 days, card required to start, see §12.3), booking requests without customer accounts (D-13), no customer deposits or payments (D-9), no automatic data deletion when a trial ends (D-18), and all other D-1–D-20.
 
 ---
 
@@ -134,7 +134,7 @@ Not in the MVP: automated SMS/email/social messages, customer payments or deposi
 ### 3.2 Required before the public paid launch (D-10, D-14, D-18)
 
 - Subscription billing at the validated price (target $49/month, D-12), with **tax handling for subscriptions** reviewed with an accountant.
-- 7-day free trial starting at activation; trial enforcement; account-state handling — tested.
+- 3-day free trial with a card required to start (D-14, revised in Phase 8); trial enforcement; account-state handling — tested.
 - Retention, closure and deletion policy finalized, legally reviewed and disclosed; pre-deletion notice delivery before any automated deletion is enabled.
 - Transactional email provider for auth emails (possibly needed earlier — V-12).
 - Public self-serve sign-up; legal review; name clearance and domain (approved spending).
@@ -184,7 +184,7 @@ A feature joins the active plan only if two or more pilots independently need it
 | Route | Purpose |
 |---|---|
 | `/` | Home: real screenshots, request → approval flow, included / not available yet, early-access CTA |
-| `/pricing` | **Pilot stage:** Early access — $25 for the first month, what happens after, how to apply. **Paid launch:** validated price and 7-day trial terms |
+| `/pricing` | **Pilot stage:** Early access — $25 for the first month, what happens after, how to apply. **Paid launch:** Founding 5 ($30 once, five spots) and Standard ($30/month, 3-day trial, card required) terms |
 | `/contact` | Contact and pilot application |
 | `/legal/terms`, `/legal/privacy`, `/legal/pilot-terms` | Legal pages |
 
@@ -443,7 +443,7 @@ A start time is offered only if, for its interval (plus buffers around existing 
 
 ### 7.1 Sign-up, activation and onboarding
 
-Pilot: invite → sign-up → accept pilot terms. Paid launch: open sign-up. Email verification via Supabase Auth. **Activation = email verified AND business created** (D-14). At activation: pilot accounts → `pilot`; paid-launch accounts → `trialing` with `trial_ends_at = activated_at + 7 days`. During onboarding the business's general schedule resource is created with C = 1 for mobile-only businesses or the owner's chosen capacity for shops.
+Pilot: invite → sign-up → accept pilot terms. Paid launch: open sign-up. Email verification via Supabase Auth. **Activation = email verified AND business created** (D-14). At activation: pilot accounts → `pilot`; paid-launch accounts choose a plan in Settings → Billing (Phase 8): Standard starts a 3-day trial at checkout (card required), Founding 5 is a $30 one-time purchase. During onboarding the business's general schedule resource is created with C = 1 for mobile-only businesses or the owner's chosen capacity for shops.
 
 ### 7.2 Owner handles a request
 
@@ -790,9 +790,16 @@ Metrics: requests received; median first response time; request outcomes; reques
 
 Duration, $25 first-month price and collection method, what happens after the first month, features may change, no SLA, data ownership, export, retention position, end-of-pilot options, not a free trial.
 
-### 12.3 Activation and 7-day free trial (D-14)
+### 12.3 Plans and the 3-day free trial (D-14, revised in Phase 8)
 
-Activation = email verified AND business created. Trial = `activated_at` + 7 days exactly. No card required (preference). Disclosed everywhere it's offered. Pilot accounts never enter `trialing`. Built and tested in Phase 8 before the public paid launch.
+Approved in Phase 8 (supersedes the original "7 days from activation, no card" preference):
+
+- **Founding 5:** $30 once, lifetime, limited to five successful purchases platform-wide; never billed again; a claimed spot is never reopened (refund, cancellation, closure or deletion).
+- **Standard:** $30/month. **A card is required to start the 3-day free trial**; the owner authorizes the $30/month subscription at checkout; **nothing is charged during the trial**; Stripe bills the card automatically at the trial end and monthly after that, unless the owner cancels first. Checkout shows the exact trial end and first billing date. One trial per business.
+- Failed payments and expired cards: `past_due` with 7 days' grace (REC-09), then read-only until paid; the owner updates the card in Stripe's Customer Portal.
+- Pilot accounts keep pilot access and are never charged automatically; they can move to a plan when they agree.
+
+Details: `docs/PHASE8_BILLING.md`.
 
 ### 12.4 Account states and access
 
@@ -942,7 +949,7 @@ All criteria pass at 375, 768 and 1280 px and meet `DESIGN_SYSTEM.md` §12. 🧪
 
 **Pilot, trial, retention, closure (D-14, D-18)**
 - [ ] Pilot accounts never show "free trial". 🧪
-- [ ] *(Phase 8)* Trial ends exactly 7 days after activation; restricted state read-only at the DB; **no rows deleted**; subscribing restores access. 🧪
+- [ ] *(Phase 8)* Standard trial lasts 3 days, needs a card to start and charges nothing until it ends; restricted state read-only at the DB; **no rows deleted**; subscribing restores access. 🧪
 - [ ] Closure grace and deletion leave zero rows for that business; deletion jobs disabled until policy approved. 🧪
 
 ---
@@ -1061,7 +1068,7 @@ Original checklist (kept for reference):
 | **5. Customers & vehicles** | CRUD, multiple vehicles, search, history, archive, anonymize | **CRUD, multiple vehicles, search and archive done in the owner's Phase 3**; service history (needs appointments) and anonymize remain |
 | **6. Leads, quotes, follow-ups** | Leads, quotes, communications, templates, tasks | — |
 | **7. Analytics, settings, data; hardening; pilot** | Metrics, export, closure request (deletion disabled), security review, accessibility, marketing (early access), legal drafts, pilot terms | 3–5 pilots onboarded |
-| **8. Paid-launch readiness** | Billing, subscription tax, 7-day trial, account states, retention policy and notices, email provider, legal review, public sign-up, name and domain | Phase 8 acceptance criteria pass; legal and accountant sign-off |
+| **8. Paid-launch readiness** | Billing, subscription tax, 3-day trial (card required), account states, retention policy and notices, email provider, legal review, public sign-up, name and domain | Phase 8 acceptance criteria pass; legal and accountant sign-off |
 
 ---
 
@@ -1084,7 +1091,7 @@ Original checklist (kept for reference):
 | D-11 | Pilot: 3–5 businesses incl. mobile detailers; $25 first month, early-access offer | Rev 3 |
 | D-12 | Public subscription target $49/month, subject to validation | Rev 3 |
 | D-13 | Booking requests without customer accounts | Rev 3 |
-| D-14 | 7-day free trial starts after email verification and activation; no card (preference) | Rev 3 |
+| D-14 | Free trial — **revised in Phase 8:** 3 days, card required to start, no charge during the trial, then $30/month (originally: 7 days from activation, no card) | Rev 3; revised Phase 8 |
 | D-15 | Multiple vehicles per customer; one specific vehicle per request | Rev 3 |
 | D-16 | Pending requests don't block availability; optional owner-placed temporary holds | Rev 3 |
 | D-17 | Owner-configurable cancellation/rescheduling policies; 24 h suggested default | Rev 3 |

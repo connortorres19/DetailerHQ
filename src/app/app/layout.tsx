@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { AppShell } from '@/components/app/shell/AppShell';
+import { getBillingSummary } from '@/data/billing';
 import { getThemePreference, requireBusiness } from '@/data/session';
+import { billingBanner } from '@/domain/billing';
 
 export const metadata: Metadata = { title: { template: '%s · DetailerHQ', default: 'DetailerHQ' } };
 
@@ -9,9 +11,10 @@ export const metadata: Metadata = { title: { template: '%s · DetailerHQ', defau
 // (globals.css: dark tokens apply while an .app-theme[data-theme] is on the page).
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const [{ user, business }, theme] = await Promise.all([requireBusiness(), getThemePreference()]);
+  const banner = billingBanner(await getBillingSummary(business), business.timezone);
   return (
     <div className="app-theme" data-theme={theme}>
-      <AppShell business={business} user={user}>
+      <AppShell business={business} user={user} billing={banner}>
         {children}
       </AppShell>
     </div>

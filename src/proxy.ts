@@ -14,6 +14,7 @@ export const config = {
     '/r/:path*',
     '/q/:path*',
     '/onboarding/:path*',
+    '/pricing', // Phase 8: live founding-spot count (dynamic)
     '/sign-in',
     '/sign-up',
     '/forgot-password',

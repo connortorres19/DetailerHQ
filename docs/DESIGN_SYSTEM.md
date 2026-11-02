@@ -29,7 +29,7 @@
 - Added §1.1 **One system, three contexts** — how the same tokens serve the marketing site, the public booking/status pages and the dashboard.
 - Added a **claims and honesty policy** (§2.4): no fake testimonials, invented statistics or unsupported performance claims; stage-appropriate pilot vs. trial wording.
 - Copy updated for **no automated messaging** ("Open in Messages", never "Send SMS") and **recorded** (not collected) amounts.
-- Landing page and pricing hierarchy now adapt to the **pilot** stage and the later **7-day trial** stage.
+- Landing page and pricing hierarchy now adapt to the **pilot** stage and the later **paid** stage (Founding 5 and Standard with a 3-day trial; Phase 8).
 - Explicit **tablet** layout (768–1023 px).
 - New component specs: **customer status page**, **propose a different time**, **conflict and duplicate warnings**, **notification center**, **message templates and "Did you send it?"**, **communication log**, **account banners and restricted (read-only) state**, **analytics money labels**.
 - Status badge set updated for the new request and lead statuses.
@@ -144,7 +144,7 @@ Applies to the marketing site, in-app copy, onboarding, emails we write ourselve
 - **No unsupported performance claims** ("Double your bookings", "Never miss a lead", "Save 10 hours a week").
 - **No customer logos** without permission.
 - **No features described before they ship** — including automated texts/emails, payments, deposits, integrations and AI. "Coming soon" lists are avoided; if needed, use "Not available yet" in the included/not-included section.
-- **Stage-correct wording:** during the pilot, use "early access", "pilot program" and "pilot access"; "7-day free trial" and "no credit card required" appear only after trial enforcement and billing ship (PRODUCT_PLAN §3.2).
+- **Stage-correct wording:** during the pilot, use "early access", "pilot program" and "pilot access"; "3-day free trial" appears only after billing ships (Phase 8). The trial **requires a card** — never write "no credit card required"; always state that nothing is charged during the trial and when the first $30 charge happens.
 - **Early-access price:** shown as "Early access: $25 for your first month" with, in the same block, what happens after the first month (as decided — PRODUCT_PLAN §17.3). No implied discount from an unvalidated "regular price", no countdowns, no scarcity claims beyond the true pilot size ("We're working with a small group of 3–5 businesses").
 - **Public price:** the $49/month target is an internal hypothesis and is **not** published until validated (PRODUCT_PLAN §12.1).
 - **Trial start:** wherever the trial is described, say it starts "once you verify your email and set up your business".
@@ -433,7 +433,7 @@ The marketing site may be more atmospheric than the product — dark graphite se
 ### 9.1 Global header
 
 - Left: wordmark (set in Plex Sans 600, letter-spaced −0.01em; placeholder until the name is cleared). Optional small brass mark.
-- Center/right: Product · Pricing (labelled "Early access" during the pilot) · Sign in · primary button whose label depends on the stage: **"Apply for early access"** during the pilot; **"Start 7-day free trial"** only after trial enforcement and billing ship.
+- Center/right: Product · Pricing (labelled "Early access" during the pilot) · Sign in · primary button whose label depends on the stage: **"Apply for early access"** during the pilot; **"Start 3-day free trial"** only after billing ships (card required; Phase 8).
 - Height 64px, solid background (dark on the hero, light below). No transparency blur.
 - Mobile: wordmark + "Sign in" + menu button opening a full-screen sheet.
 
@@ -451,7 +451,7 @@ The marketing site may be more atmospheric than the product — dark graphite se
 5. **Leads, quotes and follow-ups** — screenshot of a lead with its quote, communication log and follow-up task; one line explaining templates open in the owner's own Messages or Mail app.
 6. **Honest numbers** — analytics screenshot with the line: "Every number comes from jobs you've actually recorded." Shows quoted value, booked job value and recorded revenue as separate, labelled figures.
 7. **What's included and what isn't (yet)** — a plain two-column list. *Included:* booking page and request status links, approvals and suggested times, calendar, customers & vehicles, leads & quotes, follow-up reminders and message templates, analytics, CSV export. *Not available yet:* automatic texts or emails, online payments and deposits, social media integrations, CSV import. This builds trust.
-8. **Pricing teaser** — **pilot stage:** "Early access for 3–5 detailing businesses — $25 for your first month," one line on what happens after, and a link to the early-access page; **paid-launch stage (after price validation):** one plan, price, and the trial stated in full ("7-day free trial. No credit card required. When it ends, subscribe to keep using DetailerHQ — your data isn't deleted.").
+8. **Pricing teaser** — **pilot stage:** "Early access for 3–5 detailing businesses — $25 for your first month," one line on what happens after, and a link to the early-access page; **paid-launch stage (after price validation):** one plan, price, and the trial stated in full ("3-day free trial — card required, nothing charged until it ends, then $30/month. Cancel anytime before the trial ends and you won't be charged. Your data is never deleted.").
 9. **Founder note** — short, signed, real person (photo optional), why this is being built and how to reach them. Replaces fake testimonials until real ones exist.
 10. **FAQ** — 5–7 practical questions (data ownership, export, texting, mobile, cancellation).
 11. **Footer** — dark; product links, legal, contact email, © year. Small and tidy.
@@ -846,7 +846,7 @@ The most important customer-facing screen: it replaces confirmation texts in the
 
 - **Banner** under the top bar, full content width, 40px min height, status tone background + 1px border, text + one action:
   - Pilot: neutral — "Pilot access until Dec 15, 2026." · "View pilot terms" (shown only in the final 14 days).
-  - Pending activation: info — "Verify your email to activate your account and publish your booking page." · "Resend email". (Paid-launch stage adds: "Your 7-day trial starts once you're activated.")
+  - Pending activation: info — "Verify your email to activate your account and publish your booking page." · "Resend email". (Paid-launch stage adds: "Choose a plan in Settings → Billing.")
   - Trial (paid-launch stage): info — "Trial ends Thu, Nov 6 at 3:42 PM CT." · "Choose a plan"; attention tone from 3 days before.
   - Restricted: critical — "Your trial has ended. Your data is safe and read-only. Subscribe to keep taking requests." · "Subscribe" · secondary "Export data".
 - **Restricted (read-only) state:** create/edit/approve buttons are removed, and each page header shows one plain line instead: "Read-only — subscribe to make changes" (visible text, not a hover tooltip); forms render as read-only text, not disabled inputs; export, account settings and subscription remain fully interactive. The booking page shows the business's contact details with "Not accepting online requests right now."

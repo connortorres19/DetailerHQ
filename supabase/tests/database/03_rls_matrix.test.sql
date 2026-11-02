@@ -39,6 +39,10 @@ begin
   insert into public.email_owner_prefs (business_id, user_id) values (a, pg_temp.owner_of(a));
   insert into public.email_outbox (business_id, template, recipient, idempotency_key) values (a, 'connection_test', 'shop@example.com', 'matrix-' || a);
   insert into public.email_suppressions (business_id, email, category) values (a, 'x@example.com', 'follow_up');
+  -- Phase 8 billing: a reservation, the billing row and an event for Business A.
+  update public.founding_slots set state = 'reserved', business_id = a, reserved_until = now() + interval '10 minutes' where slot = 1;
+  insert into public.business_billing (business_id, stripe_customer_id) values (a, 'cus_matrix');
+  insert into public.billing_events (id, type, business_id) values ('evt_matrix', 'invoice.paid', a);
 end
 $$;
 
@@ -161,7 +165,7 @@ create temp table expected as
 select t.t, actor, op,
   case
     -- Tables no client role may touch at all.
-    when t.t in ('business_counters', 'rate_limit_events') then '42501'
+    when t.t in ('business_counters', 'rate_limit_events', 'founding_slots', 'billing_events') then '42501'
     when actor = 'anon' then '42501'
     when actor in ('owner_b', 'user_u') then
       case op

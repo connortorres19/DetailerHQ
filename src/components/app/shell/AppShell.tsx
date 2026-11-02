@@ -3,11 +3,12 @@ import { signOut } from '@/app/(auth)/actions';
 import { Wordmark } from '@/components/layout/Wordmark';
 import { Notice } from '@/components/app/ui/Notice';
 import type { Business, SessionUser } from '@/data/session';
+import type { Banner } from '@/domain/billing';
 import { NavLinks } from './NavLinks';
 import styles from './AppShell.module.css';
 
 // DESIGN_SYSTEM §10–11: sidebar ≥ 1024px, icon rail 768–1023px, bottom tab bar below 768px.
-export function AppShell({ business, user, children }: { business: Business; user: SessionUser; children: React.ReactNode }) {
+export function AppShell({ business, user, billing, children }: { business: Business; user: SessionUser; billing?: Banner; children: React.ReactNode }) {
   return (
     <div className={styles.shell}>
       <a href="#content" className={styles.skip}>
@@ -49,6 +50,13 @@ export function AppShell({ business, user, children }: { business: Business; use
           <div className={styles.banner}>
             <Notice tone="attention">
               Confirm your email to activate your account. Open the link we sent to {user.email}.
+            </Notice>
+          </div>
+        ) : null}
+        {billing ? (
+          <div className={styles.banner}>
+            <Notice tone={billing.tone} action={<a href="/app/settings/billing">Billing</a>}>
+              {billing.text}
             </Notice>
           </div>
         ) : null}
